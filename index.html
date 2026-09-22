@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlySky - Ensemble Weather Forecast</title>
+    <meta name="description" content="Ensemble weather forecast for drone pilots: probability ranges for precipitation, wind speed and wind gusts from multiple weather models, powered by Open-Meteo.">
+    <meta name="theme-color" content="#0d9488">
+    <!-- PWA manifest + icons -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .lang-select, .unit-select {
+            background: rgb(30 41 59 / 0.6);
+            border: 1px solid rgb(51 65 85 / 0.5);
+            color: rgb(226 232 240);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.375rem 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            outline: none;
+        }
+        .lang-select:focus, .unit-select:focus {
+            border-color: rgb(34 211 238);
+        }
+
+        /* Model / option chips */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgb(51 65 85 / 0.6);
+            background: rgb(15 23 42);
+            color: rgb(148 163 184);
+            font-size: 0.6875rem;
+            font-weight: 500;
+            transition: all 150ms;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .chip:hover { color: rgb(241 245 249); border-color: rgb(71 85 105); }
+        .chip.active {
+            color: rgb(34 211 238);
+            background: rgb(8 51 68 / 0.5);
+            border-color: rgb(21 94 117 / 0.6);
+        }
+        .chip .chip-count { font-family: 'JetBrains Mono', monospace; opacity: 0.7; }
+
+        .search-item.highlight { background: rgb(30 41 59 / 0.8); }
+
+        .legend-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 10px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
+
+    <!-- Top Header Navigation -->
+    <header class="h-16 bg-slate-900/80 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
+        <div class="flex items-center gap-2">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
+            </div>
+            <div>
+                <span class="font-bold tracking-tight text-white text-lg">FLY<span class="text-cyan-400">SKY</span></span>
+                <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono">ENSEMBLE WX</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div id="offlineBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-800/50 text-xs text-amber-300 font-medium">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span class="hidden sm:inline" data-i18n="offlineBadge">Offline — showing cached forecast</span>
+            </div>
+            <select class="lang-select" id="langSelect" data-i18n-aria-label="langSelectorAriaLabel" aria-label="Language">
+                <option value="en">English</option>
+                <option value="uk">Українська</option>
+                <option value="pt-BR">Português (BR)</option>
+            </select>
+            <button id="btnRefresh" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs transition shadow-lg shadow-cyan-500/20 disabled:opacity-50" data-i18n-title="refreshTitle" title="Reload forecast">
+                <i class="fa-solid fa-rotate" id="refreshIcon"></i>
+                <span class="hidden sm:inline" data-i18n="refreshBtn">Refresh</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Scrollable Content -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950">
+        <div class="max-w-7xl mx-auto space-y-6">
+
+            <!-- Location card: search, current location, favorites -->
+            <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <!-- Current location -->
+                    <div class="flex items-center gap-3 min-w-0 lg:flex-1">
+                        <div class="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shrink-0">
+                            <i class="fa-solid fa-location-dot text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider" data-i18n="currentLocationLabel">Location</p>
+                            <div class="flex items-center gap-2 min-w-0">
+                                <h2 id="locName" class="text-lg font-bold text-white truncate" data-i18n="noLocation">No location selected</h2>
+                                <button id="btnFavorite" class="hidden text-lg text-slate-500 hover:text-amber-400 transition shrink-0" data-i18n-title="favoriteAdd" title="Add to favorites">
+                                    <i class="fa-regular fa-star"></i>
+                                </button>
+                            </div>
+                            <p id="locDetails" class="text-[11px] text-slate-500 font-mono truncate"></p>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="flex items-center gap-2 lg:w-[28rem]">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <input id="searchInput" type="text" autocomplete="off" spellcheck="false"
+                                class="w-full pl-8 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                                data-i18n-placeholder="searchPlaceholder" placeholder="Search city or place…"
+                                role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+                            <span id="searchSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                            <ul id="searchResults" role="listbox" class="hidden absolute left-0 right-0 top-full mt-1 z-40 max-h-80 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1"></ul>
+                        </div>
+                        <button id="btnGeolocate" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 text-sm transition" data-i18n-title="geolocateTitle" title="Use my location">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Favorites -->
+                <div class="flex items-start gap-3 pt-3 border-t border-slate-800/80">
+                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pt-1.5 shrink-0">
+                        <i class="fa-solid fa-star text-amber-400"></i> <span data-i18n="favoritesLabel">Favorites</span>
+                    </span>
+                    <div id="favoritesList" class="flex flex-wrap gap-2"></div>
+                </div>
+            </section>
+
+            <!-- Forecast settings: models + units -->
+            <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-teal-400"></i>
+                        <span data-i18n="modelsTitle">Ensemble Models</span>
+                        <span id="membersTotal" class="text-[11px] font-mono text-slate-500"></span>
+                    </h3>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <label class="text-[11px] text-slate-400" for="windUnitSelect" data-i18n="windUnitLabel">Wind</label>
+                        <select id="windUnitSelect" class="unit-select">
+                            <option value="ms">m/s</option>
+                            <option value="kmh">km/h</option>
+                            <option value="kn">kn</option>
+                            <option value="mph">mph</option>
+                        </select>
+                        <label class="text-[11px] text-slate-400 ml-1" for="precipUnitSelect" data-i18n="precipUnitLabel">Precip.</label>
+                        <select id="precipUnitSelect" class="unit-select">
+                            <option value="mm">mm</option>
+                            <option value="inch">inch</option>
+                        </select>
+                        <button id="btnMembers" type="button" class="chip ml-1" data-i18n-title="membersToggleTitle" title="Draw every ensemble member as a thin line">
+                            <i class="fa-solid fa-wave-square"></i> <span data-i18n="membersToggle">Members</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="modelChips" class="flex flex-wrap gap-2"></div>
+                <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
+            </section>
+
+            <!-- Empty state (no location yet) -->
+            <section id="emptyState" class="hidden p-10 rounded-2xl bg-slate-900 border border-dashed border-slate-700 text-center space-y-3">
+                <i class="fa-solid fa-map-location-dot text-4xl text-cyan-400"></i>
+                <h3 class="text-base font-semibold text-slate-200" data-i18n="emptyTitle">Pick a location to see the forecast</h3>
+                <p class="text-xs text-slate-400" data-i18n="emptyDesc">Search for a city above, or use your current position.</p>
+            </section>
+
+            <!-- Summary stat cards -->
+            <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+
+            <!-- One chart card per weather parameter (built dynamically) -->
+            <div id="chartsContainer" class="space-y-6"></div>
+
+            <!-- Legend explainer -->
+            <section id="legendCard" class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.12)"></span> <span data-i18n="legendMinMax">Min – max (all members)</span></span>
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.25)"></span> <span data-i18n="legendP10P90">10–90% (80% likely)</span></span>
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.45)"></span> <span data-i18n="legendP25P75">25–75% (50% likely)</span></span>
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: #38bdf8"></span> <span data-i18n="legendMedian">Median</span></span>
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(148,163,184,0.35)"></span> <span data-i18n="legendProbability">Chance of precipitation (≥ 0.1 mm/h)</span></span>
+            </section>
+
+            <!-- Footer -->
+            <footer class="pb-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span>
+                    <span data-i18n="dataSourceLabel">Weather data by</span>
+                    <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300">Open-Meteo.com</a>
+                    (CC BY 4.0)
+                </span>
+                <span class="flex items-center gap-2">
+                    <span data-i18n="moreAppsLabel">More apps:</span>
+                    <a href="https://steelgar-code.github.io/FlyLog/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 transition font-medium">FlyLog</a>
+                    <span class="text-slate-700">&middot;</span>
+                    <a href="https://steelgar-code.github.io/FlySend/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 transition font-medium">FlySend</a>
+                    <span class="text-slate-700">&middot;</span>
+                    <a href="https://steelgar-code.github.io/FlyStock/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 transition font-medium">FlyStock</a>
+                </span>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Install prompt -->
+    <div id="installPrompt" class="hidden fixed bottom-4 left-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-xs">
+        <i class="fa-solid fa-download text-cyan-400"></i>
+        <span class="text-slate-200" data-i18n="installPromptText">Install FlySky for quick access</span>
+        <button id="installBtn" class="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition" data-i18n="installBtn">Install</button>
+        <button id="installDismiss" class="text-slate-500 hover:text-slate-300 transition" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Toasts -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+
+    <script>
+        // ================= Configuration =================
+        const FORECAST_URL = 'https://ensemble-api.open-meteo.com/v1/ensemble';
+        const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+        // Hours shown on every chart, starting from the current hour at the
+        // selected location.
+        const FORECAST_HOURS = 72;
+        // A forecast is re-fetched automatically once it's older than this.
+        const FORECAST_MAX_AGE_MS = 30 * 60 * 1000;
+        // An hour counts as "wet" for the chance-of-precipitation bars when a
+        // member predicts at least this much (in mm, before unit conversion).
+        const WET_HOUR_MM = 0.1;
+
+        // Ensemble models offered in the model picker. `members` is the member
+        // count including the control run, shown as a hint in the chip.
+        const MODELS = [
+            { id: 'icon_seamless', name: 'DWD ICON', members: 40 },
+            { id: 'gfs_seamless', name: 'NOAA GFS', members: 31 },
+            { id: 'ecmwf_ifs025', name: 'ECMWF IFS', members: 51 },
+            { id: 'ecmwf_aifs025', name: 'ECMWF AIFS', members: 51 },
+            { id: 'google_weathernext2_ensemble', name: 'Google WeatherNext 2', members: 64 },
+            { id: 'gem_global', name: 'GEM Global', members: 21 },
+            { id: 'ukmo_global_ensemble_20km', name: 'UK Met Office', members: 18 },
+            { id: 'bom_access_global_ensemble', name: 'BOM ACCESS', members: 18 }
+        ];
+        const DEFAULT_MODELS = ['icon_seamless', 'gfs_seamless', 'ecmwf_ifs025', 'google_weathernext2_ensemble'];
+
+        // Weather parameters, one chart each. `unit` picks which unit setting
+        // applies. Adding a new parameter only needs a new entry here plus its
+        // translation keys.
+        const PARAMS = [
+            { key: 'precipitation', unit: 'precip', icon: 'fa-cloud-rain', color: '56, 189, 248', titleKey: 'paramPrecipitation', probability: true, beginAtZero: true },
+            { key: 'wind_speed_10m', unit: 'wind', icon: 'fa-wind', color: '45, 212, 191', titleKey: 'paramWindSpeed', beginAtZero: true },
+            { key: 'wind_gusts_10m', unit: 'wind', icon: 'fa-tornado', color: '251, 191, 36', titleKey: 'paramWindGusts', beginAtZero: true }
+        ];
+
+        const UNIT_LABELS = {
+            wind: { ms: 'm/s', kmh: 'km/h', kn: 'kn', mph: 'mph' },
+            precip: { mm: 'mm', inch: 'in' }
+        };
+
+        // ================= Translations =================
+        const LANG_KEY = 'flysky_lang';
+        const translations = {
+            en: {
+                langSelectorAriaLabel: "Language",
+                offlineBadge: "Offline — showing cached forecast",
+                refreshBtn: "Refresh",
+                refreshTitle: "Reload forecast",
+                currentLocationLabel: "Location",
+                noLocation: "No location selected",
+                favoriteAdd: "Add to favorites",
+                favoriteRemove: "Remove from favorites",
+                searchPlaceholder: "Search city or place…",
+                searchNoResults: "No places found",
+                geolocateTitle: "Use my location",
+                myLocation: "My location",
+                favoritesLabel: "Favorites",
+                favoritesEmpty: "Tap the star next to a location to save it here.",
+                modelsTitle: "Ensemble Models",
+                membersTotal: "{count} members",
+                windUnitLabel: "Wind",
+                precipUnitLabel: "Precip.",
+                membersToggle: "Members",
+                membersToggleTitle: "Draw every ensemble member as a thin line",
+                emptyTitle: "Pick a location to see the forecast",
+                emptyDesc: "Search for a city above, or use your current position.",
+                paramPrecipitation: "Precipitation",
+                paramWindSpeed: "Wind Speed (10 m)",
+                paramWindGusts: "Wind Gusts (10 m)",
+                perHour: "per hour",
+                legendMinMax: "Min – max (all members)",
+                legendP10P90: "10–90% (80% likely)",
+                legendP25P75: "25–75% (50% likely)",
+                legendMedian: "Median",
+                legendProbability: "Chance of precipitation (≥ 0.1 mm/h)",
+                tooltipMedian: "Median",
+                tooltipRange80: "80% range",
+                tooltipRange50: "50% range",
+                tooltipMinMax: "Min – max",
+                tooltipChance: "Chance of rain",
+                tooltipMembers: "Members",
+                statPrecipTitle: "Precipitation, 72 h",
+                statPrecipValue: "{median} {unit}",
+                statPrecipSub: "80% range {lo}–{hi} {unit}",
+                statPrecipChance: "{pct}% chance of ≥ 1 mm",
+                statWindTitle: "Peak Wind",
+                statGustTitle: "Peak Gusts",
+                statPeakValue: "{value} {unit}",
+                statPeakSub: "median peak · 10% chance above {hi} {unit}",
+                statPeakWhen: "at {when}",
+                statNoData: "No data from selected models",
+                forecastMeta: "Updated {time} · {models} · next {hours} h, local time ({tz})",
+                forecastMetaCached: "Cached forecast from {time} · {models}",
+                chartNoData: "Selected models don't provide this parameter here.",
+                loading: "Loading forecast…",
+                toastSelectModel: "Select at least one model",
+                toastFavAdded: "Added {name} to favorites",
+                toastFavRemoved: "Removed {name} from favorites",
+                toastForecastError: "Could not load forecast: {error}",
+                toastSearchError: "Location search failed",
+                toastGeoError: "Could not get your location",
+                toastGeoUnsupported: "Geolocation is not supported by this browser",
+                toastUsingCache: "Offline — showing the last saved forecast",
+                dataSourceLabel: "Weather data by",
+                moreAppsLabel: "More apps:",
+                installPromptText: "Install FlySky for quick access",
+                installBtn: "Install",
+                removeFavorite: "Remove"
+            },
+            uk: {
+                langSelectorAriaLabel: "Мова",
+                offlineBadge: "Офлайн — показано збережений прогноз",
+                refreshBtn: "Оновити",
+                refreshTitle: "Перезавантажити прогноз",
+                currentLocationLabel: "Місце",
+                noLocation: "Місце не вибрано",
+                favoriteAdd: "Додати в обране",
+                favoriteRemove: "Видалити з обраного",
+                searchPlaceholder: "Пошук міста чи місця…",
+                searchNoResults: "Нічого не знайдено",
+                geolocateTitle: "Моє місцезнаходження",
+                myLocation: "Моє місцезнаходження",
+                favoritesLabel: "Обране",
+                favoritesEmpty: "Натисніть зірочку біля назви місця, щоб зберегти його тут.",
+                modelsTitle: "Ансамблеві моделі",
+                membersTotal: "{count} членів ансамблю",
+                windUnitLabel: "Вітер",
+                precipUnitLabel: "Опади",
+                membersToggle: "Члени",
+                membersToggleTitle: "Показати кожного члена ансамблю тонкою лінією",
+                emptyTitle: "Виберіть місце, щоб побачити прогноз",
+                emptyDesc: "Знайдіть місто вище або використайте поточне місцезнаходження.",
+                paramPrecipitation: "Опади",
+                paramWindSpeed: "Швидкість вітру (10 м)",
+                paramWindGusts: "Пориви вітру (10 м)",
+                perHour: "за годину",
+                legendMinMax: "Мін – макс (усі члени)",
+                legendP10P90: "10–90% (ймовірність 80%)",
+                legendP25P75: "25–75% (ймовірність 50%)",
+                legendMedian: "Медіана",
+                legendProbability: "Ймовірність опадів (≥ 0,1 мм/год)",
+                tooltipMedian: "Медіана",
+                tooltipRange80: "Діапазон 80%",
+                tooltipRange50: "Діапазон 50%",
+                tooltipMinMax: "Мін – макс",
+                tooltipChance: "Ймовірність опадів",
+                tooltipMembers: "Членів",
+                statPrecipTitle: "Опади за 72 год",
+                statPrecipValue: "{median} {unit}",
+                statPrecipSub: "діапазон 80%: {lo}–{hi} {unit}",
+                statPrecipChance: "{pct}% ймовірність ≥ 1 мм",
+                statWindTitle: "Максимальний вітер",
+                statGustTitle: "Максимальні пориви",
+                statPeakValue: "{value} {unit}",
+                statPeakSub: "медіана піку · 10% ймовірність понад {hi} {unit}",
+                statPeakWhen: "о {when}",
+                statNoData: "Немає даних від вибраних моделей",
+                forecastMeta: "Оновлено {time} · {models} · наступні {hours} год, місцевий час ({tz})",
+                forecastMetaCached: "Збережений прогноз від {time} · {models}",
+                chartNoData: "Вибрані моделі не надають цей параметр для цього місця.",
+                loading: "Завантаження прогнозу…",
+                toastSelectModel: "Виберіть хоча б одну модель",
+                toastFavAdded: "{name} додано в обране",
+                toastFavRemoved: "{name} видалено з обраного",
+                toastForecastError: "Не вдалося завантажити прогноз: {error}",
+                toastSearchError: "Помилка пошуку місця",
+                toastGeoError: "Не вдалося визначити місцезнаходження",
+                toastGeoUnsupported: "Браузер не підтримує геолокацію",
+                toastUsingCache: "Офлайн — показано останній збережений прогноз",
+                dataSourceLabel: "Дані про погоду:",
+                moreAppsLabel: "Інші застосунки:",
+                installPromptText: "Встановіть FlySky для швидкого доступу",
+                installBtn: "Встановити",
+                removeFavorite: "Видалити"
+            },
+            'pt-BR': {
+                langSelectorAriaLabel: "Idioma",
+                offlineBadge: "Offline — mostrando previsão salva",
+                refreshBtn: "Atualizar",
+                refreshTitle: "Recarregar previsão",
+                currentLocationLabel: "Local",
+                noLocation: "Nenhum local selecionado",
+                favoriteAdd: "Adicionar aos favoritos",
+                favoriteRemove: "Remover dos favoritos",
+                searchPlaceholder: "Buscar cidade ou lugar…",
+                searchNoResults: "Nenhum lugar encontrado",
+                geolocateTitle: "Usar minha localização",
+                myLocation: "Minha localização",
+                favoritesLabel: "Favoritos",
+                favoritesEmpty: "Toque na estrela ao lado de um local para salvá-lo aqui.",
+                modelsTitle: "Modelos de conjunto",
+                membersTotal: "{count} membros",
+                windUnitLabel: "Vento",
+                precipUnitLabel: "Precip.",
+                membersToggle: "Membros",
+                membersToggleTitle: "Desenhar cada membro do conjunto como uma linha fina",
+                emptyTitle: "Escolha um local para ver a previsão",
+                emptyDesc: "Busque uma cidade acima ou use sua posição atual.",
+                paramPrecipitation: "Precipitação",
+                paramWindSpeed: "Velocidade do vento (10 m)",
+                paramWindGusts: "Rajadas de vento (10 m)",
+                perHour: "por hora",
+                legendMinMax: "Mín – máx (todos os membros)",
+                legendP10P90: "10–90% (80% provável)",
+                legendP25P75: "25–75% (50% provável)",
+                legendMedian: "Mediana",
+                legendProbability: "Chance de precipitação (≥ 0,1 mm/h)",
+                tooltipMedian: "Mediana",
+                tooltipRange80: "Faixa 80%",
+                tooltipRange50: "Faixa 50%",
+                tooltipMinMax: "Mín – máx",
+                tooltipChance: "Chance de chuva",
+                tooltipMembers: "Membros",
+                statPrecipTitle: "Precipitação, 72 h",
+                statPrecipValue: "{median} {unit}",
+                statPrecipSub: "faixa 80%: {lo}–{hi} {unit}",
+                statPrecipChance: "{pct}% de chance de ≥ 1 mm",
+                statWindTitle: "Vento máximo",
+                statGustTitle: "Rajadas máximas",
+                statPeakValue: "{value} {unit}",
+                statPeakSub: "pico mediano · 10% de chance acima de {hi} {unit}",
+                statPeakWhen: "em {when}",
+                statNoData: "Sem dados dos modelos selecionados",
+                forecastMeta: "Atualizado {time} · {models} · próximas {hours} h, hora local ({tz})",
+                forecastMetaCached: "Previsão salva de {time} · {models}",
+                chartNoData: "Os modelos selecionados não fornecem este parâmetro aqui.",
+                loading: "Carregando previsão…",
+                toastSelectModel: "Selecione pelo menos um modelo",
+                toastFavAdded: "{name} adicionado aos favoritos",
+                toastFavRemoved: "{name} removido dos favoritos",
+                toastForecastError: "Não foi possível carregar a previsão: {error}",
+                toastSearchError: "Falha na busca de local",
+                toastGeoError: "Não foi possível obter sua localização",
+                toastGeoUnsupported: "Geolocalização não suportada por este navegador",
+                toastUsingCache: "Offline — mostrando a última previsão salva",
+                dataSourceLabel: "Dados meteorológicos por",
+                moreAppsLabel: "Mais apps:",
+                installPromptText: "Instale o FlySky para acesso rápido",
+                installBtn: "Instalar",
+                removeFavorite: "Remover"
+            }
+        };
+
+        // Geocoding API only understands 2-letter language codes.
+        const GEOCODING_LANG = { en: 'en', uk: 'uk', 'pt-BR': 'pt' };
+
+        function detectLang() {
+            try {
+                const saved = localStorage.getItem(LANG_KEY);
+                if (saved && translations[saved]) return saved;
+            } catch (err) {}
+            const nav = (navigator.language || 'en').toLowerCase();
+            if (nav.startsWith('uk')) return 'uk';
+            if (nav.startsWith('pt')) return 'pt-BR';
+            return 'en';
+        }
+        let currentLang = detectLang();
+
+        function t(key, vars) {
+            let str = (translations[currentLang] && translations[currentLang][key]) ?? translations.en[key] ?? key;
+            if (vars) Object.keys(vars).forEach(k => { str = str.split(`{${k}}`).join(vars[k]); });
+            return str;
+        }
+
+        function applyStaticTranslations() {
+            document.documentElement.lang = currentLang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.getAttribute('data-i18n'));
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+            });
+            document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+                el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+            });
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+            });
+        }
+
+        function setLang(lang) {
+            if (!translations[lang]) lang = 'en';
+            currentLang = lang;
+            try { localStorage.setItem(LANG_KEY, lang); } catch (err) {}
+            applyStaticTranslations();
+            document.getElementById('langSelect').value = currentLang;
+            renderAll();
+        }
+
+        // ================= Storage =================
+        // Safely read + parse a localStorage key, falling back to a default if the
+        // key is missing, storage is unavailable, or the stored JSON is corrupted.
+        function loadFromStorage(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw === null) return fallback;
+                const parsed = JSON.parse(raw);
+                return parsed ?? fallback;
+            } catch (err) {
+                return fallback;
+            }
+        }
+
+        function saveToStorage(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (err) {
+                console.error('FlySky: failed to save to local storage.', err);
+            }
+        }
+
+        function isValidLocation(loc) {
+            return loc && typeof loc === 'object' && typeof loc.name === 'string' &&
+                Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude);
+        }
+
+        // ================= Application State =================
+        let state = {
+            location: loadFromStorage('flysky_last_location', null),
+            favorites: loadFromStorage('flysky_favorites', []),
+            models: loadFromStorage('flysky_models', DEFAULT_MODELS),
+            windUnit: loadFromStorage('flysky_wind_unit', 'ms'),
+            precipUnit: loadFromStorage('flysky_precip_unit', 'mm'),
+            showMembers: loadFromStorage('flysky_show_members', false) === true,
+            // Last successful forecast: { key, fetchedAt, data }. Persisted so
+            // the app still shows something useful with no network.
+            forecast: loadFromStorage('flysky_forecast_cache', null),
+            forecastFromCache: false,
+            loading: false
+        };
+        if (!isValidLocation(state.location)) state.location = null;
+        if (!Array.isArray(state.favorites)) state.favorites = [];
+        state.favorites = state.favorites.filter(isValidLocation);
+        if (!Array.isArray(state.models)) state.models = DEFAULT_MODELS.slice();
+        state.models = state.models.filter(id => MODELS.some(m => m.id === id));
+        if (!state.models.length) state.models = DEFAULT_MODELS.slice();
+        if (!UNIT_LABELS.wind[state.windUnit]) state.windUnit = 'ms';
+        if (!UNIT_LABELS.precip[state.precipUnit]) state.precipUnit = 'mm';
+        if (state.forecast && (!state.forecast.data || !state.forecast.key)) state.forecast = null;
+        if (state.forecast) state.forecastFromCache = true;
+
+        function saveSettings() {
+            saveToStorage('flysky_last_location', state.location);
+            saveToStorage('flysky_favorites', state.favorites);
+            saveToStorage('flysky_models', state.models);
+            saveToStorage('flysky_wind_unit', state.windUnit);
+            saveToStorage('flysky_precip_unit', state.precipUnit);
+            saveToStorage('flysky_show_members', state.showMembers);
+        }
+
+        // Chart.js instances keyed by parameter key.
+        let chartInstances = {};
+        // Processed forecast (per-parameter stats), rebuilt whenever the
+        // forecast data changes.
+        let processed = null;
+
+        // ================= Helpers =================
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function roundCoord(n) {
+            return Math.round(n * 1000) / 1000;
+        }
+
+        // Favorites are matched by rounded coordinates, so the same place picked
+        // from search or from the favorites list is recognized as one location.
+        function locationKey(loc) {
+            return `${roundCoord(loc.latitude)},${roundCoord(loc.longitude)}`;
+        }
+
+        function isFavorite(loc) {
+            return !!loc && state.favorites.some(f => locationKey(f) === locationKey(loc));
+        }
+
+        function locationSubtitle(loc) {
+            return [loc.admin1, loc.country].filter(Boolean).join(', ');
+        }
+
+        function unitLabel(param) {
+            return param.unit === 'wind' ? UNIT_LABELS.wind[state.windUnit] : UNIT_LABELS.precip[state.precipUnit];
+        }
+
+        function formatValue(value, param) {
+            if (value === null || value === undefined || !Number.isFinite(value)) return '–';
+            let digits;
+            if (param.unit === 'precip') digits = state.precipUnit === 'inch' ? 2 : 1;
+            else digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
+            return value.toLocaleString(currentLang, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        }
+
+        // Forecast times come back as location-local "YYYY-MM-DDTHH:MM" strings.
+        // Treat them as UTC wall-clock values and always format in UTC, so the
+        // viewer's own timezone never shifts them.
+        function parseLocalTime(str) {
+            return new Date(str + ':00Z');
+        }
+
+        function formatTime(str, opts) {
+            return new Intl.DateTimeFormat(currentLang, { timeZone: 'UTC', ...opts }).format(parseLocalTime(str));
+        }
+
+        function formatHour(str) {
+            return formatTime(str, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+        }
+
+        function formatDayLabel(str) {
+            return formatTime(str, { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+
+        function formatDayHour(str) {
+            return formatTime(str, { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+        }
+
+        // Linear-interpolated quantile of an already sorted array.
+        function quantile(sorted, q) {
+            if (!sorted.length) return null;
+            const pos = (sorted.length - 1) * q;
+            const lo = Math.floor(pos);
+            const hi = Math.ceil(pos);
+            return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+        }
+
+        // ================= Forecast Data =================
+        function forecastKey() {
+            if (!state.location) return null;
+            return [locationKey(state.location), state.models.slice().sort().join('+'), state.windUnit, state.precipUnit].join('|');
+        }
+
+        function buildForecastUrl() {
+            const params = new URLSearchParams({
+                latitude: state.location.latitude,
+                longitude: state.location.longitude,
+                hourly: PARAMS.map(p => p.key).join(','),
+                models: state.models.join(','),
+                // 4 days so a full 72-hour window from "now" is always covered.
+                forecast_days: 4,
+                timezone: 'auto',
+                wind_speed_unit: state.windUnit,
+                precipitation_unit: state.precipUnit
+            });
+            return `${FORECAST_URL}?${params.toString()}`;
+        }
+
+        async function loadForecast({ force = false } = {}) {
+            if (!state.location) return;
+            if (!state.models.length) {
+                showToast(t('toastSelectModel'), 'warning');
+                return;
+            }
+            const key = forecastKey();
+            const fresh = state.forecast && state.forecast.key === key &&
+                Date.now() - state.forecast.fetchedAt < FORECAST_MAX_AGE_MS;
+            if (fresh && !force) {
+                state.forecastFromCache = false;
+                processForecast();
+                renderAll();
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const res = await fetch(buildForecastUrl());
+                const body = await res.json().catch(() => null);
+                if (!res.ok || !body || body.error) {
+                    throw new Error((body && body.reason) || `HTTP ${res.status}`);
+                }
+                // Ignore a response for a location/model set that's no longer current.
+                if (forecastKey() !== key) return;
+                state.forecast = { key, fetchedAt: Date.now(), data: body };
+                state.forecastFromCache = false;
+                saveToStorage('flysky_forecast_cache', state.forecast);
+            } catch (err) {
+                console.error('FlySky: forecast request failed.', err);
+                if (state.forecast && state.forecast.key === key) {
+                    state.forecastFromCache = true;
+                    showToast(t('toastUsingCache'), 'warning');
+                } else {
+                    showToast(t('toastForecastError', { error: err.message || String(err) }), 'warning');
+                }
+            } finally {
+                setLoading(false);
+            }
+            processForecast();
+            renderAll();
+        }
+
+        // Turns the raw API response into per-parameter ensemble statistics.
+        //
+        // With a single model, member series come back as e.g.
+        // `wind_speed_10m` (control) and `wind_speed_10m_member01`…; with
+        // several models each key also gets a `_<model>` suffix. Rather than
+        // depend on the exact naming, we pool every hourly series whose key
+        // starts with the parameter name, and attribute it to a model when the
+        // key ends with a known model id.
+        function processForecast() {
+            processed = null;
+            const fc = state.forecast;
+            if (!fc || fc.key !== forecastKey() || !fc.data || !fc.data.hourly) return;
+            const hourly = fc.data.hourly;
+            const times = hourly.time || [];
+
+            // Current hour at the forecast location, in the same local
+            // "YYYY-MM-DDTHH" form the API uses.
+            const offsetMs = (fc.data.utc_offset_seconds || 0) * 1000;
+            const nowLocal = new Date(Date.now() + offsetMs).toISOString().slice(0, 13);
+            let start = times.findIndex(tm => tm.slice(0, 13) >= nowLocal);
+            if (start < 0) start = Math.max(0, times.length - FORECAST_HOURS);
+            const end = Math.min(times.length, start + FORECAST_HOURS);
+            const windowTimes = times.slice(start, end);
+
+            const otherParamKeys = PARAMS.map(p => p.key);
+            const result = { times: windowTimes, params: {}, modelsWithData: new Set() };
+
+            PARAMS.forEach(param => {
+                const members = [];
+                Object.keys(hourly).forEach(k => {
+                    if (k !== param.key && !k.startsWith(param.key + '_')) return;
+                    // Don't let e.g. "wind_speed_10m" claim a longer param key.
+                    if (otherParamKeys.some(o => o !== param.key && o.startsWith(param.key) && (k === o || k.startsWith(o + '_')))) return;
+                    const series = hourly[k];
+                    if (!Array.isArray(series)) return;
+                    const values = series.slice(start, end);
+                    if (!values.some(v => v !== null && v !== undefined)) return;
+                    const model = MODELS.find(m => k.endsWith('_' + m.id));
+                    const modelId = model ? model.id : (state.models.length === 1 ? state.models[0] : null);
+                    if (modelId) result.modelsWithData.add(modelId);
+                    members.push({ key: k, model: modelId, values });
+                });
+
+                const stats = { min: [], p10: [], p25: [], median: [], p75: [], p90: [], max: [], chance: [], count: [] };
+                const wetThreshold = state.precipUnit === 'inch' ? WET_HOUR_MM / 25.4 : WET_HOUR_MM;
+                windowTimes.forEach((_, i) => {
+                    const vals = members.map(m => m.values[i]).filter(v => v !== null && v !== undefined && Number.isFinite(v));
+                    vals.sort((a, b) => a - b);
+                    stats.count.push(vals.length);
+                    stats.min.push(vals.length ? vals[0] : null);
+                    stats.p10.push(quantile(vals, 0.1));
+                    stats.p25.push(quantile(vals, 0.25));
+                    stats.median.push(quantile(vals, 0.5));
+                    stats.p75.push(quantile(vals, 0.75));
+                    stats.p90.push(quantile(vals, 0.9));
+                    stats.max.push(vals.length ? vals[vals.length - 1] : null);
+                    stats.chance.push(vals.length ? Math.round(vals.filter(v => v >= wetThreshold - 1e-9).length / vals.length * 100) : null);
+                });
+
+                result.params[param.key] = { members, stats, summary: summarize(param, members) };
+            });
+
+            processed = result;
+        }
+
+        // Per-member aggregates over the whole window, turned into ensemble
+        // statistics for the summary cards: total precipitation for rain, and
+        // the peak value for wind/gusts.
+        function summarize(param, members) {
+            if (!members.length) return null;
+            if (param.key === 'precipitation') {
+                const totals = members.map(m => m.values.reduce((sum, v) => sum + (Number.isFinite(v) ? v : 0), 0)).sort((a, b) => a - b);
+                const oneMm = state.precipUnit === 'inch' ? 1 / 25.4 : 1;
+                return {
+                    median: quantile(totals, 0.5),
+                    p10: quantile(totals, 0.1),
+                    p90: quantile(totals, 0.9),
+                    chance: Math.round(totals.filter(v => v >= oneMm - 1e-9).length / totals.length * 100)
+                };
+            }
+            const peaks = members
+                .map(m => m.values.filter(Number.isFinite))
+                .filter(vals => vals.length)
+                .map(vals => Math.max(...vals))
+                .sort((a, b) => a - b);
+            if (!peaks.length) return null;
+            return { median: quantile(peaks, 0.5), p90: quantile(peaks, 0.9) };
+        }
+
+        // ================= Rendering =================
+        function renderAll() {
+            renderLocation();
+            renderFavorites();
+            renderModelChips();
+            renderUnits();
+            renderMeta();
+            const hasLocation = !!state.location;
+            document.getElementById('emptyState').classList.toggle('hidden', hasLocation);
+            document.getElementById('statsGrid').classList.toggle('hidden', !hasLocation);
+            document.getElementById('chartsContainer').classList.toggle('hidden', !hasLocation);
+            document.getElementById('legendCard').classList.toggle('hidden', !hasLocation);
+            if (hasLocation) {
+                renderStats();
+                renderCharts();
+            }
+        }
+
+        function renderLocation() {
+            const nameEl = document.getElementById('locName');
+            const detailsEl = document.getElementById('locDetails');
+            const favBtn = document.getElementById('btnFavorite');
+            const loc = state.location;
+            if (!loc) {
+                nameEl.textContent = t('noLocation');
+                detailsEl.textContent = '';
+                favBtn.classList.add('hidden');
+                return;
+            }
+            nameEl.textContent = loc.name;
+            const coords = `${loc.latitude.toFixed(3)}°, ${loc.longitude.toFixed(3)}°`;
+            const elev = Number.isFinite(loc.elevation) ? ` · ${Math.round(loc.elevation)} m` : '';
+            const sub = locationSubtitle(loc);
+            detailsEl.textContent = (sub ? sub + ' · ' : '') + coords + elev;
+            favBtn.classList.remove('hidden');
+            const fav = isFavorite(loc);
+            favBtn.innerHTML = `<i class="${fav ? 'fa-solid' : 'fa-regular'} fa-star"></i>`;
+            favBtn.classList.toggle('text-amber-400', fav);
+            favBtn.classList.toggle('text-slate-500', !fav);
+            favBtn.title = t(fav ? 'favoriteRemove' : 'favoriteAdd');
+            favBtn.setAttribute('aria-label', favBtn.title);
+            favBtn.setAttribute('aria-pressed', fav ? 'true' : 'false');
+        }
+
+        function renderFavorites() {
+            const list = document.getElementById('favoritesList');
+            if (!state.favorites.length) {
+                list.innerHTML = `<span class="text-xs text-slate-500 pt-1">${escapeHtml(t('favoritesEmpty'))}</span>`;
+                return;
+            }
+            const currentKey = state.location ? locationKey(state.location) : null;
+            list.innerHTML = state.favorites.map((f, i) => {
+                const active = locationKey(f) === currentKey;
+                const sub = locationSubtitle(f);
+                return `<span class="chip ${active ? 'active' : ''} pr-1" title="${escapeHtml(sub)}">
+                    <button type="button" data-fav-select="${i}" class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-location-dot text-[10px]"></i>${escapeHtml(f.name)}
+                    </button>
+                    <button type="button" data-fav-remove="${i}" class="px-1 text-slate-500 hover:text-rose-400 transition" aria-label="${escapeHtml(t('removeFavorite'))}" title="${escapeHtml(t('removeFavorite'))}">
+                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                </span>`;
+            }).join('');
+        }
+
+        function renderModelChips() {
+            const wrap = document.getElementById('modelChips');
+            wrap.innerHTML = MODELS.map(m => {
+                const active = state.models.includes(m.id);
+                const missing = active && processed && !state.loading && processed.modelsWithData.size && !processed.modelsWithData.has(m.id);
+                return `<button type="button" class="chip ${active ? 'active' : ''}" data-model="${m.id}" aria-pressed="${active}">
+                    <i class="fa-solid ${active ? 'fa-square-check' : 'fa-square'} text-[10px]"></i>
+                    ${escapeHtml(m.name)} <span class="chip-count">${m.members}</span>
+                    ${missing ? '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[10px]" title="No data"></i>' : ''}
+                </button>`;
+            }).join('');
+            const total = MODELS.filter(m => state.models.includes(m.id)).reduce((s, m) => s + m.members, 0);
+            document.getElementById('membersTotal').textContent = total ? t('membersTotal', { count: total }) : '';
+            document.getElementById('btnMembers').classList.toggle('active', state.showMembers);
+        }
+
+        function renderUnits() {
+            document.getElementById('windUnitSelect').value = state.windUnit;
+            document.getElementById('precipUnitSelect').value = state.precipUnit;
+        }
+
+        function renderMeta() {
+            const el = document.getElementById('forecastMeta');
+            const fc = state.forecast;
+            if (!state.location || !fc || fc.key !== forecastKey()) {
+                el.textContent = state.loading ? t('loading') : '';
+                return;
+            }
+            const time = new Intl.DateTimeFormat(currentLang, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
+            const models = MODELS.filter(m => state.models.includes(m.id)).map(m => m.name).join(', ');
+            const tz = fc.data.timezone_abbreviation || fc.data.timezone || 'UTC';
+            el.textContent = state.loading ? t('loading') :
+                state.forecastFromCache ? t('forecastMetaCached', { time, models }) :
+                t('forecastMeta', { time, models, hours: FORECAST_HOURS, tz });
+        }
+
+        function statCard({ title, icon, color, value, sub, extra }) {
+            return `<div class="p-4 rounded-2xl bg-slate-900 border border-slate-800/80 relative overflow-hidden shadow-sm">
+                <div class="flex justify-between items-start">
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">${escapeHtml(title)}</p>
+                        <h3 class="text-2xl font-extrabold text-white font-mono mt-1">${escapeHtml(value)}</h3>
+                    </div>
+                    <div class="p-2.5 rounded-xl border shrink-0" style="color: rgb(${color}); background: rgba(${color}, 0.1); border-color: rgba(${color}, 0.3)">
+                        <i class="fa-solid ${icon} text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-slate-400 space-y-0.5">
+                    <p>${escapeHtml(sub)}</p>
+                    ${extra ? `<p class="font-medium" style="color: rgb(${color})">${escapeHtml(extra)}</p>` : ''}
+                </div>
+            </div>`;
+        }
+
+        function renderStats() {
+            const grid = document.getElementById('statsGrid');
+            if (!processed) {
+                grid.innerHTML = PARAMS.map(p => statCard({ title: t(p.titleKey), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData') })).join('');
+                return;
+            }
+            grid.innerHTML = PARAMS.map(param => {
+                const data = processed.params[param.key];
+                const s = data && data.summary;
+                const unit = unitLabel(param);
+                if (!s) return statCard({ title: t(param.titleKey), icon: param.icon, color: param.color, value: '–', sub: t('statNoData') });
+                if (param.key === 'precipitation') {
+                    return statCard({
+                        title: t('statPrecipTitle'), icon: param.icon, color: param.color,
+                        value: t('statPrecipValue', { median: formatValue(s.median, param), unit }),
+                        sub: t('statPrecipSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param), unit }),
+                        extra: t('statPrecipChance', { pct: s.chance })
+                    });
+                }
+                // Time of the highest point of the median curve.
+                const med = data.stats.median;
+                let peakIdx = -1;
+                med.forEach((v, i) => { if (Number.isFinite(v) && (peakIdx < 0 || v > med[peakIdx])) peakIdx = i; });
+                return statCard({
+                    title: t(param.key === 'wind_gusts_10m' ? 'statGustTitle' : 'statWindTitle'), icon: param.icon, color: param.color,
+                    value: t('statPeakValue', { value: formatValue(s.median, param), unit }),
+                    sub: t('statPeakSub', { hi: formatValue(s.p90, param), unit }),
+                    extra: peakIdx >= 0 ? t('statPeakWhen', { when: formatDayHour(processed.times[peakIdx]) }) : ''
+                });
+            }).join('');
+        }
+
+        // Chart.js plugin: dashed separators at local midnight with the day name,
+        // so a 72-hour hourly axis stays readable.
+        const dayDividerPlugin = {
+            id: 'dayDividers',
+            beforeDatasetsDraw(chart) {
+                const times = chart.$times;
+                if (!times || !times.length) return;
+                const { ctx, chartArea, scales } = chart;
+                const x = scales.x;
+                ctx.save();
+                ctx.font = '600 10px Inter, system-ui, sans-serif';
+                ctx.textBaseline = 'top';
+                const dayStarts = [0];
+                times.forEach((tm, i) => { if (i > 0 && tm.slice(11, 13) === '00') dayStarts.push(i); });
+                dayStarts.forEach((idx, n) => {
+                    const px = x.getPixelForValue(idx);
+                    if (idx > 0) {
+                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+                        ctx.setLineDash([4, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(px, chartArea.top);
+                        ctx.lineTo(px, chartArea.bottom);
+                        ctx.stroke();
+                    }
+                    // Label only if there's room before the next day starts.
+                    const nextPx = n + 1 < dayStarts.length ? x.getPixelForValue(dayStarts[n + 1]) : chartArea.right;
+                    if (nextPx - px > 60) {
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.fillText(formatDayLabel(times[idx]), px + 6, chartArea.top + 4);
+                    }
+                });
+                ctx.restore();
+            }
+        };
+
+        function chartCardHtml(param) {
+            return `<div class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4" id="chartWrap-${param.key}">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid ${param.icon}" style="color: rgb(${param.color})"></i>
+                        <span id="chartTitle-${param.key}"></span>
+                        <span id="chartUnit-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
+                    </h3>
+                    <span id="chartMembers-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
+                </div>
+                <div class="h-64 sm:h-72 relative">
+                    <canvas id="chart-${param.key}"></canvas>
+                    <div id="chartOverlay-${param.key}" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 bg-slate-900/70 rounded-xl"></div>
+                </div>
+            </div>`;
+        }
+
+        function buildDatasets(param, data) {
+            const c = param.color;
+            const s = data ? data.stats : { min: [], max: [], p10: [], p90: [], p25: [], p75: [], median: [], chance: [] };
+            // Monotone interpolation never overshoots the data, so smoothed
+            // curves can't dip below zero between two dry hours.
+            const line = { cubicInterpolationMode: 'monotone', spanGaps: true, pointRadius: 0 };
+            const band = (label, values, fill, alpha) => ({
+                ...line, label, data: values, fill, backgroundColor: `rgba(${c}, ${alpha})`,
+                borderWidth: 0, pointHoverRadius: 0, order: 2
+            });
+            // Filled bands use `fill: '-1'` (down to the previous dataset), so
+            // the order of the first six datasets matters.
+            const datasets = [
+                band('min', s.min, false, 0),
+                band('max', s.max, '-1', 0.12),
+                band('p10', s.p10, false, 0),
+                band('p90', s.p90, '-1', 0.18),
+                band('p25', s.p25, false, 0),
+                band('p75', s.p75, '-1', 0.28),
+                {
+                    ...line, label: 'median', data: s.median, fill: false, borderColor: `rgb(${c})`, borderWidth: 2,
+                    pointHoverRadius: 4, pointBackgroundColor: `rgb(${c})`, order: 1
+                }
+            ];
+            if (param.probability) {
+                datasets.push({
+                    type: 'bar', label: 'chance', data: s.chance, yAxisID: 'yChance',
+                    backgroundColor: 'rgba(148, 163, 184, 0.16)', borderWidth: 0, barPercentage: 1, categoryPercentage: 0.9, order: 4
+                });
+            }
+            if (state.showMembers && data) {
+                data.members.forEach(m => {
+                    datasets.push({
+                        ...line, label: 'member', data: m.values, fill: false, borderColor: `rgba(${c}, 0.18)`, borderWidth: 1,
+                        pointHoverRadius: 0, order: 3
+                    });
+                });
+            }
+            return datasets;
+        }
+
+        function tooltipLines(param, idx) {
+            if (!processed) return [];
+            const data = processed.params[param.key];
+            if (!data) return [];
+            const s = data.stats;
+            const u = unitLabel(param);
+            const f = v => formatValue(v, param);
+            const lines = [
+                `${t('tooltipMedian')}: ${f(s.median[idx])} ${u}`,
+                `${t('tooltipRange50')}: ${f(s.p25[idx])} – ${f(s.p75[idx])} ${u}`,
+                `${t('tooltipRange80')}: ${f(s.p10[idx])} – ${f(s.p90[idx])} ${u}`,
+                `${t('tooltipMinMax')}: ${f(s.min[idx])} – ${f(s.max[idx])} ${u}`
+            ];
+            if (param.probability && s.chance[idx] !== null) lines.push(`${t('tooltipChance')}: ${s.chance[idx]}%`);
+            lines.push(`${t('tooltipMembers')}: ${s.count[idx]}`);
+            return lines;
+        }
+
+        function renderCharts() {
+            const container = document.getElementById('chartsContainer');
+            PARAMS.forEach(param => {
+                if (!document.getElementById(`chartWrap-${param.key}`)) {
+                    container.insertAdjacentHTML('beforeend', chartCardHtml(param));
+                }
+                const data = processed ? processed.params[param.key] : null;
+                const hasData = !!(data && data.members.length);
+                document.getElementById(`chartTitle-${param.key}`).textContent = t(param.titleKey);
+                document.getElementById(`chartUnit-${param.key}`).textContent =
+                    param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
+                document.getElementById(`chartMembers-${param.key}`).textContent =
+                    hasData ? t('membersTotal', { count: data.members.length }) : '';
+
+                const overlay = document.getElementById(`chartOverlay-${param.key}`);
+                const overlayText = state.loading ? t('loading') : (!hasData ? t('chartNoData') : '');
+                overlay.classList.toggle('hidden', !overlayText);
+                overlay.innerHTML = overlayText
+                    ? `${state.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-2"></i>' : ''}${escapeHtml(overlayText)}`
+                    : '';
+
+                if (typeof Chart === 'undefined') return;
+                const times = processed ? processed.times : [];
+                const labels = times.map(formatHour);
+                const datasets = buildDatasets(param, hasData ? data : null);
+
+                let chart = chartInstances[param.key];
+                if (chart) {
+                    chart.$times = times;
+                    chart.data.labels = labels;
+                    chart.data.datasets = datasets;
+                    chart.options.scales.yChance.display = !!param.probability;
+                    chart.update('none');
+                    return;
+                }
+                try {
+                    const ctx = document.getElementById(`chart-${param.key}`).getContext('2d');
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels, datasets },
+                        plugins: [dayDividerPlugin],
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                    borderColor: 'rgba(51, 65, 85, 0.8)',
+                                    borderWidth: 1,
+                                    titleColor: '#e2e8f0',
+                                    bodyColor: '#cbd5e1',
+                                    padding: 10,
+                                    displayColors: false,
+                                    // Only the median point drives the tooltip;
+                                    // its body is the full ensemble breakdown.
+                                    filter: item => item.dataset.label === 'median',
+                                    callbacks: {
+                                        title: items => items.length ? formatDayHour(chart.$times[items[0].dataIndex]) : '',
+                                        label: () => null,
+                                        afterBody: items => items.length ? tooltipLines(param, items[0].dataIndex) : []
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: { color: '#94a3b8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 } }
+                                },
+                                y: {
+                                    beginAtZero: !!param.beginAtZero,
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: { color: '#94a3b8', font: { size: 10 } }
+                                },
+                                yChance: {
+                                    display: !!param.probability,
+                                    position: 'right',
+                                    min: 0,
+                                    max: 100,
+                                    grid: { display: false },
+                                    ticks: { color: '#64748b', font: { size: 10 }, stepSize: 25, callback: v => `${v}%` }
+                                }
+                            }
+                        }
+                    });
+                    chart.$times = times;
+                    chartInstances[param.key] = chart;
+                } catch (err) {
+                    console.error('FlySky: chart initialization failed.', err);
+                }
+            });
+        }
+
+        function setLoading(loading) {
+            state.loading = loading;
+            document.getElementById('btnRefresh').disabled = loading;
+            document.getElementById('refreshIcon').classList.toggle('fa-spin', loading);
+            renderMeta();
+            if (state.location) {
+                renderStats();
+                renderCharts();
+            }
+        }
+
+        // ================= Location & Favorites =================
+        function selectLocation(loc) {
+            state.location = {
+                name: loc.name,
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                elevation: Number.isFinite(loc.elevation) ? loc.elevation : undefined,
+                admin1: loc.admin1 || '',
+                country: loc.country || '',
+                country_code: loc.country_code || ''
+            };
+            saveSettings();
+            processed = null;
+            processForecast();
+            renderAll();
+            loadForecast();
+        }
+
+        function toggleFavorite() {
+            const loc = state.location;
+            if (!loc) return;
+            if (isFavorite(loc)) {
+                state.favorites = state.favorites.filter(f => locationKey(f) !== locationKey(loc));
+                showToast(t('toastFavRemoved', { name: loc.name }));
+            } else {
+                state.favorites.push({ ...loc });
+                showToast(t('toastFavAdded', { name: loc.name }), 'success');
+            }
+            saveSettings();
+            renderLocation();
+            renderFavorites();
+        }
+
+        function setupFavorites() {
+            document.getElementById('btnFavorite').addEventListener('click', toggleFavorite);
+            document.getElementById('favoritesList').addEventListener('click', e => {
+                const sel = e.target.closest('[data-fav-select]');
+                const rem = e.target.closest('[data-fav-remove]');
+                if (rem) {
+                    const fav = state.favorites[Number(rem.dataset.favRemove)];
+                    if (!fav) return;
+                    state.favorites.splice(Number(rem.dataset.favRemove), 1);
+                    saveSettings();
+                    showToast(t('toastFavRemoved', { name: fav.name }));
+                    renderLocation();
+                    renderFavorites();
+                } else if (sel) {
+                    const fav = state.favorites[Number(sel.dataset.favSelect)];
+                    if (fav) selectLocation(fav);
+                }
+            });
+        }
+
+        // ================= Search =================
+        let searchResults = [];
+        let searchHighlight = -1;
+        let searchTimer = null;
+        let searchSeq = 0;
+
+        function closeSearch() {
+            const list = document.getElementById('searchResults');
+            list.classList.add('hidden');
+            document.getElementById('searchInput').setAttribute('aria-expanded', 'false');
+            searchHighlight = -1;
+        }
+
+        function renderSearchResults() {
+            const list = document.getElementById('searchResults');
+            const input = document.getElementById('searchInput');
+            if (!searchResults.length) {
+                list.innerHTML = `<li class="px-3 py-2 text-xs text-slate-500">${escapeHtml(t('searchNoResults'))}</li>`;
+            } else {
+                list.innerHTML = searchResults.map((r, i) => {
+                    const sub = locationSubtitle(r);
+                    const fav = isFavorite(r);
+                    return `<li role="option" id="searchOpt-${i}" data-result="${i}" aria-selected="${i === searchHighlight}"
+                        class="search-item ${i === searchHighlight ? 'highlight' : ''} px-3 py-2 cursor-pointer hover:bg-slate-800/80 flex items-center gap-2">
+                        <i class="fa-solid ${fav ? 'fa-star text-amber-400' : 'fa-location-dot text-slate-500'} text-xs w-4 text-center"></i>
+                        <span class="min-w-0">
+                            <span class="block text-sm text-slate-100 truncate">${escapeHtml(r.name)}</span>
+                            <span class="block text-[11px] text-slate-500 truncate">${escapeHtml(sub)}</span>
+                        </span>
+                        ${r.country_code ? `<span class="ml-auto text-[10px] font-mono text-slate-500">${escapeHtml(r.country_code)}</span>` : ''}
+                    </li>`;
+                }).join('');
+            }
+            list.classList.remove('hidden');
+            input.setAttribute('aria-expanded', 'true');
+            if (searchHighlight >= 0) {
+                input.setAttribute('aria-activedescendant', `searchOpt-${searchHighlight}`);
+                document.getElementById(`searchOpt-${searchHighlight}`)?.scrollIntoView({ block: 'nearest' });
+            } else {
+                input.removeAttribute('aria-activedescendant');
+            }
+        }
+
+        async function runSearch(query) {
+            const seq = ++searchSeq;
+            const spinner = document.getElementById('searchSpinner');
+            spinner.classList.remove('hidden');
+            try {
+                const params = new URLSearchParams({ name: query, count: 10, language: GEOCODING_LANG[currentLang] || 'en', format: 'json' });
+                const res = await fetch(`${GEOCODING_URL}?${params.toString()}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const body = await res.json();
+                if (seq !== searchSeq) return;
+                searchResults = (body.results || []).filter(isValidLocation);
+                searchHighlight = searchResults.length ? 0 : -1;
+                renderSearchResults();
+            } catch (err) {
+                if (seq !== searchSeq) return;
+                console.error('FlySky: geocoding failed.', err);
+                showToast(t('toastSearchError'), 'warning');
+            } finally {
+                if (seq === searchSeq) spinner.classList.add('hidden');
+            }
+        }
+
+        function pickSearchResult(i) {
+            const r = searchResults[i];
+            if (!r) return;
+            const input = document.getElementById('searchInput');
+            input.value = '';
+            closeSearch();
+            input.blur();
+            selectLocation(r);
+        }
+
+        function setupSearch() {
+            const input = document.getElementById('searchInput');
+            const list = document.getElementById('searchResults');
+            input.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                const q = input.value.trim();
+                if (q.length < 2) {
+                    searchSeq++;
+                    document.getElementById('searchSpinner').classList.add('hidden');
+                    closeSearch();
+                    return;
+                }
+                searchTimer = setTimeout(() => runSearch(q), 300);
+            });
+            input.addEventListener('keydown', e => {
+                const open = !list.classList.contains('hidden');
+                if (e.key === 'ArrowDown' && open && searchResults.length) {
+                    e.preventDefault();
+                    searchHighlight = (searchHighlight + 1) % searchResults.length;
+                    renderSearchResults();
+                } else if (e.key === 'ArrowUp' && open && searchResults.length) {
+                    e.preventDefault();
+                    searchHighlight = (searchHighlight - 1 + searchResults.length) % searchResults.length;
+                    renderSearchResults();
+                } else if (e.key === 'Enter' && open && searchHighlight >= 0) {
+                    e.preventDefault();
+                    pickSearchResult(searchHighlight);
+                } else if (e.key === 'Escape') {
+                    closeSearch();
+                }
+            });
+            input.addEventListener('focus', () => {
+                if (input.value.trim().length >= 2 && searchResults.length) renderSearchResults();
+            });
+            // mousedown (not click) so it fires before the input's blur closes the list.
+            list.addEventListener('mousedown', e => {
+                const item = e.target.closest('[data-result]');
+                if (!item) return;
+                e.preventDefault();
+                pickSearchResult(Number(item.dataset.result));
+            });
+            document.addEventListener('click', e => {
+                if (!e.target.closest('#searchResults') && e.target !== input) closeSearch();
+            });
+
+            document.getElementById('btnGeolocate').addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    showToast(t('toastGeoUnsupported'), 'warning');
+                    return;
+                }
+                const icon = document.querySelector('#btnGeolocate i');
+                icon.classList.add('fa-spin');
+                navigator.geolocation.getCurrentPosition(pos => {
+                    icon.classList.remove('fa-spin');
+                    selectLocation({
+                        name: t('myLocation'),
+                        latitude: roundCoord(pos.coords.latitude),
+                        longitude: roundCoord(pos.coords.longitude)
+                    });
+                }, () => {
+                    icon.classList.remove('fa-spin');
+                    showToast(t('toastGeoError'), 'warning');
+                }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 });
+            });
+        }
+
+        // ================= Settings controls =================
+        function setupControls() {
+            document.getElementById('modelChips').addEventListener('click', e => {
+                const chip = e.target.closest('[data-model]');
+                if (!chip) return;
+                const id = chip.dataset.model;
+                if (state.models.includes(id)) {
+                    if (state.models.length === 1) {
+                        showToast(t('toastSelectModel'), 'warning');
+                        return;
+                    }
+                    state.models = state.models.filter(m => m !== id);
+                } else {
+                    // Keep the picker order so the request/cache key is stable.
+                    state.models = MODELS.map(m => m.id).filter(m => m === id || state.models.includes(m));
+                }
+                saveSettings();
+                processed = null;
+                renderAll();
+                loadForecast();
+            });
+            document.getElementById('windUnitSelect').addEventListener('change', e => {
+                state.windUnit = e.target.value;
+                saveSettings();
+                processed = null;
+                loadForecast();
+            });
+            document.getElementById('precipUnitSelect').addEventListener('change', e => {
+                state.precipUnit = e.target.value;
+                saveSettings();
+                processed = null;
+                loadForecast();
+            });
+            document.getElementById('btnMembers').addEventListener('click', () => {
+                state.showMembers = !state.showMembers;
+                saveSettings();
+                renderModelChips();
+                renderCharts();
+            });
+            document.getElementById('btnRefresh').addEventListener('click', () => loadForecast({ force: true }));
+            document.getElementById('langSelect').addEventListener('change', e => setLang(e.target.value));
+        }
+
+        // --- Offline indicator
+        function setupOfflineIndicator() {
+            const badge = document.getElementById('offlineBadge');
+            function update() {
+                badge.classList.toggle('hidden', navigator.onLine);
+                badge.classList.toggle('flex', !navigator.onLine);
+            }
+            window.addEventListener('online', () => { update(); loadForecast(); });
+            window.addEventListener('offline', update);
+            update();
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const bgClass = type === 'success' ? 'bg-emerald-950 border-emerald-800 text-emerald-300' :
+                            type === 'warning' ? 'bg-amber-950 border-amber-800 text-amber-300' :
+                            'bg-slate-900 border-slate-700 text-slate-200';
+
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-400' :
+                         type === 'warning' ? 'fa-triangle-exclamation text-amber-400' :
+                         'fa-circle-info text-cyan-400';
+
+            const toast = document.createElement('div');
+            toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl border text-xs shadow-xl transition-all duration-300 transform translate-y-2 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span>`;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ================= Init =================
+        document.addEventListener('DOMContentLoaded', () => {
+            applyStaticTranslations();
+            document.getElementById('langSelect').value = currentLang;
+            setupSearch();
+            setupFavorites();
+            setupControls();
+            setupOfflineIndicator();
+            processForecast();
+            renderAll();
+            loadForecast();
+            // Keep the 72-hour window sliding forward while the page stays open.
+            setInterval(() => {
+                if (document.visibilityState === 'visible') loadForecast();
+            }, 10 * 60 * 1000);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') loadForecast();
+            });
+        });
+
+        // Register the offline service worker (http/https only, not file://).
+        if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.warn('FlySky: service worker registration failed (offline asset caching unavailable).', err);
+                });
+            });
+        }
+
+        // ================= Install prompt =================
+        let deferredInstallPrompt = null;
+        const installPromptEl = document.getElementById('installPrompt');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            try { if (localStorage.getItem('pwa-install-dismissed')) return; } catch (err) {}
+            if (window.matchMedia('(display-mode: standalone)').matches) return;
+            installPromptEl.classList.remove('hidden');
+        });
+
+        document.getElementById('installBtn').addEventListener('click', () => {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt.userChoice.then((choice) => {
+                if (choice.outcome === 'accepted') installPromptEl.classList.add('hidden');
+                deferredInstallPrompt = null;
+            });
+        });
+
+        document.getElementById('installDismiss').addEventListener('click', () => {
+            installPromptEl.classList.add('hidden');
+            try { localStorage.setItem('pwa-install-dismissed', 'true'); } catch (err) {}
+        });
+    </script>
+</body>
+</html>

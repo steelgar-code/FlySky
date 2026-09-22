@@ -1,0 +1,27 @@
+{
+  "short_name": "FlySky",
+  "name": "FlySky - Ensemble Weather Forecast",
+  "description": "Ensemble weather forecast ranges for precipitation, wind and gusts.",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#020617",
+  "theme_color": "#0d9488",
+  "display": "standalone"
+}
