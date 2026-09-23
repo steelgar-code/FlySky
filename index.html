@@ -1223,7 +1223,9 @@
         // ================= Forecast Data =================
         function forecastKey() {
             if (!state.location) return null;
-            return [state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
+            // "v2": bumps the cache format, so forecasts saved by the version that
+            // mis-split ensemble responses are refetched instead of reused.
+            return ['v2', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
         }
 
         // Forecast days (counted from local midnight today) needed to cover
@@ -1286,19 +1288,65 @@
             }
         }
 
+        // Names the ensemble API uses for a model in multi-model responses
+        // when they differ from the id we request (the forecast API echoes
+        // the requested ids). Anything not listed is still matched by prefix
+        // and, failing that, by request order.
+        const RESPONSE_MODEL_ALIASES = {
+            icon_seamless: ['icon_seamless_eps'],
+            ecmwf_ifs025: ['ecmwf_ifs025_ensemble'],
+            ecmwf_aifs025: ['ecmwf_aifs025_ensemble'],
+            gfs_seamless: ['ncep_gefs_seamless', 'gfs_seamless_ensemble'],
+            gem_global: ['gem_global_ensemble']
+        };
+
         // Splits a multi-model response into one response per model. With
-        // several models the API suffixes every column with the model id
-        // ("wind_speed_10m_member01_icon_seamless"); stripping it gives the
-        // same shape as a single-model response.
+        // several models every column carries a model suffix, e.g.
+        // "wind_speed_10m_member01_icon_seamless_eps". The suffix is read from
+        // the column name itself (after the variable and optional member
+        // part) and mapped back to the requested model: exact id, known
+        // alias, prefix, then the order models were requested in (the API
+        // answers in that order). Returns the per-model responses plus the
+        // models no column could be attributed to.
         function splitCombined(body, models) {
-            const byLength = models.slice().sort((a, b) => b.length - a.length);
-            const hourly = Object.fromEntries(models.map(id => [id, { time: body.hourly.time }]));
+            const varsByLength = PARAMS.map(p => p.key).sort((a, b) => b.length - a.length);
+            const columns = [];     // { base, suffix, series }
+            const suffixes = [];    // distinct response model names, in order of appearance
             Object.keys(body.hourly).forEach(k => {
                 if (k === 'time') return;
-                const id = byLength.find(m => k.endsWith('_' + m));
-                if (id) hourly[id][k.slice(0, -(id.length + 1))] = body.hourly[k];
+                const v = varsByLength.find(x => k.startsWith(x + '_'));
+                if (!v) return;
+                const rest = k.slice(v.length + 1);
+                const m = rest.match(/^(member\d+)_(.+)$/);
+                const suffix = m ? m[2] : rest;
+                columns.push({ base: m ? `${v}_${m[1]}` : v, suffix, series: body.hourly[k] });
+                if (!suffixes.includes(suffix)) suffixes.push(suffix);
             });
-            return models.map(id => ({ model: id, data: { ...body, hourly: hourly[id] } }));
+
+            const modelOf = {};     // response suffix -> requested model id
+            const taken = new Set();
+            const assign = (suffix, id) => { modelOf[suffix] = id; taken.add(id); };
+            const free = () => suffixes.filter(sfx => !(sfx in modelOf));
+            free().forEach(sfx => { if (models.includes(sfx) && !taken.has(sfx)) assign(sfx, sfx); });
+            free().forEach(sfx => {
+                const id = models.find(m => !taken.has(m) && (RESPONSE_MODEL_ALIASES[m] || []).includes(sfx));
+                if (id) assign(sfx, id);
+            });
+            free().forEach(sfx => {
+                const id = models.slice().sort((a, b) => b.length - a.length)
+                    .find(m => !taken.has(m) && (sfx.startsWith(m + '_') || m.startsWith(sfx + '_')));
+                if (id) assign(sfx, id);
+            });
+            const leftModels = models.filter(m => !taken.has(m));
+            free().forEach((sfx, i) => { if (leftModels[i]) assign(sfx, leftModels[i]); });
+
+            const hourly = Object.fromEntries(models.map(id => [id, { time: body.hourly.time }]));
+            columns.forEach(c => { const id = modelOf[c.suffix]; if (id) hourly[id][c.base] = c.series; });
+            const missing = models.filter(id => Object.keys(hourly[id]).length <= 1);
+            return {
+                results: models.filter(id => !missing.includes(id)).map(id => ({ model: id, data: { ...body, hourly: hourly[id] } })),
+                missing
+            };
         }
 
         // Fetches all selected models: first as one combined request; if that
@@ -1309,7 +1357,14 @@
             if (models.length > 1) {
                 try {
                     const r = await requestForecast(mode, models, days, signal);
-                    if (r.data) return splitCombined(r.data, models);
+                    if (r.data) {
+                        const split = splitCombined(r.data, models);
+                        if (!split.missing.length) return split.results;
+                        // Safety net: any model none of the columns could be matched to
+                        // is fetched on its own rather than shown as failed.
+                        console.warn('FlySky: no data matched in combined response for', split.missing, '- fetching them individually.');
+                        return split.results.concat(await fetchModelsOneByOne(mode, split.missing, days, signal));
+                    }
                     console.warn('FlySky: combined request failed, fetching models one by one.', r.error);
                 } catch (err) {
                     if (err.name === 'AbortError') throw err;
@@ -1317,6 +1372,10 @@
                     return models.map(model => ({ model, error: err.message || String(err), network: true }));
                 }
             }
+            return fetchModelsOneByOne(mode, models, days, signal);
+        }
+
+        async function fetchModelsOneByOne(mode, models, days, signal) {
             const results = [];
             for (const [i, model] of models.entries()) {
                 if (i) await sleep(MODEL_REQUEST_GAP_MS);
