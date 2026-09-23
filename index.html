@@ -168,48 +168,43 @@
     <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-36 lg:pb-24 bg-slate-950">
         <div class="max-w-7xl mx-auto space-y-6">
 
-            <!-- Location card: search, current location, favorites -->
-            <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4">
-                <div class="flex flex-col lg:flex-row lg:items-center gap-4">
-                    <!-- Current location -->
-                    <div class="flex items-center gap-3 min-w-0 lg:flex-1">
-                        <div class="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shrink-0">
-                            <i class="fa-solid fa-location-dot text-lg"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider" data-i18n="currentLocationLabel">Location</p>
-                            <div class="flex items-center gap-2 min-w-0">
-                                <h2 id="locName" class="text-lg font-bold text-white truncate" data-i18n="noLocation">No location selected</h2>
-                                <button id="btnFavorite" class="hidden text-lg text-slate-500 hover:text-amber-400 transition shrink-0" data-i18n-title="favoriteAdd" title="Add to favorites">
-                                    <i class="fa-regular fa-star"></i>
-                                </button>
-                            </div>
-                            <p id="locDetails" class="text-[11px] text-slate-500 font-mono truncate"></p>
-                        </div>
-                    </div>
-
-                    <!-- Search -->
-                    <div class="flex items-center gap-2 lg:w-[28rem]">
-                        <div class="relative flex-1">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                            <input id="searchInput" type="text" autocomplete="off" spellcheck="false"
-                                class="w-full pl-8 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-                                data-i18n-placeholder="searchPlaceholder" placeholder="Search city or place…"
-                                role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
-                            <span id="searchSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
-                            <ul id="searchResults" role="listbox" class="hidden absolute left-0 right-0 top-full mt-1 z-40 max-h-80 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1"></ul>
-                        </div>
-                        <button id="btnGeolocate" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 text-sm transition" data-i18n-title="geolocateTitle" title="Use my location">
-                            <i class="fa-solid fa-location-crosshairs"></i>
-                        </button>
-                    </div>
+            <!-- Location card: current location (click to search), favorites -->
+            <section class="px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-2.5">
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnLocation" class="flex items-center gap-3 min-w-0 flex-1 text-left group" aria-expanded="false" aria-controls="searchPanel" data-i18n-title="changeLocationTitle" title="Change location">
+                        <span class="p-2 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 shrink-0 group-hover:border-cyan-500/60 transition">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </span>
+                        <span class="min-w-0">
+                            <span class="flex items-center gap-2 min-w-0">
+                                <span id="locName" class="text-base font-bold text-white truncate group-hover:text-cyan-300 transition" data-i18n="noLocation">No location selected</span>
+                                <i class="fa-solid fa-magnifying-glass text-[11px] text-slate-500 group-hover:text-cyan-400 transition shrink-0"></i>
+                            </span>
+                            <span id="locDetails" class="block text-[11px] text-slate-500 font-mono truncate"></span>
+                        </span>
+                    </button>
+                    <button id="btnFavorite" class="hidden w-9 h-9 rounded-xl text-lg text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition shrink-0" data-i18n-title="favoriteAdd" title="Add to favorites">
+                        <i class="fa-regular fa-star"></i>
+                    </button>
+                    <button id="btnGeolocate" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 text-sm transition shrink-0" data-i18n-title="geolocateTitle" title="Use my location">
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                    </button>
                 </div>
 
-                <!-- Favorites -->
-                <div class="flex items-start gap-3 pt-3 border-t border-slate-800/80">
-                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pt-1.5 shrink-0">
-                        <i class="fa-solid fa-star text-amber-400"></i> <span data-i18n="favoritesLabel">Favorites</span>
-                    </span>
+                <!-- Search (opens when the location is clicked) -->
+                <div id="searchPanel" class="hidden relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input id="searchInput" type="text" autocomplete="off" spellcheck="false"
+                        class="w-full pl-8 pr-8 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+                        data-i18n-placeholder="searchPlaceholder" placeholder="Search city or place…"
+                        role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+                    <span id="searchSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                    <ul id="searchResults" role="listbox" class="hidden absolute left-0 right-0 top-full mt-1 z-40 max-h-80 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1"></ul>
+                </div>
+
+                <!-- Favorites (always visible) -->
+                <div class="flex items-center gap-2 overflow-x-auto">
+                    <i class="fa-solid fa-star text-amber-400 text-[11px] shrink-0" data-i18n-title="favoritesLabel" title="Favorites"></i>
                     <div id="favoritesList" class="flex flex-wrap gap-2"></div>
                 </div>
             </section>
@@ -263,7 +258,7 @@
                     <span data-i18n="flightTitle">Flight Conditions</span>
                 </h3>
                 <div>
-                    <div id="flightStrip" data-flight-bar="all" class="flex h-9 rounded-lg overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                    <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                 </div>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
@@ -284,7 +279,21 @@
             </section>
 
             <!-- Summary stat cards -->
-            <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            <section id="statsCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4">
+                <button type="button" id="btnStatsToggle" class="w-full flex items-center justify-between gap-3 text-left" aria-expanded="true" aria-controls="statsGrid">
+                    <span class="min-w-0">
+                        <span class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-gauge-high text-cyan-400"></i>
+                            <span data-i18n="statsTitle">Forecast Summary</span>
+                        </span>
+                        <span id="statsSummary" class="hidden block text-[11px] text-slate-400 font-mono truncate mt-0.5"></span>
+                    </span>
+                    <span class="shrink-0 w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                        <i id="statsChevron" class="fa-solid fa-chevron-up text-xs transition-transform"></i>
+                    </span>
+                </button>
+                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+            </section>
 
             <!-- One chart card per weather parameter (built dynamically) -->
             <div id="chartsContainer" class="space-y-6"></div>
@@ -472,6 +481,8 @@
                 refreshBtn: "Refresh",
                 refreshTitle: "Reload forecast",
                 currentLocationLabel: "Location",
+                changeLocationTitle: "Change location",
+                statsTitle: "Forecast Summary",
                 noLocation: "No location selected",
                 favoriteAdd: "Add to favorites",
                 favoriteRemove: "Remove from favorites",
@@ -582,6 +593,8 @@
                 refreshBtn: "Оновити",
                 refreshTitle: "Перезавантажити прогноз",
                 currentLocationLabel: "Місце",
+                changeLocationTitle: "Змінити місце",
+                statsTitle: "Підсумок прогнозу",
                 noLocation: "Місце не вибрано",
                 favoriteAdd: "Додати в обране",
                 favoriteRemove: "Видалити з обраного",
@@ -692,6 +705,8 @@
                 refreshBtn: "Atualizar",
                 refreshTitle: "Recarregar previsão",
                 currentLocationLabel: "Local",
+                changeLocationTitle: "Mudar local",
+                statsTitle: "Resumo da previsão",
                 noLocation: "Nenhum local selecionado",
                 favoriteAdd: "Adicionar aos favoritos",
                 favoriteRemove: "Remover dos favoritos",
@@ -884,6 +899,7 @@
             showMembers: loadFromStorage('flysky_show_members', false) === true,
             settingsCollapsed: loadFromStorage('flysky_settings_collapsed', false) === true,
             flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
+            statsCollapsed: loadFromStorage('flysky_stats_collapsed', false) === true,
             // Last loaded forecast: { key, days, fetchedAt, meta, times,
             // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
@@ -923,6 +939,7 @@
             saveToStorage('flysky_show_members', state.showMembers);
             saveToStorage('flysky_settings_collapsed', state.settingsCollapsed);
             saveToStorage('flysky_flight_details_open', state.flightDetailsOpen);
+            saveToStorage('flysky_stats_collapsed', state.statsCollapsed);
         }
 
         // Chart.js instances keyed by parameter key.
@@ -1275,7 +1292,7 @@
             renderMeta();
             const hasLocation = !!state.location;
             document.getElementById('emptyState').classList.toggle('hidden', hasLocation);
-            document.getElementById('statsGrid').classList.toggle('hidden', !hasLocation);
+            document.getElementById('statsCard').classList.toggle('hidden', !hasLocation);
             document.getElementById('chartsContainer').classList.toggle('hidden', !hasLocation);
             document.getElementById('legendCard').classList.toggle('hidden', !hasLocation);
             document.getElementById('flightCard').classList.toggle('hidden', !hasLocation);
@@ -1382,11 +1399,17 @@
                 (f && f.missing.length ? `<span class="text-amber-300/80"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(t('flightMissing', { params: f.missing.map(k => t(k)).join(', ') }))}</span>` : '');
         }
 
-        // Axis under the strip: day names at midnight first, then hour labels
-        // at the finest round step (1/2/3/6/12 h) that still fits, skipping
-        // any label that would collide with one already placed.
+        // Axis under the strips. Labels sit on hour boundaries 0…n, so the
+        // start and end of the window are always labeled (the end is the
+        // last hour + 1). Priority: start/end, then day names at midnight,
+        // then hour labels at the finest round step (1/2/3/6/12 h) that fits;
+        // anything that would collide with an already placed label is skipped.
         function renderFlightAxis() {
             document.querySelectorAll('[data-flight-axis]').forEach(renderAxisInto);
+        }
+
+        function addHoursToLocal(str, h) {
+            return new Date(parseLocalTime(str).getTime() + h * 3600e3).toISOString().slice(0, 16);
         }
 
         function renderAxisInto(axis) {
@@ -1394,29 +1417,57 @@
             const n = hours.length;
             const width = axis.clientWidth;
             if (!n || !width) { axis.innerHTML = ''; return; }
-            const pxPerHour = width / n;
-            const DAY_W = 70, HOUR_W = 38, PAD = 6;
-            const step = [1, 2, 3, 6, 12].find(st => st * pxPerHour >= HOUR_W + PAD) || 24;
-            const candidates = [];
-            hours.forEach((h, i) => {
-                const hr = Number(h.time.slice(11, 13));
-                if (hr === 0 && i > 0) candidates.push({ i, day: true, w: DAY_W, text: formatDayLabel(h.time) });
-            });
-            if (step < 24) hours.forEach((h, i) => {
-                const hr = Number(h.time.slice(11, 13));
-                if (hr % step === 0 && !(hr === 0 && i > 0)) candidates.push({ i, day: false, w: HOUR_W, text: formatHour(h.time) });
-            });
-            const placed = [];
-            candidates.forEach(c => {
-                const x = (c.i / n) * width;
-                const lo = x - c.w / 2, hi = x + c.w / 2;
-                if (lo < -4 || hi > width + 4) return;
-                if (placed.some(p => lo < p.hi + PAD && hi > p.lo - PAD)) return;
-                placed.push({ ...c, lo, hi });
-            });
-            axis.innerHTML = placed.map(p =>
-                `<span class="absolute top-0 -translate-x-1/2 whitespace-nowrap ${p.day ? 'text-slate-300 font-semibold' : ''}" style="left: ${(p.i / n) * 100}%">${escapeHtml(p.text)}</span>`
-            ).join('');
+            const times = hours.map(h => h.time).concat(addHoursToLocal(hours[n - 1].time, 1));
+            // Narrow layouts get a compact day name ("Thu 24").
+            const compactDays = (24 * width) / n < 150;
+            const DAY_W = compactDays ? 44 : 66, HOUR_W = 32, PAD = 4;
+            const dayLabel = tm => compactDays ? formatTime(tm, { weekday: 'short', day: 'numeric' }) : formatDayLabel(tm);
+            const hourOf = k => Number(times[k].slice(11, 13));
+            const isMidnight = k => hourOf(k) === 0 && k > 0 && k < n;
+
+            const layout = step => {
+                const candidates = [
+                    { k: 0, w: HOUR_W, text: formatHour(times[0]), align: 'start' },
+                    { k: n, w: HOUR_W, text: formatHour(times[n]), align: 'end' }
+                ];
+                for (let k = 1; k < n; k++) if (isMidnight(k)) candidates.push({ k, day: true, w: DAY_W, text: dayLabel(times[k]) });
+                // Short windows count steps from the start (09, 11, 13 …);
+                // multi-day ones align to the clock (00, 06, 12, 18).
+                const onStep = k => (n <= 24 ? k : hourOf(k)) % step === 0;
+                if (step < 24) for (let k = 1; k < n; k++) {
+                    if (!isMidnight(k) && onStep(k)) candidates.push({ k, w: HOUR_W, text: formatHour(times[k]) });
+                }
+                const placed = [];
+                let dropped = 0;
+                candidates.forEach(c => {
+                    const x = (c.k / n) * width;
+                    const lo = c.align === 'start' ? x : c.align === 'end' ? x - c.w : x - c.w / 2;
+                    const hi = lo + c.w;
+                    const clash = placed.filter(p => lo < p.hi + PAD && hi > p.lo - PAD);
+                    if (clash.length) {
+                        // Giving way to a day name is expected; only hour-vs-hour
+                        // clashes mean the step is too fine.
+                        if (clash.some(p => !p.day)) dropped++;
+                        return;
+                    }
+                    placed.push({ ...c, lo, hi });
+                });
+                return { placed, dropped };
+            };
+            // Finest step whose labels all fit (keeps spacing even); if none
+            // does, fall back to the step that fits by width, dropping clashes.
+            const steps = [1, 2, 3, 6, 12, 24];
+            let result = null;
+            for (const st of steps) {
+                const r = layout(st);
+                if (!r.dropped) { result = r; break; }
+            }
+            if (!result) result = layout(steps.find(st => st * width / n >= HOUR_W + PAD) || 24);
+            const placed = result.placed;
+            axis.innerHTML = placed.map(p => {
+                const shift = p.align === 'start' ? '' : p.align === 'end' ? '-translate-x-full' : '-translate-x-1/2';
+                return `<span class="absolute top-0 ${shift} whitespace-nowrap ${p.day ? 'text-slate-300 font-semibold' : ''}" style="left: ${(p.k / n) * 100}%">${escapeHtml(p.text)}</span>`;
+            }).join('');
         }
 
         function setupFlightStrip() {
@@ -1586,7 +1637,7 @@
         }
 
         function statCard({ title, icon, color, value, sub, extra }) {
-            return `<div class="p-4 rounded-2xl bg-slate-900 border border-slate-800/80 relative overflow-hidden shadow-sm">
+            return `<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 relative overflow-hidden">
                 <div class="flex justify-between items-start">
                     <div class="min-w-0">
                         <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">${escapeHtml(title)}</p>
@@ -1603,7 +1654,25 @@
             </div>`;
         }
 
+        function renderStatsPanel() {
+            const collapsed = state.statsCollapsed;
+            document.getElementById('statsGrid').classList.toggle('hidden', collapsed);
+            document.getElementById('btnStatsToggle').setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            document.getElementById('statsChevron').style.transform = collapsed ? 'rotate(180deg)' : '';
+            const summary = document.getElementById('statsSummary');
+            summary.classList.toggle('hidden', !collapsed);
+            // One-line recap of the four tiles for the collapsed header.
+            const parts = PARAMS.map(param => {
+                const s = processed && processed.params[param.key] && processed.params[param.key].summary;
+                if (!s) return null;
+                const icon = `<i class="fa-solid ${param.icon}" style="color: rgb(${param.color})"></i>`;
+                return `${icon} ${escapeHtml(formatValue(s.median, param))} ${escapeHtml(unitLabel(param))}`;
+            }).filter(Boolean);
+            summary.innerHTML = parts.join('<span class="text-slate-600 mx-2">·</span>');
+        }
+
         function renderStats() {
+            renderStatsPanel();
             const grid = document.getElementById('statsGrid');
             if (!processed) {
                 grid.innerHTML = PARAMS.map(p => statCard({ title: t(p.titleKey), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData') })).join('');
@@ -1945,7 +2014,10 @@
                     renderFavorites();
                 } else if (sel) {
                     const fav = state.favorites[Number(sel.dataset.favSelect)];
-                    if (fav) selectLocation(fav);
+                    if (fav) {
+                        setSearchPanel(false);
+                        selectLocation(fav);
+                    }
                 }
             });
         }
@@ -1955,6 +2027,17 @@
         let searchHighlight = -1;
         let searchTimer = null;
         let searchSeq = 0;
+
+        function setSearchPanel(open) {
+            document.getElementById('searchPanel').classList.toggle('hidden', !open);
+            document.getElementById('btnLocation').setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) {
+                document.getElementById('searchInput').focus();
+            } else {
+                document.getElementById('searchInput').value = '';
+                closeSearch();
+            }
+        }
 
         function closeSearch() {
             const list = document.getElementById('searchResults');
@@ -2019,9 +2102,8 @@
             const r = searchResults[i];
             if (!r) return;
             const input = document.getElementById('searchInput');
-            input.value = '';
-            closeSearch();
             input.blur();
+            setSearchPanel(false);
             selectLocation(r);
         }
 
@@ -2053,7 +2135,9 @@
                     e.preventDefault();
                     pickSearchResult(searchHighlight);
                 } else if (e.key === 'Escape') {
-                    closeSearch();
+                    // First Escape closes the result list, the next one the search field.
+                    if (open) closeSearch();
+                    else if (state.location) setSearchPanel(false);
                 }
             });
             input.addEventListener('focus', () => {
@@ -2070,6 +2154,13 @@
                 if (!e.target.closest('#searchResults') && e.target !== input) closeSearch();
             });
 
+            document.getElementById('btnLocation').addEventListener('click', () => {
+                const open = document.getElementById('searchPanel').classList.contains('hidden');
+                setSearchPanel(open || !state.location);
+            });
+            // With no location yet, the search field is the first thing to use.
+            if (!state.location) setSearchPanel(true);
+
             document.getElementById('btnGeolocate').addEventListener('click', () => {
                 if (!navigator.geolocation) {
                     showToast(t('toastGeoUnsupported'), 'warning');
@@ -2079,6 +2170,7 @@
                 icon.classList.add('fa-spin');
                 navigator.geolocation.getCurrentPosition(pos => {
                     icon.classList.remove('fa-spin');
+                    setSearchPanel(false);
                     selectLocation({
                         name: t('myLocation'),
                         latitude: roundCoord(pos.coords.latitude),
@@ -2155,6 +2247,11 @@
                 renderCharts();
             });
             document.getElementById('btnRefresh').addEventListener('click', () => loadForecast({ force: true }));
+            document.getElementById('btnStatsToggle').addEventListener('click', () => {
+                state.statsCollapsed = !state.statsCollapsed;
+                saveSettings();
+                renderStatsPanel();
+            });
             document.getElementById('btnSettingsToggle').addEventListener('click', () => {
                 state.settingsCollapsed = !state.settingsCollapsed;
                 saveSettings();

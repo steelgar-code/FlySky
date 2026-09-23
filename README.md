@@ -18,10 +18,10 @@ Ensemble weather forecast for drone/UAV pilots. Instead of a single "best guess"
 - **Parameters** — precipitation (with an hourly chance-of-precipitation bar), wind speed at 10 m, wind gusts at 10 m, and low cloud cover.
 - **Time windows** — 3 h, 8 h, 24 h (default), 48 h, 72 h, or 1 week, starting from the current hour in the location's local time. The selector sits in the floating bar next to the mode switch.
 - **Collapsible model settings** — fold the models/units panel away once it's set up; the collapsed header still summarizes the selection, and the last-updated info sits inside the panel.
-- **Summary cards** — expected precipitation total with its 80% range and the chance of at least 1 mm, the median peak wind and gusts with a 1-in-10 worst case, and the average low cloud cover with its clearest hour.
+- **Forecast summary** — a collapsible panel (with a one-line recap when folded) holding expected precipitation total with its 80% range and the chance of at least 1 mm, the median peak wind and gusts with a 1-in-10 worst case, and the average low cloud cover with its clearest hour.
 - **Model picker** — defaults suit Ukraine and Eastern Europe (DWD ICON, ECMWF IFS and AIFS, plus Google WeatherNext 2 for ensembles and Météo-France and UK Met Office for the Models mode), with NOAA GFS, GEM, JMA, and BOM also available. A model that fails to load is flagged and skipped without breaking the rest.
-- **Location search** — search any city or place, or use your current position.
-- **Favorites** — star a location to save it, then switch between favorites with one tap. The last selected location, mode, models, and time window are remembered.
+- **Location search** — click the current location to open the search field, or use your current position.
+- **Favorites** — star a location to save it; favorites stay one tap away under the location name. The last selected location, mode, models, and time window are remembered.
 - **Units** — wind in m/s, km/h, knots, or mph; precipitation in mm or inches.
 - **Offline-friendly** — installable PWA; the last loaded forecast is kept so it can still be viewed with no network.
 - **Multi-language** — available in English, Ukrainian, and Portuguese (BR).
