@@ -245,8 +245,8 @@
                         </select>
                     </div>
                     <div id="modelChips" class="flex flex-wrap gap-2"></div>
+                    <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
                 </div>
-                <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
             </section>
 
             <!-- Empty state (no location yet) -->
@@ -258,19 +258,29 @@
 
             <!-- Flight conditions timeline -->
             <section id="flightCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                        <i class="fa-solid fa-plane-departure text-emerald-400"></i>
-                        <span data-i18n="flightTitle">Flight Conditions</span>
-                    </h3>
-                    <span class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values · hover or tap the bar for details</span>
-                </div>
+                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plane-departure text-emerald-400"></i>
+                    <span data-i18n="flightTitle">Flight Conditions</span>
+                </h3>
                 <div>
-                    <div id="flightStrip" class="flex h-9 rounded-lg overflow-hidden bg-slate-950 cursor-crosshair"></div>
-                    <div id="flightAxis" class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                    <div id="flightStrip" data-flight-bar="all" class="flex h-9 rounded-lg overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                    <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                 </div>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
-                <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400 pt-2 border-t border-slate-800/80"></div>
+
+                <!-- Per-cause breakdown (collapsible) -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <button type="button" id="btnFlightDetails" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="flightDetailsBody">
+                        <i id="flightDetailsChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                        <span data-i18n="flightDetailsToggle">Breakdown by cause</span>
+                    </button>
+                    <div id="flightDetailsBody" class="hidden space-y-3 pt-3">
+                        <div id="flightFactorBars" class="space-y-2"></div>
+                        <div data-flight-axis class="relative h-5 text-[10px] text-slate-500 font-mono"></div>
+                        <p class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values of the selected models · hover or tap a bar for details</p>
+                        <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400"></div>
+                    </div>
+                </div>
             </section>
 
             <!-- Summary stat cards -->
@@ -441,6 +451,13 @@
             none: { color: '#334155', icon: 'fa-circle-question', labelKey: 'flightNoData' }
         };
         const WIND_TO_MS = { ms: 1, kmh: 1 / 3.6, kn: 0.514444, mph: 0.44704 };
+        // Per-cause bars in the flight breakdown. `checks` are the per-hour
+        // checks from computeFlight() that feed each bar (worst one wins).
+        const FLIGHT_FACTORS = [
+            { key: 'rain', checks: ['rain'], icon: 'fa-cloud-rain', labelKey: 'flightFactorRain' },
+            { key: 'wind', checks: ['wind', 'gust'], icon: 'fa-wind', labelKey: 'flightFactorWind' },
+            { key: 'cloud', checks: ['cloud'], icon: 'fa-cloud', labelKey: 'flightFactorCloud' }
+        ];
 
         // Variables a given API/model rejected in this session, so we don't
         // keep re-requesting them (e.g. a parameter the ensemble API lacks).
@@ -472,7 +489,11 @@
                 perModelToggle: "Per model",
                 perModelToggleTitle: "Show each model's forecast as its own line instead of the combined range",
                 flightTitle: "Flight Conditions",
-                flightHint: "Based on median values · hover or tap the bar for details",
+                flightHint: "Based on median values of the selected models · hover or tap a bar for details",
+                flightDetailsToggle: "Breakdown by cause",
+                flightFactorRain: "Precipitation",
+                flightFactorWind: "Wind + gusts",
+                flightFactorCloud: "Low clouds",
                 flightGood: "Suitable",
                 flightMarginal: "Uncertain",
                 flightBad: "Not suitable",
@@ -578,7 +599,11 @@
                 perModelToggle: "По моделях",
                 perModelToggleTitle: "Показати прогноз кожної моделі окремою лінією замість загального діапазону",
                 flightTitle: "Умови для польоту",
-                flightHint: "За медіанними значеннями · наведіть або торкніться смуги для деталей",
+                flightHint: "За медіанними значеннями вибраних моделей · наведіть або торкніться смуги для деталей",
+                flightDetailsToggle: "Розбивка за причинами",
+                flightFactorRain: "Опади",
+                flightFactorWind: "Вітер + пориви",
+                flightFactorCloud: "Низька хмарність",
                 flightGood: "Придатно",
                 flightMarginal: "Невизначено",
                 flightBad: "Непридатно",
@@ -684,7 +709,11 @@
                 perModelToggle: "Por modelo",
                 perModelToggleTitle: "Mostrar a previsão de cada modelo como uma linha própria em vez da faixa combinada",
                 flightTitle: "Condições de voo",
-                flightHint: "Com base nos valores medianos · passe o mouse ou toque na barra para detalhes",
+                flightHint: "Com base nos valores medianos dos modelos selecionados · passe o mouse ou toque em uma barra para detalhes",
+                flightDetailsToggle: "Detalhamento por causa",
+                flightFactorRain: "Precipitação",
+                flightFactorWind: "Vento + rajadas",
+                flightFactorCloud: "Nuvens baixas",
                 flightGood: "Adequado",
                 flightMarginal: "Incerto",
                 flightBad: "Inadequado",
@@ -854,6 +883,7 @@
             precipUnit: loadFromStorage('flysky_precip_unit', 'mm'),
             showMembers: loadFromStorage('flysky_show_members', false) === true,
             settingsCollapsed: loadFromStorage('flysky_settings_collapsed', false) === true,
+            flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
             // Last loaded forecast: { key, days, fetchedAt, meta, times,
             // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
@@ -892,6 +922,7 @@
             saveToStorage('flysky_precip_unit', state.precipUnit);
             saveToStorage('flysky_show_members', state.showMembers);
             saveToStorage('flysky_settings_collapsed', state.settingsCollapsed);
+            saveToStorage('flysky_flight_details_open', state.flightDetailsOpen);
         }
 
         // Chart.js instances keyed by parameter key.
@@ -1267,17 +1298,41 @@
             return t(key === 'wind' ? 'factorWind' : 'factorGust', { v: formatValue(value, windParam), u: unitLabel(windParam) });
         }
 
-        function flightHourText(h) {
-            const st = FLIGHT_STATUS[h.status];
-            const parts = ['rain', 'wind', 'gust', 'cloud']
+        const FLIGHT_RANK = { none: -1, good: 0, marginal: 1, bad: 2 };
+
+        // Status of one breakdown bar for an hour: the worst of its checks.
+        function factorStatus(h, factor) {
+            return factor.checks.map(k => h.checks[k] || 'none')
+                .reduce((a, b) => (FLIGHT_RANK[b] > FLIGHT_RANK[a] ? b : a), 'none');
+        }
+
+        // Detail line for an hour: the overall verdict, or — when hovering a
+        // breakdown bar — that cause's verdict and only its values.
+        function flightHourText(h, factor) {
+            const status = factor ? factorStatus(h, factor) : h.status;
+            const st = FLIGHT_STATUS[status];
+            const keys = factor ? factor.checks : ['rain', 'wind', 'gust', 'cloud'];
+            const parts = keys
                 .filter(k => h.values[k] !== null && h.values[k] !== undefined && Number.isFinite(h.values[k]))
                 .map(k => {
                     const txt = escapeHtml(flightFactorText(k, h.values[k]));
-                    return h.reasons.includes(k) ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
+                    const decisive = status !== 'good' && h.checks[k] === status;
+                    return decisive ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
                 });
+            const label = factor ? `${t(factor.labelKey)}: ${t(st.labelKey)}` : t(st.labelKey);
             return `<span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
-                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(t(st.labelKey))}</span>
+                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>
                 <span class="text-slate-400">${parts.join(' · ')}</span>`;
+        }
+
+        // One cell per hour; a 2px gap wherever the status changes keeps
+        // neighbouring zones distinct without relying on color alone.
+        function flightCellsHtml(hours, statusOf) {
+            return hours.map((h, i) => {
+                const st = statusOf(h);
+                const gap = i > 0 && statusOf(hours[i - 1]) !== st ? 'margin-left: 2px;' : '';
+                return `<div data-flight-hour="${i}" class="flex-1 min-w-0 hover:brightness-125 transition" style="${gap} background: ${FLIGHT_STATUS[st].color}" title="${escapeHtml(formatDayHour(h.time) + ' · ' + t(FLIGHT_STATUS[st].labelKey))}"></div>`;
+            }).join('');
         }
 
         function flightSummaryHtml() {
@@ -1294,18 +1349,24 @@
 
         function renderFlight() {
             const strip = document.getElementById('flightStrip');
-            const axis = document.getElementById('flightAxis');
             const detail = document.getElementById('flightDetail');
             const f = processed && processed.flight;
             const hours = f ? f.hours : [];
 
-            // One cell per hour; a 2px gap wherever the status changes keeps
-            // neighbouring zones distinct without relying on color alone.
-            strip.innerHTML = hours.map((h, i) => {
-                const gap = i > 0 && hours[i - 1].status !== h.status ? 'margin-left: 2px;' : '';
-                return `<div data-flight-hour="${i}" class="flex-1 min-w-0 hover:brightness-125 transition" style="${gap} background: ${FLIGHT_STATUS[h.status].color}" title="${escapeHtml(formatDayHour(h.time) + ' · ' + t(FLIGHT_STATUS[h.status].labelKey))}"></div>`;
-            }).join('');
+            strip.innerHTML = flightCellsHtml(hours, h => h.status);
 
+            document.getElementById('flightFactorBars').innerHTML = FLIGHT_FACTORS.map(factor => {
+                const noData = hours.length && hours.every(h => factorStatus(h, factor) === 'none');
+                return `<div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mb-1">
+                        <i class="fa-solid ${factor.icon} w-3.5 text-center"></i>
+                        <span class="font-medium text-slate-300">${escapeHtml(t(factor.labelKey))}</span>
+                        ${noData ? `<span class="text-slate-500">· ${escapeHtml(t('flightNoData'))}</span>` : ''}
+                    </div>
+                    <div data-flight-bar="${factor.key}" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair">${flightCellsHtml(hours, h => factorStatus(h, factor))}</div>
+                </div>`;
+            }).join('');
+            renderFlightDetailsPanel();
             renderFlightAxis();
 
             detail.innerHTML = flightSummaryHtml();
@@ -1325,7 +1386,10 @@
         // at the finest round step (1/2/3/6/12 h) that still fits, skipping
         // any label that would collide with one already placed.
         function renderFlightAxis() {
-            const axis = document.getElementById('flightAxis');
+            document.querySelectorAll('[data-flight-axis]').forEach(renderAxisInto);
+        }
+
+        function renderAxisInto(axis) {
             const hours = processed && processed.flight ? processed.flight.hours : [];
             const n = hours.length;
             const width = axis.clientWidth;
@@ -1361,16 +1425,36 @@
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(renderFlightAxis, 150);
             });
-            const strip = document.getElementById('flightStrip');
+            const card = document.getElementById('flightCard');
             const detail = document.getElementById('flightDetail');
             const show = e => {
                 const cell = e.target.closest('[data-flight-hour]');
+                const bar = cell && cell.closest('[data-flight-bar]');
                 const h = cell && processed && processed.flight && processed.flight.hours[Number(cell.dataset.flightHour)];
-                if (h) detail.innerHTML = flightHourText(h);
+                if (!h) return;
+                detail.innerHTML = flightHourText(h, FLIGHT_FACTORS.find(f => f.key === bar.dataset.flightBar));
             };
-            strip.addEventListener('mousemove', show);
-            strip.addEventListener('click', show);
-            strip.addEventListener('mouseleave', () => { detail.innerHTML = flightSummaryHtml(); });
+            card.addEventListener('mousemove', show);
+            card.addEventListener('click', show);
+            card.addEventListener('mouseover', e => {
+                if (!e.target.closest('[data-flight-bar]')) detail.innerHTML = flightSummaryHtml();
+            });
+            card.addEventListener('mouseleave', () => { detail.innerHTML = flightSummaryHtml(); });
+
+            document.getElementById('btnFlightDetails').addEventListener('click', () => {
+                state.flightDetailsOpen = !state.flightDetailsOpen;
+                saveSettings();
+                renderFlightDetailsPanel();
+                // The axis needs a measurable width, which it only has once shown.
+                renderFlightAxis();
+            });
+        }
+
+        function renderFlightDetailsPanel() {
+            const open = state.flightDetailsOpen;
+            document.getElementById('flightDetailsBody').classList.toggle('hidden', !open);
+            document.getElementById('btnFlightDetails').setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById('flightDetailsChevron').style.transform = open ? 'rotate(180deg)' : '';
         }
 
         function renderSettingsPanel() {
