@@ -10,6 +10,16 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="favicon.png" type="image/png">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- Offline service worker. Kept in its own tiny script, ahead of the CDN
+         scripts, so nothing else on the page (a failed CDN load, an app error)
+         can stop it from registering. Needs http(s); file:// can't use it. -->
+    <script>
+        if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+            navigator.serviceWorker.register('./sw.js').catch(err => {
+                console.warn('FlySky: service worker registration failed (offline mode unavailable).', err);
+            });
+        }
+    </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -2714,15 +2724,6 @@
                 if (document.visibilityState === 'visible') loadForecast();
             });
         });
-
-        // Register the offline service worker (http/https only, not file://).
-        if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => {
-                    console.warn('FlySky: service worker registration failed (offline asset caching unavailable).', err);
-                });
-            });
-        }
 
         // ================= Install prompt =================
         // Per-app key: FlyLog/FlySend/FlySky share the steelgar-code.github.io
