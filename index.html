@@ -165,7 +165,7 @@
     </header>
 
     <!-- Main Scrollable Content -->
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950">
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 sm:pb-24 bg-slate-950">
         <div class="max-w-7xl mx-auto space-y-6">
 
             <!-- Location card: search, current location, favorites -->
@@ -217,17 +217,11 @@
             <!-- Forecast settings: mode, models, time window, units -->
             <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <div class="seg" role="group" data-i18n-aria-label="modeLabel" aria-label="Forecast mode">
-                            <button type="button" data-mode="ensemble" data-i18n-title="modeEnsembleTitle" title="Probability ranges from ensemble model runs">
-                                <i class="fa-solid fa-layer-group"></i> <span data-i18n="modeEnsemble">Ensemble</span>
-                            </button>
-                            <button type="button" data-mode="deterministic" data-i18n-title="modeDeterministicTitle" title="Spread between the main forecast of each model">
-                                <i class="fa-solid fa-bullseye"></i> <span data-i18n="modeDeterministic">Models</span>
-                            </button>
-                        </div>
+                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-teal-400"></i>
+                        <span id="modelsTitle"></span>
                         <span id="membersTotal" class="text-[11px] font-mono text-slate-500"></span>
-                    </div>
+                    </h3>
                     <div class="flex items-center gap-2 flex-wrap">
                         <label class="text-[11px] text-slate-400" for="windUnitSelect" data-i18n="windUnitLabel">Wind</label>
                         <select id="windUnitSelect" class="unit-select">
@@ -241,9 +235,6 @@
                             <option value="mm">mm</option>
                             <option value="inch">inch</option>
                         </select>
-                        <button id="btnMembers" type="button" class="chip ml-1" data-i18n-title="membersToggleTitle" title="Draw every ensemble member as a thin line">
-                            <i class="fa-solid fa-wave-square"></i> <span data-i18n="membersToggle">Members</span>
-                        </button>
                     </div>
                 </div>
                 <div id="modelChips" class="flex flex-wrap gap-2"></div>
@@ -271,11 +262,12 @@
 
             <!-- Legend explainer -->
             <section id="legendCard" class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.12)"></span> <span id="legendMinMax"></span></span>
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.25)"></span> <span data-i18n="legendP10P90">10–90% (80% likely)</span></span>
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.45)"></span> <span data-i18n="legendP25P75">25–75% (50% likely)</span></span>
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: #38bdf8"></span> <span data-i18n="legendMedian">Median</span></span>
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(148,163,184,0.35)"></span> <span data-i18n="legendProbability">Chance of precipitation (≥ 0.1 mm/h)</span></span>
+                <span id="legendPerModel" class="hidden flex items-center gap-1.5"><i class="fa-solid fa-circle-info text-cyan-400"></i> <span data-i18n="legendPerModel">Each line is one model's forecast. Switch the view off to see the combined range.</span></span>
+                <span data-legend-range class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.12)"></span> <span id="legendMinMax"></span></span>
+                <span data-legend-range class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.25)"></span> <span data-i18n="legendP10P90">10–90% (80% likely)</span></span>
+                <span data-legend-range class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.45)"></span> <span data-i18n="legendP25P75">25–75% (50% likely)</span></span>
+                <span data-legend-range class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: #38bdf8"></span> <span data-i18n="legendMedian">Median</span></span>
+                <span data-legend-range class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(148,163,184,0.35)"></span> <span data-i18n="legendProbability">Chance of precipitation (≥ 0.1 mm/h)</span></span>
             </section>
 
             <!-- Footer -->
@@ -297,8 +289,24 @@
         </div>
     </main>
 
+    <!-- Floating dock: data source + view toggle, always reachable while
+         scrolling through the charts so the effect can be compared directly. -->
+    <div id="modeDock" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-2xl shadow-black/50 backdrop-blur-md">
+        <div class="seg" role="group" data-i18n-aria-label="modeLabel" aria-label="Forecast mode">
+            <button type="button" data-mode="ensemble" data-i18n-title="modeEnsembleTitle" title="Probability ranges from every run of each ensemble model">
+                <i class="fa-solid fa-layer-group"></i> <span data-i18n="modeEnsemble">Ensemble</span>
+            </button>
+            <button type="button" data-mode="deterministic" data-i18n-title="modeDeterministicTitle" title="Spread between the main (deterministic) forecast of each model">
+                <i class="fa-solid fa-bullseye"></i> <span data-i18n="modeDeterministic">Models</span>
+            </button>
+        </div>
+        <button id="btnMembers" type="button" class="chip py-1.5" aria-pressed="false">
+            <i class="fa-solid fa-wave-square"></i> <span id="membersToggleLabel"></span>
+        </button>
+    </div>
+
     <!-- Install prompt -->
-    <div id="installPrompt" class="hidden fixed bottom-4 left-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-xs">
+    <div id="installPrompt" class="hidden fixed bottom-20 left-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-xs">
         <i class="fa-solid fa-download text-cyan-400"></i>
         <span class="text-slate-200" data-i18n="installPromptText">Install FlySky for quick access</span>
         <button id="installBtn" class="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition" data-i18n="installBtn">Install</button>
@@ -306,7 +314,7 @@
     </div>
 
     <!-- Toasts -->
-    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end"></div>
+    <div id="toastContainer" class="fixed bottom-20 right-4 z-50 flex flex-col gap-2 items-end"></div>
 
     <script>
         // ================= Configuration =================
@@ -354,12 +362,27 @@
                     { id: 'ukmo_seamless', name: 'UK Met Office' },
                     { id: 'gfs_seamless', name: 'NOAA GFS' },
                     { id: 'gem_seamless', name: 'GEM' },
-                    { id: 'jma_seamless', name: 'JMA' },
-                    { id: 'cma_grapes_global', name: 'CMA GRAPES' }
+                    { id: 'jma_seamless', name: 'JMA' }
                 ],
                 defaults: ['icon_seamless', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'meteofrance_seamless', 'ukmo_seamless']
             }
         };
+        // Fixed categorical colors for the per-model view, assigned by each
+        // model's position in the list so a model keeps its color no matter
+        // which others are selected. Validated for CVD/contrast on the
+        // slate-900 chart surface; the list is capped at 8 to match.
+        const MODEL_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+
+        function modelColor(modelId) {
+            const i = modeModels().findIndex(m => m.id === modelId);
+            return MODEL_COLORS[i >= 0 ? i % MODEL_COLORS.length : 0];
+        }
+
+        function modelName(modelId) {
+            const m = modeModels().find(x => x.id === modelId);
+            return m ? m.name : modelId;
+        }
+
         function modeModels() {
             return MODES[state.mode].models;
         }
@@ -406,6 +429,11 @@
                 precipUnitLabel: "Precip.",
                 membersToggle: "Members",
                 membersToggleTitle: "Draw every ensemble member as a thin line",
+                perModelToggle: "Per model",
+                perModelToggleTitle: "Show each model's forecast as its own line instead of the combined range",
+                legendPerModel: "Each line is one model's forecast. Turn off “Per model” to see the combined range.",
+                modelsTitleEnsemble: "Ensemble Models",
+                modelsTitleDeterministic: "Weather Models",
                 emptyTitle: "Pick a location to see the forecast",
                 emptyDesc: "Search for a city above, or use your current position.",
                 paramPrecipitation: "Precipitation",
@@ -490,6 +518,11 @@
                 precipUnitLabel: "Опади",
                 membersToggle: "Члени",
                 membersToggleTitle: "Показати кожного члена ансамблю тонкою лінією",
+                perModelToggle: "По моделях",
+                perModelToggleTitle: "Показати прогноз кожної моделі окремою лінією замість загального діапазону",
+                legendPerModel: "Кожна лінія — прогноз однієї моделі. Вимкніть «По моделях», щоб побачити загальний діапазон.",
+                modelsTitleEnsemble: "Ансамблеві моделі",
+                modelsTitleDeterministic: "Погодні моделі",
                 emptyTitle: "Виберіть місце, щоб побачити прогноз",
                 emptyDesc: "Знайдіть місто вище або використайте поточне місцезнаходження.",
                 paramPrecipitation: "Опади",
@@ -574,6 +607,11 @@
                 precipUnitLabel: "Precip.",
                 membersToggle: "Membros",
                 membersToggleTitle: "Desenhar cada membro do conjunto como uma linha fina",
+                perModelToggle: "Por modelo",
+                perModelToggleTitle: "Mostrar a previsão de cada modelo como uma linha própria em vez da faixa combinada",
+                legendPerModel: "Cada linha é a previsão de um modelo. Desative “Por modelo” para ver a faixa combinada.",
+                modelsTitleEnsemble: "Modelos de conjunto",
+                modelsTitleDeterministic: "Modelos meteorológicos",
                 emptyTitle: "Escolha um local para ver a previsão",
                 emptyDesc: "Busque uma cidade acima ou use sua posição atual.",
                 paramPrecipitation: "Precipitação",
@@ -1140,7 +1178,12 @@
             document.getElementById('membersTotal').textContent = state.mode === 'ensemble'
                 ? t('membersTotal', { count: chosen.reduce((sum, m) => sum + m.members, 0) })
                 : t('modelsCount', { count: chosen.length });
-            document.getElementById('btnMembers').classList.toggle('active', state.showMembers);
+            document.getElementById('modelsTitle').textContent = t(state.mode === 'ensemble' ? 'modelsTitleEnsemble' : 'modelsTitleDeterministic');
+            const btn = document.getElementById('btnMembers');
+            btn.classList.toggle('active', state.showMembers);
+            btn.setAttribute('aria-pressed', state.showMembers ? 'true' : 'false');
+            btn.title = t(state.mode === 'ensemble' ? 'membersToggleTitle' : 'perModelToggleTitle');
+            document.getElementById('membersToggleLabel').textContent = t(state.mode === 'ensemble' ? 'membersToggle' : 'perModelToggle');
         }
 
         function windowLabel(hours) {
@@ -1157,6 +1200,8 @@
                 `<button type="button" data-window="${h}" class="${h === state.window ? 'active' : ''}" aria-pressed="${h === state.window}">${escapeHtml(windowLabel(h))}</button>`
             ).join('');
             document.getElementById('legendMinMax').textContent = t(state.mode === 'ensemble' ? 'legendMinMaxEnsemble' : 'legendMinMaxModels');
+            document.querySelectorAll('[data-legend-range]').forEach(el => el.classList.toggle('hidden', perModelView()));
+            document.getElementById('legendPerModel').classList.toggle('hidden', !perModelView());
         }
 
         // "186 members" / "5 models" label for the current mode.
@@ -1290,6 +1335,7 @@
                     </h3>
                     <span id="chartMembers-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
                 </div>
+                <div id="chartLegend-${param.key}" class="hidden flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-300"></div>
                 <div class="h-64 sm:h-72 relative">
                     <canvas id="chart-${param.key}"></canvas>
                     <div id="chartOverlay-${param.key}" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 bg-slate-900/70 rounded-xl"></div>
@@ -1297,8 +1343,22 @@
             </div>`;
         }
 
+        // In Models mode the Members toggle swaps the combined range for one
+        // colored line per model; in Ensemble mode it overlays member lines.
+        function perModelView() {
+            return state.mode === 'deterministic' && state.showMembers;
+        }
+
         function buildDatasets(param, data) {
             const c = param.color;
+            if (perModelView()) {
+                const line = { cubicInterpolationMode: 'monotone', spanGaps: true, pointRadius: 0 };
+                return (data ? data.members : []).map(m => ({
+                    ...line, label: 'model', modelName: modelName(m.model), data: m.values, fill: false,
+                    borderColor: modelColor(m.model), backgroundColor: modelColor(m.model), borderWidth: 2,
+                    pointHoverRadius: 4, pointHoverBorderWidth: 2, pointHoverBorderColor: '#0f172a'
+                }));
+            }
             const s = data ? data.stats : { min: [], max: [], p10: [], p90: [], p25: [], p75: [], median: [], chance: [] };
             // Monotone interpolation never overshoots the data, so smoothed
             // curves can't dip below zero between two dry hours.
@@ -1369,6 +1429,12 @@
                     param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
                     hasData ? countLabel(data.members.length) : '';
+                const legend = document.getElementById(`chartLegend-${param.key}`);
+                const showLegend = perModelView() && hasData;
+                legend.classList.toggle('hidden', !showLegend);
+                legend.innerHTML = showLegend ? data.members.map(m =>
+                    `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${modelColor(m.model)}"></span>${escapeHtml(modelName(m.model))}</span>`
+                ).join('') : '';
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
                 const overlayText = state.loading ? t('loading') : hasData ? '' :
@@ -1388,7 +1454,8 @@
                     chart.$times = times;
                     chart.data.labels = labels;
                     chart.data.datasets = datasets;
-                    chart.options.scales.yChance.display = !!param.probability;
+                    chart.options.scales.yChance.display = !!param.probability && !perModelView();
+                    chart.options.plugins.tooltip.displayColors = perModelView();
                     chart.update('none');
                     return;
                 }
@@ -1412,14 +1479,23 @@
                                     titleColor: '#e2e8f0',
                                     bodyColor: '#cbd5e1',
                                     padding: 10,
-                                    displayColors: false,
-                                    // Only the median point drives the tooltip;
-                                    // its body is the full ensemble breakdown.
-                                    filter: item => item.dataset.label === 'median',
+                                    displayColors: perModelView(),
+                                    boxWidth: 10,
+                                    boxHeight: 10,
+                                    boxPadding: 4,
+                                    // Range view: only the median point drives
+                                    // the tooltip and its body is the full
+                                    // breakdown. Per-model view: one line per
+                                    // model, highest value first.
+                                    filter: item => item.dataset.label === (perModelView() ? 'model' : 'median'),
+                                    itemSort: (a, b) => (b.raw ?? -Infinity) - (a.raw ?? -Infinity),
                                     callbacks: {
                                         title: items => items.length ? formatDayHour(chart.$times[items[0].dataIndex]) : '',
-                                        label: () => null,
-                                        afterBody: items => items.length ? tooltipLines(param, items[0].dataIndex) : []
+                                        label: item => perModelView()
+                                            ? `${item.dataset.modelName}: ${formatValue(item.raw, param)} ${unitLabel(param)}`
+                                            : null,
+                                        labelColor: item => ({ borderColor: item.dataset.borderColor, backgroundColor: item.dataset.borderColor, borderRadius: 2 }),
+                                        afterBody: items => items.length && !perModelView() ? tooltipLines(param, items[0].dataIndex) : []
                                     }
                                 }
                             },
@@ -1435,7 +1511,7 @@
                                     ticks: { color: '#94a3b8', font: { size: 10 } }
                                 },
                                 yChance: {
-                                    display: !!param.probability,
+                                    display: !!param.probability && !perModelView(),
                                     position: 'right',
                                     min: 0,
                                     max: 100,
@@ -1717,6 +1793,7 @@
             document.getElementById('btnMembers').addEventListener('click', () => {
                 state.showMembers = !state.showMembers;
                 saveSettings();
+                renderModeAndWindow();
                 renderModelChips();
                 renderCharts();
             });
