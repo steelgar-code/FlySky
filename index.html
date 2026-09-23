@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FlySky - Ensemble Weather Forecast</title>
-    <meta name="description" content="Ensemble weather forecast for drone pilots: probability ranges for precipitation, wind speed and wind gusts from multiple weather models, powered by Open-Meteo.">
+    <meta name="description" content="Weather forecast for drone pilots: probability ranges for precipitation, wind, gusts and low clouds from ensemble and deterministic weather models, powered by Open-Meteo.">
     <meta name="theme-color" content="#0d9488">
     <!-- PWA manifest + icons -->
     <link rel="manifest" href="manifest.json">
@@ -97,6 +97,32 @@
         }
         .chip .chip-count { font-family: 'JetBrains Mono', monospace; opacity: 0.7; }
 
+        /* Segmented button group (mode + time window) */
+        .seg {
+            display: inline-flex;
+            padding: 2px;
+            border-radius: 0.625rem;
+            background: rgb(2 6 23);
+            border: 1px solid rgb(51 65 85 / 0.6);
+        }
+        .seg button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.3rem 0.625rem;
+            border-radius: 0.5rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: rgb(148 163 184);
+            transition: all 150ms;
+            white-space: nowrap;
+        }
+        .seg button:hover { color: rgb(241 245 249); }
+        .seg button.active {
+            color: rgb(2 6 23);
+            background: rgb(34 211 238);
+        }
+
         .search-item.highlight { background: rgb(30 41 59 / 0.8); }
 
         .legend-swatch {
@@ -117,7 +143,7 @@
             </div>
             <div>
                 <span class="font-bold tracking-tight text-white text-lg">FLY<span class="text-cyan-400">SKY</span></span>
-                <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono">ENSEMBLE WX</span>
+                <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono">MULTI-MODEL WX</span>
             </div>
         </div>
 
@@ -188,14 +214,20 @@
                 </div>
             </section>
 
-            <!-- Forecast settings: models + units -->
+            <!-- Forecast settings: mode, models, time window, units -->
             <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
-                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                        <i class="fa-solid fa-layer-group text-teal-400"></i>
-                        <span data-i18n="modelsTitle">Ensemble Models</span>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <div class="seg" role="group" data-i18n-aria-label="modeLabel" aria-label="Forecast mode">
+                            <button type="button" data-mode="ensemble" data-i18n-title="modeEnsembleTitle" title="Probability ranges from ensemble model runs">
+                                <i class="fa-solid fa-layer-group"></i> <span data-i18n="modeEnsemble">Ensemble</span>
+                            </button>
+                            <button type="button" data-mode="deterministic" data-i18n-title="modeDeterministicTitle" title="Spread between the main forecast of each model">
+                                <i class="fa-solid fa-bullseye"></i> <span data-i18n="modeDeterministic">Models</span>
+                            </button>
+                        </div>
                         <span id="membersTotal" class="text-[11px] font-mono text-slate-500"></span>
-                    </h3>
+                    </div>
                     <div class="flex items-center gap-2 flex-wrap">
                         <label class="text-[11px] text-slate-400" for="windUnitSelect" data-i18n="windUnitLabel">Wind</label>
                         <select id="windUnitSelect" class="unit-select">
@@ -215,6 +247,12 @@
                     </div>
                 </div>
                 <div id="modelChips" class="flex flex-wrap gap-2"></div>
+                <div class="flex items-center gap-3 flex-wrap pt-1">
+                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                        <i class="fa-solid fa-clock text-cyan-400"></i> <span data-i18n="windowLabel">Time window</span>
+                    </span>
+                    <div id="windowButtons" class="seg" role="group"></div>
+                </div>
                 <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
             </section>
 
@@ -226,14 +264,14 @@
             </section>
 
             <!-- Summary stat cards -->
-            <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+            <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
 
             <!-- One chart card per weather parameter (built dynamically) -->
             <div id="chartsContainer" class="space-y-6"></div>
 
             <!-- Legend explainer -->
             <section id="legendCard" class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.12)"></span> <span data-i18n="legendMinMax">Min – max (all members)</span></span>
+                <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.12)"></span> <span id="legendMinMax"></span></span>
                 <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.25)"></span> <span data-i18n="legendP10P90">10–90% (80% likely)</span></span>
                 <span class="flex items-center gap-1.5"><span class="legend-swatch" style="background: rgba(56,189,248,0.45)"></span> <span data-i18n="legendP25P75">25–75% (50% likely)</span></span>
                 <span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: #38bdf8"></span> <span data-i18n="legendMedian">Median</span></span>
@@ -272,30 +310,59 @@
 
     <script>
         // ================= Configuration =================
-        const FORECAST_URL = 'https://ensemble-api.open-meteo.com/v1/ensemble';
         const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
-        // Hours shown on every chart, starting from the current hour at the
-        // selected location.
-        const FORECAST_HOURS = 72;
+        // Selectable time windows (hours from the current hour at the selected
+        // location). Only as many forecast days as the window needs are fetched.
+        const WINDOWS = [3, 8, 24, 48, 72, 168];
+        const DEFAULT_WINDOW = 24;
         // A forecast is re-fetched automatically once it's older than this.
         const FORECAST_MAX_AGE_MS = 30 * 60 * 1000;
         // An hour counts as "wet" for the chance-of-precipitation bars when a
         // member predicts at least this much (in mm, before unit conversion).
         const WET_HOUR_MM = 0.1;
 
-        // Ensemble models offered in the model picker. `members` is the member
-        // count including the control run, shown as a hint in the chip.
-        const MODELS = [
-            { id: 'icon_seamless', name: 'DWD ICON', members: 40 },
-            { id: 'gfs_seamless', name: 'NOAA GFS', members: 31 },
-            { id: 'ecmwf_ifs025', name: 'ECMWF IFS', members: 51 },
-            { id: 'ecmwf_aifs025', name: 'ECMWF AIFS', members: 51 },
-            { id: 'google_weathernext2_ensemble', name: 'Google WeatherNext 2', members: 64 },
-            { id: 'gem_global', name: 'GEM Global', members: 21 },
-            { id: 'ukmo_global_ensemble_20km', name: 'UK Met Office', members: 18 },
-            { id: 'bom_access_global_ensemble', name: 'BOM ACCESS', members: 18 }
-        ];
-        const DEFAULT_MODELS = ['icon_seamless', 'gfs_seamless', 'ecmwf_ifs025', 'google_weathernext2_ensemble'];
+        // Two data sources that feed the same charts:
+        //  - ensemble: every member of each ensemble model run (Ensemble API);
+        //    `members` is the member count incl. the control run.
+        //  - deterministic: the single main forecast of each model (Forecast
+        //    API), so the bands show how much the models disagree.
+        // Defaults are picked for Ukraine / Eastern Europe: ICON (ICON-EU nest
+        // covers the region), ECMWF IFS + AIFS, and — for deterministic —
+        // Météo-France ARPEGE Europe and the UK Met Office global model.
+        const MODES = {
+            ensemble: {
+                url: 'https://ensemble-api.open-meteo.com/v1/ensemble',
+                models: [
+                    { id: 'icon_seamless', name: 'DWD ICON', members: 40 },
+                    { id: 'ecmwf_ifs025', name: 'ECMWF IFS', members: 51 },
+                    { id: 'ecmwf_aifs025', name: 'ECMWF AIFS', members: 51 },
+                    { id: 'google_weathernext2_ensemble', name: 'Google WeatherNext 2', members: 64 },
+                    { id: 'gfs_seamless', name: 'NOAA GFS', members: 31 },
+                    { id: 'ukmo_global_ensemble_20km', name: 'UK Met Office', members: 18 },
+                    { id: 'gem_global', name: 'GEM Global', members: 21 },
+                    { id: 'bom_access_global_ensemble', name: 'BOM ACCESS', members: 18 }
+                ],
+                defaults: ['icon_seamless', 'ecmwf_ifs025', 'ecmwf_aifs025', 'google_weathernext2_ensemble']
+            },
+            deterministic: {
+                url: 'https://api.open-meteo.com/v1/forecast',
+                models: [
+                    { id: 'icon_seamless', name: 'DWD ICON' },
+                    { id: 'ecmwf_ifs025', name: 'ECMWF IFS' },
+                    { id: 'ecmwf_aifs025_single', name: 'ECMWF AIFS' },
+                    { id: 'meteofrance_seamless', name: 'Météo-France' },
+                    { id: 'ukmo_seamless', name: 'UK Met Office' },
+                    { id: 'gfs_seamless', name: 'NOAA GFS' },
+                    { id: 'gem_seamless', name: 'GEM' },
+                    { id: 'jma_seamless', name: 'JMA' },
+                    { id: 'cma_grapes_global', name: 'CMA GRAPES' }
+                ],
+                defaults: ['icon_seamless', 'ecmwf_ifs025', 'ecmwf_aifs025_single', 'meteofrance_seamless', 'ukmo_seamless']
+            }
+        };
+        function modeModels() {
+            return MODES[state.mode].models;
+        }
 
         // Weather parameters, one chart each. `unit` picks which unit setting
         // applies. Adding a new parameter only needs a new entry here plus its
@@ -303,13 +370,18 @@
         const PARAMS = [
             { key: 'precipitation', unit: 'precip', icon: 'fa-cloud-rain', color: '56, 189, 248', titleKey: 'paramPrecipitation', probability: true, beginAtZero: true },
             { key: 'wind_speed_10m', unit: 'wind', icon: 'fa-wind', color: '45, 212, 191', titleKey: 'paramWindSpeed', beginAtZero: true },
-            { key: 'wind_gusts_10m', unit: 'wind', icon: 'fa-tornado', color: '251, 191, 36', titleKey: 'paramWindGusts', beginAtZero: true }
+            { key: 'wind_gusts_10m', unit: 'wind', icon: 'fa-tornado', color: '251, 191, 36', titleKey: 'paramWindGusts', beginAtZero: true },
+            { key: 'cloud_cover_low', unit: 'percent', icon: 'fa-cloud', color: '167, 139, 250', titleKey: 'paramLowClouds', beginAtZero: true, max: 100 }
         ];
 
         const UNIT_LABELS = {
             wind: { ms: 'm/s', kmh: 'km/h', kn: 'kn', mph: 'mph' },
             precip: { mm: 'mm', inch: 'in' }
         };
+
+        // Variables a given API/model rejected in this session, so we don't
+        // keep re-requesting them (e.g. a parameter the ensemble API lacks).
+        const unsupportedVars = { ensemble: new Set(), deterministic: new Set() };
 
         // ================= Translations =================
         const LANG_KEY = 'flysky_lang';
@@ -329,7 +401,6 @@
                 myLocation: "My location",
                 favoritesLabel: "Favorites",
                 favoritesEmpty: "Tap the star next to a location to save it here.",
-                modelsTitle: "Ensemble Models",
                 membersTotal: "{count} members",
                 windUnitLabel: "Wind",
                 precipUnitLabel: "Precip.",
@@ -341,7 +412,6 @@
                 paramWindSpeed: "Wind Speed (10 m)",
                 paramWindGusts: "Wind Gusts (10 m)",
                 perHour: "per hour",
-                legendMinMax: "Min – max (all members)",
                 legendP10P90: "10–90% (80% likely)",
                 legendP25P75: "25–75% (50% likely)",
                 legendMedian: "Median",
@@ -352,7 +422,26 @@
                 tooltipMinMax: "Min – max",
                 tooltipChance: "Chance of rain",
                 tooltipMembers: "Members",
-                statPrecipTitle: "Precipitation, 72 h",
+                statPrecipTitle: "Precipitation, {window}",
+                modeLabel: "Forecast mode",
+                modeEnsemble: "Ensemble",
+                modeEnsembleTitle: "Probability ranges from every run of each ensemble model",
+                modeDeterministic: "Models",
+                modeDeterministicTitle: "Spread between the main (deterministic) forecast of each model",
+                windowLabel: "Time window",
+                windowHours: "{n} h",
+                windowWeek: "1 week",
+                modelsCount: "{count} models",
+                paramLowClouds: "Low Cloud Cover",
+                legendMinMaxEnsemble: "Min – max (all members)",
+                legendMinMaxModels: "Min – max (all models)",
+                tooltipModels: "Models",
+                statCloudTitle: "Low Clouds",
+                statCloudValue: "{value}%",
+                statCloudSub: "average · 80% range {lo}–{hi}%",
+                statCloudClearest: "clearest at {when}",
+                toastModelFailed: "{model} unavailable: {error}",
+                modelNoData: "No data from this model",
                 statPrecipValue: "{median} {unit}",
                 statPrecipSub: "80% range {lo}–{hi} {unit}",
                 statPrecipChance: "{pct}% chance of ≥ 1 mm",
@@ -362,9 +451,10 @@
                 statPeakSub: "median peak · 10% chance above {hi} {unit}",
                 statPeakWhen: "at {when}",
                 statNoData: "No data from selected models",
-                forecastMeta: "Updated {time} · {models} · next {hours} h, local time ({tz})",
+                forecastMeta: "Updated {time} · {models} · next {window}, local time ({tz})",
                 forecastMetaCached: "Cached forecast from {time} · {models}",
                 chartNoData: "Selected models don't provide this parameter here.",
+                chartNotInMode: "Not available from ensemble models — switch to Models mode.",
                 loading: "Loading forecast…",
                 toastSelectModel: "Select at least one model",
                 toastFavAdded: "Added {name} to favorites",
@@ -395,7 +485,6 @@
                 myLocation: "Моє місцезнаходження",
                 favoritesLabel: "Обране",
                 favoritesEmpty: "Натисніть зірочку біля назви місця, щоб зберегти його тут.",
-                modelsTitle: "Ансамблеві моделі",
                 membersTotal: "{count} членів ансамблю",
                 windUnitLabel: "Вітер",
                 precipUnitLabel: "Опади",
@@ -407,7 +496,6 @@
                 paramWindSpeed: "Швидкість вітру (10 м)",
                 paramWindGusts: "Пориви вітру (10 м)",
                 perHour: "за годину",
-                legendMinMax: "Мін – макс (усі члени)",
                 legendP10P90: "10–90% (ймовірність 80%)",
                 legendP25P75: "25–75% (ймовірність 50%)",
                 legendMedian: "Медіана",
@@ -418,7 +506,26 @@
                 tooltipMinMax: "Мін – макс",
                 tooltipChance: "Ймовірність опадів",
                 tooltipMembers: "Членів",
-                statPrecipTitle: "Опади за 72 год",
+                statPrecipTitle: "Опади за {window}",
+                modeLabel: "Режим прогнозу",
+                modeEnsemble: "Ансамбль",
+                modeEnsembleTitle: "Діапазони ймовірностей з усіх прогонів кожної ансамблевої моделі",
+                modeDeterministic: "Моделі",
+                modeDeterministicTitle: "Розкид між основними (детерміністичними) прогнозами моделей",
+                windowLabel: "Період",
+                windowHours: "{n} год",
+                windowWeek: "1 тиждень",
+                modelsCount: "{count} моделей",
+                paramLowClouds: "Низька хмарність",
+                legendMinMaxEnsemble: "Мін – макс (усі члени)",
+                legendMinMaxModels: "Мін – макс (усі моделі)",
+                tooltipModels: "Моделей",
+                statCloudTitle: "Низька хмарність",
+                statCloudValue: "{value}%",
+                statCloudSub: "середня · діапазон 80%: {lo}–{hi}%",
+                statCloudClearest: "найясніше о {when}",
+                toastModelFailed: "{model} недоступна: {error}",
+                modelNoData: "Немає даних від цієї моделі",
                 statPrecipValue: "{median} {unit}",
                 statPrecipSub: "діапазон 80%: {lo}–{hi} {unit}",
                 statPrecipChance: "{pct}% ймовірність ≥ 1 мм",
@@ -428,9 +535,10 @@
                 statPeakSub: "медіана піку · 10% ймовірність понад {hi} {unit}",
                 statPeakWhen: "о {when}",
                 statNoData: "Немає даних від вибраних моделей",
-                forecastMeta: "Оновлено {time} · {models} · наступні {hours} год, місцевий час ({tz})",
+                forecastMeta: "Оновлено {time} · {models} · наступні {window}, місцевий час ({tz})",
                 forecastMetaCached: "Збережений прогноз від {time} · {models}",
                 chartNoData: "Вибрані моделі не надають цей параметр для цього місця.",
+                chartNotInMode: "Недоступно для ансамблевих моделей — перейдіть у режим «Моделі».",
                 loading: "Завантаження прогнозу…",
                 toastSelectModel: "Виберіть хоча б одну модель",
                 toastFavAdded: "{name} додано в обране",
@@ -461,7 +569,6 @@
                 myLocation: "Minha localização",
                 favoritesLabel: "Favoritos",
                 favoritesEmpty: "Toque na estrela ao lado de um local para salvá-lo aqui.",
-                modelsTitle: "Modelos de conjunto",
                 membersTotal: "{count} membros",
                 windUnitLabel: "Vento",
                 precipUnitLabel: "Precip.",
@@ -473,7 +580,6 @@
                 paramWindSpeed: "Velocidade do vento (10 m)",
                 paramWindGusts: "Rajadas de vento (10 m)",
                 perHour: "por hora",
-                legendMinMax: "Mín – máx (todos os membros)",
                 legendP10P90: "10–90% (80% provável)",
                 legendP25P75: "25–75% (50% provável)",
                 legendMedian: "Mediana",
@@ -484,7 +590,26 @@
                 tooltipMinMax: "Mín – máx",
                 tooltipChance: "Chance de chuva",
                 tooltipMembers: "Membros",
-                statPrecipTitle: "Precipitação, 72 h",
+                statPrecipTitle: "Precipitação, {window}",
+                modeLabel: "Modo de previsão",
+                modeEnsemble: "Conjunto",
+                modeEnsembleTitle: "Faixas de probabilidade de todas as rodadas de cada modelo de conjunto",
+                modeDeterministic: "Modelos",
+                modeDeterministicTitle: "Dispersão entre a previsão principal (determinística) de cada modelo",
+                windowLabel: "Período",
+                windowHours: "{n} h",
+                windowWeek: "1 semana",
+                modelsCount: "{count} modelos",
+                paramLowClouds: "Nuvens baixas",
+                legendMinMaxEnsemble: "Mín – máx (todos os membros)",
+                legendMinMaxModels: "Mín – máx (todos os modelos)",
+                tooltipModels: "Modelos",
+                statCloudTitle: "Nuvens baixas",
+                statCloudValue: "{value}%",
+                statCloudSub: "média · faixa 80%: {lo}–{hi}%",
+                statCloudClearest: "mais limpo em {when}",
+                toastModelFailed: "{model} indisponível: {error}",
+                modelNoData: "Sem dados deste modelo",
                 statPrecipValue: "{median} {unit}",
                 statPrecipSub: "faixa 80%: {lo}–{hi} {unit}",
                 statPrecipChance: "{pct}% de chance de ≥ 1 mm",
@@ -494,9 +619,10 @@
                 statPeakSub: "pico mediano · 10% de chance acima de {hi} {unit}",
                 statPeakWhen: "em {when}",
                 statNoData: "Sem dados dos modelos selecionados",
-                forecastMeta: "Atualizado {time} · {models} · próximas {hours} h, hora local ({tz})",
+                forecastMeta: "Atualizado {time} · {models} · próximas {window}, hora local ({tz})",
                 forecastMetaCached: "Previsão salva de {time} · {models}",
                 chartNoData: "Os modelos selecionados não fornecem este parâmetro aqui.",
+                chartNotInMode: "Indisponível nos modelos de conjunto — mude para o modo Modelos.",
                 loading: "Carregando previsão…",
                 toastSelectModel: "Selecione pelo menos um modelo",
                 toastFavAdded: "{name} adicionado aos favoritos",
@@ -591,11 +717,15 @@
         let state = {
             location: loadFromStorage('flysky_last_location', null),
             favorites: loadFromStorage('flysky_favorites', []),
-            models: loadFromStorage('flysky_models', DEFAULT_MODELS),
+            mode: loadFromStorage('flysky_mode', 'ensemble'),
+            // Selected model ids, kept separately for each mode.
+            modelsByMode: loadFromStorage('flysky_models_by_mode', {}),
+            window: loadFromStorage('flysky_window', DEFAULT_WINDOW),
             windUnit: loadFromStorage('flysky_wind_unit', 'ms'),
             precipUnit: loadFromStorage('flysky_precip_unit', 'mm'),
             showMembers: loadFromStorage('flysky_show_members', false) === true,
-            // Last successful forecast: { key, fetchedAt, data }. Persisted so
+            // Last loaded forecast: { key, days, fetchedAt, meta, times,
+            // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
             forecast: loadFromStorage('flysky_forecast_cache', null),
             forecastFromCache: false,
@@ -604,18 +734,30 @@
         if (!isValidLocation(state.location)) state.location = null;
         if (!Array.isArray(state.favorites)) state.favorites = [];
         state.favorites = state.favorites.filter(isValidLocation);
-        if (!Array.isArray(state.models)) state.models = DEFAULT_MODELS.slice();
-        state.models = state.models.filter(id => MODELS.some(m => m.id === id));
-        if (!state.models.length) state.models = DEFAULT_MODELS.slice();
+        if (!MODES[state.mode]) state.mode = 'ensemble';
+        if (!state.modelsByMode || typeof state.modelsByMode !== 'object' || Array.isArray(state.modelsByMode)) state.modelsByMode = {};
+        Object.keys(MODES).forEach(mode => {
+            let ids = state.modelsByMode[mode];
+            if (!Array.isArray(ids)) ids = [];
+            ids = ids.filter(id => MODES[mode].models.some(m => m.id === id));
+            state.modelsByMode[mode] = ids.length ? ids : MODES[mode].defaults.slice();
+        });
+        if (!WINDOWS.includes(state.window)) state.window = DEFAULT_WINDOW;
         if (!UNIT_LABELS.wind[state.windUnit]) state.windUnit = 'ms';
         if (!UNIT_LABELS.precip[state.precipUnit]) state.precipUnit = 'mm';
-        if (state.forecast && (!state.forecast.data || !state.forecast.key)) state.forecast = null;
+        if (state.forecast && (!state.forecast.key || !state.forecast.models || !Array.isArray(state.forecast.times))) state.forecast = null;
         if (state.forecast) state.forecastFromCache = true;
+
+        function selectedModels() {
+            return state.modelsByMode[state.mode];
+        }
 
         function saveSettings() {
             saveToStorage('flysky_last_location', state.location);
             saveToStorage('flysky_favorites', state.favorites);
-            saveToStorage('flysky_models', state.models);
+            saveToStorage('flysky_mode', state.mode);
+            saveToStorage('flysky_models_by_mode', state.modelsByMode);
+            saveToStorage('flysky_window', state.window);
             saveToStorage('flysky_wind_unit', state.windUnit);
             saveToStorage('flysky_precip_unit', state.precipUnit);
             saveToStorage('flysky_show_members', state.showMembers);
@@ -651,13 +793,15 @@
         }
 
         function unitLabel(param) {
+            if (param.unit === 'percent') return '%';
             return param.unit === 'wind' ? UNIT_LABELS.wind[state.windUnit] : UNIT_LABELS.precip[state.precipUnit];
         }
 
         function formatValue(value, param) {
             if (value === null || value === undefined || !Number.isFinite(value)) return '–';
             let digits;
-            if (param.unit === 'precip') digits = state.precipUnit === 'inch' ? 2 : 1;
+            if (param.unit === 'percent') digits = 0;
+            else if (param.unit === 'precip') digits = state.precipUnit === 'inch' ? 2 : 1;
             else digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
             return value.toLocaleString(currentLang, { minimumFractionDigits: digits, maximumFractionDigits: digits });
         }
@@ -697,33 +841,70 @@
         // ================= Forecast Data =================
         function forecastKey() {
             if (!state.location) return null;
-            return [locationKey(state.location), state.models.slice().sort().join('+'), state.windUnit, state.precipUnit].join('|');
+            return [state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
         }
 
-        function buildForecastUrl() {
+        // Forecast days (counted from local midnight today) needed to cover
+        // the selected window starting at the current hour.
+        function daysNeeded() {
+            return Math.ceil((24 + state.window) / 24);
+        }
+
+        function buildForecastUrl(mode, model, vars, days) {
             const params = new URLSearchParams({
                 latitude: state.location.latitude,
                 longitude: state.location.longitude,
-                hourly: PARAMS.map(p => p.key).join(','),
-                models: state.models.join(','),
-                // 4 days so a full 72-hour window from "now" is always covered.
-                forecast_days: 4,
+                hourly: vars.join(','),
+                models: model,
+                forecast_days: days,
                 timezone: 'auto',
                 wind_speed_unit: state.windUnit,
                 precipitation_unit: state.precipUnit
             });
-            return `${FORECAST_URL}?${params.toString()}`;
+            return `${MODES[mode].url}?${params.toString()}`;
+        }
+
+        // Fetches one model. Each model gets its own request so a single
+        // unavailable model (or a variable one API doesn't offer) never takes
+        // the whole forecast down. When the API rejects a variable by name, it
+        // is dropped and the request retried without it.
+        async function fetchModel(mode, model, days) {
+            let vars = PARAMS.map(p => p.key).filter(v => !unsupportedVars[mode].has(v));
+            try {
+                for (;;) {
+                    const res = await fetch(buildForecastUrl(mode, model, vars, days));
+                    const body = await res.json().catch(() => null);
+                    if (res.ok && body && !body.error && body.hourly) return { model, data: body };
+                    const reason = (body && body.reason) || `HTTP ${res.status}`;
+                    let bad = null;
+                    if (res.status === 400) {
+                        const m = reason.match(/value\s+['"]?([a-z0-9_]+)/i);
+                        if (m && vars.includes(m[1])) bad = m[1];
+                        if (!bad) {
+                            const hits = vars.filter(v => new RegExp(`\\b${v}\\b`).test(reason));
+                            if (hits.length === 1) bad = hits[0];
+                        }
+                    }
+                    if (bad && vars.length > 1) {
+                        console.warn(`FlySky: ${mode} API rejected "${bad}", retrying without it.`);
+                        unsupportedVars[mode].add(bad);
+                        vars = vars.filter(v => v !== bad);
+                        continue;
+                    }
+                    return { model, error: reason };
+                }
+            } catch (err) {
+                return { model, error: err.message || String(err), network: true };
+            }
         }
 
         async function loadForecast({ force = false } = {}) {
             if (!state.location) return;
-            if (!state.models.length) {
-                showToast(t('toastSelectModel'), 'warning');
-                return;
-            }
             const key = forecastKey();
-            const fresh = state.forecast && state.forecast.key === key &&
-                Date.now() - state.forecast.fetchedAt < FORECAST_MAX_AGE_MS;
+            const days = daysNeeded();
+            const fc = state.forecast;
+            const fresh = fc && fc.key === key && fc.days >= days &&
+                Date.now() - fc.fetchedAt < FORECAST_MAX_AGE_MS;
             if (fresh && !force) {
                 state.forecastFromCache = false;
                 processForecast();
@@ -731,74 +912,98 @@
                 return;
             }
 
+            const mode = state.mode;
+            const models = selectedModels().slice();
             setLoading(true);
+            let results;
             try {
-                const res = await fetch(buildForecastUrl());
-                const body = await res.json().catch(() => null);
-                if (!res.ok || !body || body.error) {
-                    throw new Error((body && body.reason) || `HTTP ${res.status}`);
-                }
-                // Ignore a response for a location/model set that's no longer current.
-                if (forecastKey() !== key) return;
-                state.forecast = { key, fetchedAt: Date.now(), data: body };
-                state.forecastFromCache = false;
-                saveToStorage('flysky_forecast_cache', state.forecast);
-            } catch (err) {
-                console.error('FlySky: forecast request failed.', err);
-                if (state.forecast && state.forecast.key === key) {
+                results = await Promise.all(models.map(id => fetchModel(mode, id, days)));
+            } finally {
+                setLoading(false);
+            }
+            // Ignore responses for a location/mode/model set that's no longer current.
+            if (forecastKey() !== key) return;
+
+            const ok = results.filter(r => r.data);
+            const failed = results.filter(r => r.error);
+            if (!ok.length) {
+                console.error('FlySky: forecast request failed.', failed);
+                if (fc && fc.key === key) {
                     state.forecastFromCache = true;
                     showToast(t('toastUsingCache'), 'warning');
                 } else {
-                    showToast(t('toastForecastError', { error: err.message || String(err) }), 'warning');
+                    showToast(t('toastForecastError', { error: failed.length ? failed[0].error : '?' }), 'warning');
                 }
-            } finally {
-                setLoading(false);
+            } else {
+                const first = ok[0].data;
+                state.forecast = {
+                    key,
+                    days,
+                    fetchedAt: Date.now(),
+                    meta: {
+                        timezone: first.timezone,
+                        timezoneAbbreviation: first.timezone_abbreviation,
+                        utcOffsetSeconds: first.utc_offset_seconds || 0
+                    },
+                    times: first.hourly.time || [],
+                    models: Object.fromEntries(ok.map(r => [r.model, r.data.hourly])),
+                    errors: Object.fromEntries(failed.map(r => [r.model, r.error]))
+                };
+                state.forecastFromCache = false;
+                saveToStorage('flysky_forecast_cache', state.forecast);
+                failed.filter(r => !r.network).forEach(r => {
+                    const m = modeModels().find(x => x.id === r.model);
+                    showToast(t('toastModelFailed', { model: m ? m.name : r.model, error: r.error }), 'warning');
+                });
             }
             processForecast();
             renderAll();
         }
 
-        // Turns the raw API response into per-parameter ensemble statistics.
+        // Turns the per-model API responses into per-parameter statistics.
         //
-        // With a single model, member series come back as e.g.
-        // `wind_speed_10m` (control) and `wind_speed_10m_member01`…; with
-        // several models each key also gets a `_<model>` suffix. Rather than
-        // depend on the exact naming, we pool every hourly series whose key
-        // starts with the parameter name, and attribute it to a model when the
-        // key ends with a known model id.
+        // Ensemble responses hold one series per member (`wind_speed_10m`
+        // for the control run, `wind_speed_10m_member01`, …); deterministic
+        // responses hold a single `wind_speed_10m` series. Either way every
+        // series whose key starts with the parameter name is treated as one
+        // member, and all members of all selected models are pooled.
         function processForecast() {
             processed = null;
             const fc = state.forecast;
-            if (!fc || fc.key !== forecastKey() || !fc.data || !fc.data.hourly) return;
-            const hourly = fc.data.hourly;
-            const times = hourly.time || [];
+            if (!fc || fc.key !== forecastKey()) return;
+            const times = fc.times;
 
             // Current hour at the forecast location, in the same local
             // "YYYY-MM-DDTHH" form the API uses.
-            const offsetMs = (fc.data.utc_offset_seconds || 0) * 1000;
-            const nowLocal = new Date(Date.now() + offsetMs).toISOString().slice(0, 13);
+            const nowLocal = new Date(Date.now() + fc.meta.utcOffsetSeconds * 1000).toISOString().slice(0, 13);
             let start = times.findIndex(tm => tm.slice(0, 13) >= nowLocal);
-            if (start < 0) start = Math.max(0, times.length - FORECAST_HOURS);
-            const end = Math.min(times.length, start + FORECAST_HOURS);
+            if (start < 0) start = Math.max(0, times.length - state.window);
+            const end = Math.min(times.length, start + state.window);
             const windowTimes = times.slice(start, end);
 
-            const otherParamKeys = PARAMS.map(p => p.key);
+            const paramKeys = PARAMS.map(p => p.key);
             const result = { times: windowTimes, params: {}, modelsWithData: new Set() };
 
             PARAMS.forEach(param => {
                 const members = [];
-                Object.keys(hourly).forEach(k => {
-                    if (k !== param.key && !k.startsWith(param.key + '_')) return;
-                    // Don't let e.g. "wind_speed_10m" claim a longer param key.
-                    if (otherParamKeys.some(o => o !== param.key && o.startsWith(param.key) && (k === o || k.startsWith(o + '_')))) return;
-                    const series = hourly[k];
-                    if (!Array.isArray(series)) return;
-                    const values = series.slice(start, end);
-                    if (!values.some(v => v !== null && v !== undefined)) return;
-                    const model = MODELS.find(m => k.endsWith('_' + m.id));
-                    const modelId = model ? model.id : (state.models.length === 1 ? state.models[0] : null);
-                    if (modelId) result.modelsWithData.add(modelId);
-                    members.push({ key: k, model: modelId, values });
+                Object.entries(fc.models).forEach(([modelId, hourly]) => {
+                    // Models normally share one time axis; realign if not.
+                    const own = hourly.time || times;
+                    const aligned = own.length === times.length && own[0] === times[0];
+                    const index = aligned ? null : new Map(own.map((tm, i) => [tm, i]));
+                    Object.keys(hourly).forEach(k => {
+                        if (k !== param.key && !k.startsWith(param.key + '_')) return;
+                        // Don't let a shorter param key claim a longer one's series.
+                        if (paramKeys.some(o => o !== param.key && o.startsWith(param.key) && (k === o || k.startsWith(o + '_')))) return;
+                        const series = hourly[k];
+                        if (!Array.isArray(series)) return;
+                        const values = aligned
+                            ? series.slice(start, end)
+                            : windowTimes.map(tm => (index.has(tm) ? series[index.get(tm)] : null));
+                        if (!values.some(v => v !== null && v !== undefined)) return;
+                        result.modelsWithData.add(modelId);
+                        members.push({ key: k, model: modelId, values });
+                    });
                 });
 
                 const stats = { min: [], p10: [], p25: [], median: [], p75: [], p90: [], max: [], chance: [], count: [] };
@@ -824,8 +1029,8 @@
         }
 
         // Per-member aggregates over the whole window, turned into ensemble
-        // statistics for the summary cards: total precipitation for rain, and
-        // the peak value for wind/gusts.
+        // statistics for the summary cards: total precipitation for rain, the
+        // average for cloud cover, and the peak value for wind/gusts.
         function summarize(param, members) {
             if (!members.length) return null;
             if (param.key === 'precipitation') {
@@ -838,12 +1043,15 @@
                     chance: Math.round(totals.filter(v => v >= oneMm - 1e-9).length / totals.length * 100)
                 };
             }
-            const peaks = members
+            const perMember = members
                 .map(m => m.values.filter(Number.isFinite))
-                .filter(vals => vals.length)
-                .map(vals => Math.max(...vals))
-                .sort((a, b) => a - b);
-            if (!peaks.length) return null;
+                .filter(vals => vals.length);
+            if (!perMember.length) return null;
+            if (param.key === 'cloud_cover_low') {
+                const means = perMember.map(vals => vals.reduce((a, b) => a + b, 0) / vals.length).sort((a, b) => a - b);
+                return { median: quantile(means, 0.5), p10: quantile(means, 0.1), p90: quantile(means, 0.9) };
+            }
+            const peaks = perMember.map(vals => Math.max(...vals)).sort((a, b) => a - b);
             return { median: quantile(peaks, 0.5), p90: quantile(peaks, 0.9) };
         }
 
@@ -851,6 +1059,7 @@
         function renderAll() {
             renderLocation();
             renderFavorites();
+            renderModeAndWindow();
             renderModelChips();
             renderUnits();
             renderMeta();
@@ -914,18 +1123,45 @@
 
         function renderModelChips() {
             const wrap = document.getElementById('modelChips');
-            wrap.innerHTML = MODELS.map(m => {
-                const active = state.models.includes(m.id);
-                const missing = active && processed && !state.loading && processed.modelsWithData.size && !processed.modelsWithData.has(m.id);
+            const selected = selectedModels();
+            const fc = state.forecast && state.forecast.key === forecastKey() ? state.forecast : null;
+            wrap.innerHTML = modeModels().map(m => {
+                const active = selected.includes(m.id);
+                // Flag a selected model that failed or returned nothing usable.
+                const error = active && fc && !state.loading && (fc.errors && fc.errors[m.id] ||
+                    (processed && !processed.modelsWithData.has(m.id) ? t('modelNoData') : ''));
                 return `<button type="button" class="chip ${active ? 'active' : ''}" data-model="${m.id}" aria-pressed="${active}">
                     <i class="fa-solid ${active ? 'fa-square-check' : 'fa-square'} text-[10px]"></i>
-                    ${escapeHtml(m.name)} <span class="chip-count">${m.members}</span>
-                    ${missing ? '<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[10px]" title="No data"></i>' : ''}
+                    ${escapeHtml(m.name)}${m.members ? ` <span class="chip-count">${m.members}</span>` : ''}
+                    ${error ? `<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[10px]" title="${escapeHtml(error)}"></i>` : ''}
                 </button>`;
             }).join('');
-            const total = MODELS.filter(m => state.models.includes(m.id)).reduce((s, m) => s + m.members, 0);
-            document.getElementById('membersTotal').textContent = total ? t('membersTotal', { count: total }) : '';
+            const chosen = modeModels().filter(m => selected.includes(m.id));
+            document.getElementById('membersTotal').textContent = state.mode === 'ensemble'
+                ? t('membersTotal', { count: chosen.reduce((sum, m) => sum + m.members, 0) })
+                : t('modelsCount', { count: chosen.length });
             document.getElementById('btnMembers').classList.toggle('active', state.showMembers);
+        }
+
+        function windowLabel(hours) {
+            return hours === 168 ? t('windowWeek') : t('windowHours', { n: hours });
+        }
+
+        function renderModeAndWindow() {
+            document.querySelectorAll('[data-mode]').forEach(btn => {
+                const active = btn.dataset.mode === state.mode;
+                btn.classList.toggle('active', active);
+                btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            document.getElementById('windowButtons').innerHTML = WINDOWS.map(h =>
+                `<button type="button" data-window="${h}" class="${h === state.window ? 'active' : ''}" aria-pressed="${h === state.window}">${escapeHtml(windowLabel(h))}</button>`
+            ).join('');
+            document.getElementById('legendMinMax').textContent = t(state.mode === 'ensemble' ? 'legendMinMaxEnsemble' : 'legendMinMaxModels');
+        }
+
+        // "186 members" / "5 models" label for the current mode.
+        function countLabel(count) {
+            return t(state.mode === 'ensemble' ? 'membersTotal' : 'modelsCount', { count });
         }
 
         function renderUnits() {
@@ -941,11 +1177,11 @@
                 return;
             }
             const time = new Intl.DateTimeFormat(currentLang, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
-            const models = MODELS.filter(m => state.models.includes(m.id)).map(m => m.name).join(', ');
-            const tz = fc.data.timezone_abbreviation || fc.data.timezone || 'UTC';
+            const models = modeModels().filter(m => fc.models[m.id]).map(m => m.name).join(', ');
+            const tz = fc.meta.timezoneAbbreviation || fc.meta.timezone || 'UTC';
             el.textContent = state.loading ? t('loading') :
                 state.forecastFromCache ? t('forecastMetaCached', { time, models }) :
-                t('forecastMeta', { time, models, hours: FORECAST_HOURS, tz });
+                t('forecastMeta', { time, models, window: windowLabel(state.window), tz });
         }
 
         function statCard({ title, icon, color, value, sub, extra }) {
@@ -979,14 +1215,25 @@
                 if (!s) return statCard({ title: t(param.titleKey), icon: param.icon, color: param.color, value: '–', sub: t('statNoData') });
                 if (param.key === 'precipitation') {
                     return statCard({
-                        title: t('statPrecipTitle'), icon: param.icon, color: param.color,
+                        title: t('statPrecipTitle', { window: windowLabel(state.window) }), icon: param.icon, color: param.color,
                         value: t('statPrecipValue', { median: formatValue(s.median, param), unit }),
                         sub: t('statPrecipSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param), unit }),
                         extra: t('statPrecipChance', { pct: s.chance })
                     });
                 }
-                // Time of the highest point of the median curve.
                 const med = data.stats.median;
+                if (param.key === 'cloud_cover_low') {
+                    // Time of the lowest point of the median curve.
+                    let clearIdx = -1;
+                    med.forEach((v, i) => { if (Number.isFinite(v) && (clearIdx < 0 || v < med[clearIdx])) clearIdx = i; });
+                    return statCard({
+                        title: t('statCloudTitle'), icon: param.icon, color: param.color,
+                        value: t('statCloudValue', { value: formatValue(s.median, param) }),
+                        sub: t('statCloudSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param) }),
+                        extra: clearIdx >= 0 ? t('statCloudClearest', { when: formatDayHour(processed.times[clearIdx]) }) : ''
+                    });
+                }
+                // Time of the highest point of the median curve.
                 let peakIdx = -1;
                 med.forEach((v, i) => { if (Number.isFinite(v) && (peakIdx < 0 || v > med[peakIdx])) peakIdx = i; });
                 return statCard({
@@ -1105,7 +1352,7 @@
                 `${t('tooltipMinMax')}: ${f(s.min[idx])} – ${f(s.max[idx])} ${u}`
             ];
             if (param.probability && s.chance[idx] !== null) lines.push(`${t('tooltipChance')}: ${s.chance[idx]}%`);
-            lines.push(`${t('tooltipMembers')}: ${s.count[idx]}`);
+            lines.push(`${t(state.mode === 'ensemble' ? 'tooltipMembers' : 'tooltipModels')}: ${s.count[idx]}`);
             return lines;
         }
 
@@ -1121,10 +1368,11 @@
                 document.getElementById(`chartUnit-${param.key}`).textContent =
                     param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
-                    hasData ? t('membersTotal', { count: data.members.length }) : '';
+                    hasData ? countLabel(data.members.length) : '';
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
-                const overlayText = state.loading ? t('loading') : (!hasData ? t('chartNoData') : '');
+                const overlayText = state.loading ? t('loading') : hasData ? '' :
+                    unsupportedVars[state.mode].has(param.key) ? t('chartNotInMode') : t('chartNoData');
                 overlay.classList.toggle('hidden', !overlayText);
                 overlay.innerHTML = overlayText
                     ? `${state.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-2"></i>' : ''}${escapeHtml(overlayText)}`
@@ -1182,6 +1430,7 @@
                                 },
                                 y: {
                                     beginAtZero: !!param.beginAtZero,
+                                    max: param.max,
                                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
                                     ticks: { color: '#94a3b8', font: { size: 10 } }
                                 },
@@ -1415,31 +1664,54 @@
                 const chip = e.target.closest('[data-model]');
                 if (!chip) return;
                 const id = chip.dataset.model;
-                if (state.models.includes(id)) {
-                    if (state.models.length === 1) {
+                const current = selectedModels();
+                if (current.includes(id)) {
+                    if (current.length === 1) {
                         showToast(t('toastSelectModel'), 'warning');
                         return;
                     }
-                    state.models = state.models.filter(m => m !== id);
+                    state.modelsByMode[state.mode] = current.filter(m => m !== id);
                 } else {
                     // Keep the picker order so the request/cache key is stable.
-                    state.models = MODELS.map(m => m.id).filter(m => m === id || state.models.includes(m));
+                    state.modelsByMode[state.mode] = modeModels().map(m => m.id).filter(m => m === id || current.includes(m));
                 }
                 saveSettings();
-                processed = null;
+                processForecast();
                 renderAll();
+                loadForecast();
+            });
+            document.querySelectorAll('[data-mode]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (state.mode === btn.dataset.mode) return;
+                    state.mode = btn.dataset.mode;
+                    saveSettings();
+                    processForecast();
+                    renderAll();
+                    loadForecast();
+                });
+            });
+            document.getElementById('windowButtons').addEventListener('click', e => {
+                const btn = e.target.closest('[data-window]');
+                if (!btn) return;
+                state.window = Number(btn.dataset.window);
+                saveSettings();
+                processForecast();
+                renderAll();
+                // Fetches more days only if the new window needs them.
                 loadForecast();
             });
             document.getElementById('windUnitSelect').addEventListener('change', e => {
                 state.windUnit = e.target.value;
                 saveSettings();
-                processed = null;
+                processForecast();
+                renderAll();
                 loadForecast();
             });
             document.getElementById('precipUnitSelect').addEventListener('change', e => {
                 state.precipUnit = e.target.value;
                 saveSettings();
-                processed = null;
+                processForecast();
+                renderAll();
                 loadForecast();
             });
             document.getElementById('btnMembers').addEventListener('click', () => {

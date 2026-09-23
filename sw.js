@@ -8,7 +8,7 @@
 // URL is unique, so caching them would only grow the cache. The app keeps
 // its own copy of the last forecast in localStorage for offline viewing.
 
-const CACHE_NAME = 'flysky-cache-v1';
+const CACHE_NAME = 'flysky-cache-v2';
 const PRECACHE_URLS = [
     './',
     './index.html',
