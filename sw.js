@@ -8,7 +8,7 @@
 // URL is unique, so caching them would only grow the cache. The app keeps
 // its own copy of the last forecast in localStorage for offline viewing.
 
-const CACHE_NAME = 'flysky-cache-v3';
+const CACHE_NAME = 'flysky-cache-v4';
 const PRECACHE_URLS = [
     './',
     './index.html',
@@ -41,16 +41,24 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
+    if (!event.request.url.startsWith('http')) return;
     // Let API calls go straight to the network.
     if (new URL(event.request.url).hostname.endsWith('open-meteo.com')) return;
 
     event.respondWith(
         fetch(event.request)
             .then((networkResponse) => {
-                const copy = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, copy).catch(() => {});
-                });
+                // Only keep good copies: a 404/500 must never replace a working
+                // cached file. Cross-origin CDN assets load as opaque responses
+                // (status unknown), which are fine to cache.
+                if (networkResponse.ok || networkResponse.type === 'opaque') {
+                    const copy = networkResponse.clone();
+                    event.waitUntil(
+                        caches.open(CACHE_NAME)
+                            .then((cache) => cache.put(event.request, copy))
+                            .catch(() => {})
+                    );
+                }
                 return networkResponse;
             })
             .catch(() => {

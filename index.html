@@ -157,6 +157,9 @@
                 <option value="uk">Українська</option>
                 <option value="pt-BR">Português (BR)</option>
             </select>
+            <button id="btnSettings" type="button" class="w-8 h-8 rounded-lg bg-slate-800/60 hover:bg-slate-700 border border-slate-700/50 text-slate-300 hover:text-white transition" data-i18n-title="settingsTitle" title="Settings" aria-controls="settingsDrawer" aria-expanded="false">
+                <i class="fa-solid fa-sliders"></i>
+            </button>
             <button id="btnRefresh" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs transition shadow-lg shadow-cyan-500/20 disabled:opacity-50" data-i18n-title="refreshTitle" title="Reload forecast">
                 <i class="fa-solid fa-rotate" id="refreshIcon"></i>
                 <span class="hidden sm:inline" data-i18n="refreshBtn">Refresh</span>
@@ -263,6 +266,21 @@
                 </div>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
 
+                <!-- Flight Window Planner (collapsible) -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <button type="button" id="btnPlanner" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="true" aria-controls="plannerBody">
+                        <i id="plannerChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                        <span data-i18n="plannerTitle">Flight Window Planner</span>
+                    </button>
+                    <div id="plannerBody" class="pt-3 space-y-3">
+                        <div id="plannerDays" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+                        <p class="text-[11px] text-slate-500">
+                            <span id="plannerNote"></span>
+                            <button type="button" data-open-settings class="text-cyan-400 hover:text-cyan-300 ml-1" data-i18n="plannerChange">Change</button>
+                        </p>
+                    </div>
+                </div>
+
                 <!-- Per-cause breakdown (collapsible) -->
                 <div class="pt-2 border-t border-slate-800/80">
                     <button type="button" id="btnFlightDetails" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="flightDetailsBody">
@@ -326,6 +344,42 @@
             </footer>
         </div>
     </main>
+
+    <!-- Settings drawer -->
+    <div id="settingsOverlay" class="hidden fixed inset-0 z-[55] bg-slate-950/70 backdrop-blur-sm"></div>
+    <aside id="settingsDrawer" class="fixed inset-y-0 right-0 z-[60] w-full max-w-sm bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col translate-x-full transition-transform duration-200" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" aria-hidden="true">
+        <div class="h-16 px-5 flex items-center justify-between border-b border-slate-800 shrink-0">
+            <h2 id="settingsDrawerTitle" class="font-semibold text-slate-100 flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i> <span data-i18n="settingsTitle">Settings</span>
+            </h2>
+            <button type="button" id="btnSettingsClose" class="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" data-i18n-aria-label="closeLabel" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-5 space-y-6">
+            <section class="space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="thresholdsTitle">Flight thresholds</h3>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="thresholdsDesc">Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to both wind speed and gusts.</p>
+                </div>
+                <div id="thresholdRows" class="space-y-3"></div>
+                <p id="thresholdError" class="hidden text-[11px] text-rose-400"></p>
+            </section>
+            <section class="space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="plannerSettingsTitle">Flight Window Planner</h3>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="minSlotDesc">Flyable periods (suitable + uncertain) shorter than this are left out of the planner.</p>
+                </div>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span data-i18n="minSlotLabel">Minimum window</span>
+                    <select id="minSlotSelect" class="unit-select"></select>
+                </label>
+            </section>
+            <button type="button" id="btnResetSettings" class="w-full py-2 rounded-xl border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">
+                <i class="fa-solid fa-rotate-left mr-1"></i> <span data-i18n="resetDefaults">Reset to defaults</span>
+            </button>
+        </div>
+    </aside>
 
     <!-- Floating dock: data source + view toggle, always reachable while
          scrolling through the charts so the effect can be compared directly. -->
@@ -455,11 +509,23 @@
         // to both wind speed and gusts. An hour is "bad" if any value reaches
         // its `bad` limit, "marginal" if any reaches its `marginal` limit,
         // otherwise "good".
-        const FLIGHT_RULES = {
-            rainChance: { marginal: 1e-9, bad: 40 }, // % of members/models; any non-zero chance is marginal
-            windMs: { marginal: 8, bad: 14 },
-            lowClouds: { marginal: 30, bad: 60 }    // %
-        };
+        // Defaults; the user can change them in Settings (state.flightRules).
+        //  - rain chance (% of members/models): good while ≤ rainGood, bad from rainBad
+        //  - wind & gusts (m/s, stored in m/s whatever the display unit): good below windGood, bad from windBad
+        //  - low clouds (%): good below cloudGood, bad from cloudBad
+        const DEFAULT_FLIGHT_RULES = { rainGood: 0, rainBad: 40, windGood: 8, windBad: 14, cloudGood: 30, cloudBad: 60 };
+        const MIN_SLOT_OPTIONS = [1, 2, 3, 4, 6];   // hours; forecast data is hourly
+        const DEFAULT_MIN_SLOT = 1;
+
+        function sanitizeFlightRules(r) {
+            const out = { ...DEFAULT_FLIGHT_RULES };
+            if (r && typeof r === 'object') Object.keys(out).forEach(k => { if (Number.isFinite(r[k]) && r[k] >= 0) out[k] = r[k]; });
+            // Keep every pair ordered (good < bad); fall back to defaults otherwise.
+            [['rainGood', 'rainBad'], ['windGood', 'windBad'], ['cloudGood', 'cloudBad']].forEach(([g, b]) => {
+                if (!(out[g] < out[b])) { out[g] = DEFAULT_FLIGHT_RULES[g]; out[b] = DEFAULT_FLIGHT_RULES[b]; }
+            });
+            return out;
+        }
         // Reserved status colors (never reused for series); always shown
         // together with an icon + label.
         const FLIGHT_STATUS = {
@@ -521,9 +587,36 @@
                 flightHours: "{n} h {label}",
                 flightNextGood: "next suitable: {when}",
                 flightNoGood: "no suitable hours in this window",
-                flightRuleGood: "no rain chance, wind & gusts < {w1} {u}, low clouds < 30%",
-                flightRuleMarginal: "any of: rain chance < 40%, wind or gusts {w1}–{w2} {u}, low clouds 30–60%",
-                flightRuleBad: "any of: rain chance ≥ 40%, wind or gusts ≥ {w2} {u}, low clouds ≥ 60%",
+                settingsTitle: "Settings",
+                closeLabel: "Close",
+                thresholdsTitle: "Flight thresholds",
+                thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to both wind speed and gusts.",
+                plannerSettingsTitle: "Flight Window Planner",
+                minSlotDesc: "Flyable periods (suitable + uncertain) shorter than this are left out of the planner.",
+                minSlotLabel: "Minimum window",
+                resetDefaults: "Reset to defaults",
+                plannerTitle: "Flight Window Planner",
+                plannerChange: "Change",
+                plannerNote: "Flyable windows of at least {n} h in the selected period.",
+                planToday: "Today",
+                planTomorrow: "Tomorrow",
+                planEmpty: "No flyable windows of at least {n} h in this period.",
+                planFactorRain: "rain chance up to {v}",
+                planFactorWind: "wind up to {v} {u}",
+                planFactorGust: "gusts up to {v} {u}",
+                planFactorCloud: "low clouds up to {v}",
+                thrRain: "Rain chance",
+                thrUpTo: "Suitable up to",
+                thrBelow: "Suitable below",
+                thrFrom: "Not suitable from",
+                thrError: "{name}: enter a valid number; the suitable limit must be lower than the not-suitable one.",
+                toastSettingsReset: "Settings reset to defaults",
+                ruleRainNone: "no rain chance",
+                ruleRainUpTo: "rain chance ≤ {r1}%",
+                ruleRainBetween: "rain chance above {r1}% and below {r2}%",
+                flightRuleGood: "{rainGood}, wind & gusts < {w1} {u}, low clouds < {c1}%",
+                flightRuleMarginal: "any of: {rainMarginal}, wind or gusts {w1}–{w2} {u}, low clouds {c1}–{c2}%",
+                flightRuleBad: "any of: rain chance ≥ {r2}%, wind or gusts ≥ {w2} {u}, low clouds ≥ {c2}%",
                 flightMissing: "Not included (no data): {params}",
                 factorRain: "rain chance {v}",
                 factorWind: "wind {v} {u}",
@@ -635,9 +728,36 @@
                 flightHours: "{n} год — {label}",
                 flightNextGood: "наступне придатне: {when}",
                 flightNoGood: "немає придатних годин у цьому періоді",
-                flightRuleGood: "без ймовірності опадів, вітер і пориви < {w1} {u}, низька хмарність < 30%",
-                flightRuleMarginal: "будь-що з: ймовірність опадів < 40%, вітер або пориви {w1}–{w2} {u}, низька хмарність 30–60%",
-                flightRuleBad: "будь-що з: ймовірність опадів ≥ 40%, вітер або пориви ≥ {w2} {u}, низька хмарність ≥ 60%",
+                settingsTitle: "Налаштування",
+                closeLabel: "Закрити",
+                thresholdsTitle: "Пороги для польоту",
+                thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру діють і для швидкості, і для поривів.",
+                plannerSettingsTitle: "Планувальник польотних вікон",
+                minSlotDesc: "Періоди для польоту (придатні + невизначені), коротші за цей, не показуються в планувальнику.",
+                minSlotLabel: "Мінімальне вікно",
+                resetDefaults: "Скинути до типових",
+                plannerTitle: "Планувальник польотних вікон",
+                plannerChange: "Змінити",
+                plannerNote: "Вікна для польоту тривалістю від {n} год у вибраному періоді.",
+                planToday: "Сьогодні",
+                planTomorrow: "Завтра",
+                planEmpty: "Немає вікон для польоту тривалістю від {n} год у цьому періоді.",
+                planFactorRain: "ймовірність опадів до {v}",
+                planFactorWind: "вітер до {v} {u}",
+                planFactorGust: "пориви до {v} {u}",
+                planFactorCloud: "низька хмарність до {v}",
+                thrRain: "Ймовірність опадів",
+                thrUpTo: "Придатно до",
+                thrBelow: "Придатно нижче",
+                thrFrom: "Непридатно від",
+                thrError: "{name}: введіть коректне число; поріг «придатно» має бути нижчим за «непридатно».",
+                toastSettingsReset: "Налаштування скинуто до типових",
+                ruleRainNone: "без ймовірності опадів",
+                ruleRainUpTo: "ймовірність опадів ≤ {r1}%",
+                ruleRainBetween: "ймовірність опадів понад {r1}% і нижче {r2}%",
+                flightRuleGood: "{rainGood}, вітер і пориви < {w1} {u}, низька хмарність < {c1}%",
+                flightRuleMarginal: "будь-що з: {rainMarginal}, вітер або пориви {w1}–{w2} {u}, низька хмарність {c1}–{c2}%",
+                flightRuleBad: "будь-що з: ймовірність опадів ≥ {r2}%, вітер або пориви ≥ {w2} {u}, низька хмарність ≥ {c2}%",
                 flightMissing: "Не враховано (немає даних): {params}",
                 factorRain: "ймовірність опадів {v}",
                 factorWind: "вітер {v} {u}",
@@ -749,9 +869,36 @@
                 flightHours: "{n} h {label}",
                 flightNextGood: "próximo adequado: {when}",
                 flightNoGood: "nenhuma hora adequada neste período",
-                flightRuleGood: "sem chance de chuva, vento e rajadas < {w1} {u}, nuvens baixas < 30%",
-                flightRuleMarginal: "qualquer um: chance de chuva < 40%, vento ou rajadas {w1}–{w2} {u}, nuvens baixas 30–60%",
-                flightRuleBad: "qualquer um: chance de chuva ≥ 40%, vento ou rajadas ≥ {w2} {u}, nuvens baixas ≥ 60%",
+                settingsTitle: "Configurações",
+                closeLabel: "Fechar",
+                thresholdsTitle: "Limites de voo",
+                thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para a velocidade e para as rajadas.",
+                plannerSettingsTitle: "Planejador de janelas de voo",
+                minSlotDesc: "Períodos voáveis (adequados + incertos) mais curtos que isto não aparecem no planejador.",
+                minSlotLabel: "Janela mínima",
+                resetDefaults: "Restaurar padrões",
+                plannerTitle: "Planejador de janelas de voo",
+                plannerChange: "Alterar",
+                plannerNote: "Janelas voáveis de pelo menos {n} h no período selecionado.",
+                planToday: "Hoje",
+                planTomorrow: "Amanhã",
+                planEmpty: "Nenhuma janela voável de pelo menos {n} h neste período.",
+                planFactorRain: "chance de chuva até {v}",
+                planFactorWind: "vento até {v} {u}",
+                planFactorGust: "rajadas até {v} {u}",
+                planFactorCloud: "nuvens baixas até {v}",
+                thrRain: "Chance de chuva",
+                thrUpTo: "Adequado até",
+                thrBelow: "Adequado abaixo de",
+                thrFrom: "Inadequado a partir de",
+                thrError: "{name}: insira um número válido; o limite adequado deve ser menor que o inadequado.",
+                toastSettingsReset: "Configurações restauradas",
+                ruleRainNone: "sem chance de chuva",
+                ruleRainUpTo: "chance de chuva ≤ {r1}%",
+                ruleRainBetween: "chance de chuva acima de {r1}% e abaixo de {r2}%",
+                flightRuleGood: "{rainGood}, vento e rajadas < {w1} {u}, nuvens baixas < {c1}%",
+                flightRuleMarginal: "qualquer um: {rainMarginal}, vento ou rajadas {w1}–{w2} {u}, nuvens baixas {c1}–{c2}%",
+                flightRuleBad: "qualquer um: chance de chuva ≥ {r2}%, vento ou rajadas ≥ {w2} {u}, nuvens baixas ≥ {c2}%",
                 flightMissing: "Não incluído (sem dados): {params}",
                 factorRain: "chance de chuva {v}",
                 factorWind: "vento {v} {u}",
@@ -915,6 +1062,9 @@
             settingsCollapsed: loadFromStorage('flysky_settings_collapsed', false) === true,
             flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
             statsCollapsed: loadFromStorage('flysky_stats_collapsed', false) === true,
+            plannerOpen: loadFromStorage('flysky_planner_open', true) !== false,
+            flightRules: sanitizeFlightRules(loadFromStorage('flysky_flight_rules', null)),
+            minSlotHours: loadFromStorage('flysky_min_slot_hours', DEFAULT_MIN_SLOT),
             // Last loaded forecast: { key, days, fetchedAt, meta, times,
             // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
@@ -934,6 +1084,7 @@
             state.modelsByMode[mode] = ids.length ? ids : MODES[mode].defaults.slice();
         });
         if (!WINDOWS.includes(state.window)) state.window = DEFAULT_WINDOW;
+        if (!MIN_SLOT_OPTIONS.includes(state.minSlotHours)) state.minSlotHours = DEFAULT_MIN_SLOT;
         if (!UNIT_LABELS.wind[state.windUnit]) state.windUnit = 'ms';
         if (!UNIT_LABELS.precip[state.precipUnit]) state.precipUnit = 'mm';
         if (state.forecast && (!state.forecast.key || !state.forecast.models || !Array.isArray(state.forecast.times))) state.forecast = null;
@@ -955,6 +1106,9 @@
             saveToStorage('flysky_settings_collapsed', state.settingsCollapsed);
             saveToStorage('flysky_flight_details_open', state.flightDetailsOpen);
             saveToStorage('flysky_stats_collapsed', state.statsCollapsed);
+            saveToStorage('flysky_planner_open', state.plannerOpen);
+            saveToStorage('flysky_flight_rules', state.flightRules);
+            saveToStorage('flysky_min_slot_hours', state.minSlotHours);
         }
 
         // Chart.js instances keyed by parameter key.
@@ -1243,8 +1397,12 @@
             if (!gust) missing.push('paramWindGusts');
             if (!cloud) missing.push('paramLowClouds');
 
-            const level = (value, rule) => value === null || value === undefined || !Number.isFinite(value) ? null :
-                value >= rule.bad ? 'bad' : value >= rule.marginal ? 'marginal' : 'good';
+            const R = state.flightRules;
+            const known = v => v !== null && v !== undefined && Number.isFinite(v);
+            // Rain is "good" up to and including its limit (so 0 means "no chance
+            // at all"); wind and clouds are "good" strictly below theirs.
+            const rainLevel = v => !known(v) ? null : v >= R.rainBad ? 'bad' : v > R.rainGood + 1e-9 ? 'marginal' : 'good';
+            const level = (v, good, bad) => !known(v) ? null : v >= bad ? 'bad' : v >= good ? 'marginal' : 'good';
             const rank = { good: 0, marginal: 1, bad: 2 };
 
             const hours = result.times.map((time, i) => {
@@ -1255,13 +1413,13 @@
                     cloud: cloud ? cloud.median[i] : null
                 };
                 const checks = {
-                    rain: level(values.rain, FLIGHT_RULES.rainChance),
-                    wind: level(values.wind === null ? null : values.wind * toMs, FLIGHT_RULES.windMs),
-                    gust: level(values.gust === null ? null : values.gust * toMs, FLIGHT_RULES.windMs),
-                    cloud: level(values.cloud, FLIGHT_RULES.lowClouds)
+                    rain: rainLevel(values.rain),
+                    wind: level(values.wind === null ? null : values.wind * toMs, R.windGood, R.windBad),
+                    gust: level(values.gust === null ? null : values.gust * toMs, R.windGood, R.windBad),
+                    cloud: level(values.cloud, R.cloudGood, R.cloudBad)
                 };
-                const known = Object.values(checks).filter(Boolean);
-                const status = known.length ? known.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good') : 'none';
+                const verdicts = Object.values(checks).filter(Boolean);
+                const status = verdicts.length ? verdicts.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good') : 'none';
                 // Which factors drove the verdict (for the detail line).
                 const reasons = Object.keys(checks).filter(k => checks[k] && checks[k] === status && status !== 'good');
                 return { time, status, values, checks, reasons };
@@ -1303,6 +1461,7 @@
             renderModeAndWindow();
             renderModelChips();
             renderSettingsPanel();
+            if (!document.getElementById('settingsDrawer').classList.contains('translate-x-full')) renderSettingsDrawer();
             renderUnits();
             renderMeta();
             const hasLocation = !!state.location;
@@ -1400,13 +1559,21 @@
             }).join('');
             renderFlightDetailsPanel();
             renderFlightAxis();
+            renderPlanner();
 
             detail.innerHTML = flightSummaryHtml();
 
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
             // Thresholds in the current wind unit, without trailing zeros (8, not 8.0).
             const ms = v => (Math.round(v / (WIND_TO_MS[state.windUnit] || 1) * 10) / 10).toLocaleString(currentLang);
-            const vars = { w1: ms(FLIGHT_RULES.windMs.marginal), w2: ms(FLIGHT_RULES.windMs.bad), u: unitLabel(windParam) };
+            const R = state.flightRules;
+            const num = v => v.toLocaleString(currentLang);
+            const vars = {
+                w1: ms(R.windGood), w2: ms(R.windBad), u: unitLabel(windParam),
+                c1: num(R.cloudGood), c2: num(R.cloudBad), r2: num(R.rainBad),
+                rainGood: R.rainGood > 0 ? t('ruleRainUpTo', { r1: num(R.rainGood) }) : t('ruleRainNone'),
+                rainMarginal: t('ruleRainBetween', { r1: num(R.rainGood), r2: num(R.rainBad) })
+            };
             const legendItem = (st, key) => `<span class="flex items-start gap-1.5"><i class="fa-solid ${FLIGHT_STATUS[st].icon} mt-0.5" style="color: ${FLIGHT_STATUS[st].color}"></i>
                 <span><span class="font-semibold text-slate-200">${escapeHtml(t(FLIGHT_STATUS[st].labelKey))}:</span> ${escapeHtml(t(key, vars))}</span></span>`;
             document.getElementById('flightLegend').innerHTML =
@@ -1521,6 +1688,216 @@
             document.getElementById('flightDetailsBody').classList.toggle('hidden', !open);
             document.getElementById('btnFlightDetails').setAttribute('aria-expanded', open ? 'true' : 'false');
             document.getElementById('flightDetailsChevron').style.transform = open ? 'rotate(180deg)' : '';
+        }
+
+        // ================= Flight Window Planner =================
+        // Flyable windows = runs of consecutive suitable/uncertain hours. A
+        // window shorter than the minimum duration is dropped as a whole;
+        // kept windows are split into same-status slots (and at midnight, so
+        // every slot sits under one day). Uncertain slots list the causes with
+        // their worst value in the slot. Forecast data is hourly, so slot
+        // edges fall on whole hours.
+        function computePlan(hours, minHours) {
+            const flyable = h => h.status === 'good' || h.status === 'marginal';
+            const windows = [];
+            let start = -1;
+            hours.forEach((h, i) => {
+                if (flyable(h) && start < 0) start = i;
+                if (!flyable(h) && start >= 0) { windows.push([start, i - 1]); start = -1; }
+            });
+            if (start >= 0) windows.push([start, hours.length - 1]);
+
+            const slots = [];
+            windows.filter(([a, b]) => b - a + 1 >= minHours).forEach(([a, b], w) => {
+                let slot = null;
+                for (let i = a; i <= b; i++) {
+                    const h = hours[i];
+                    const newDay = i > a && h.time.slice(0, 10) !== hours[i - 1].time.slice(0, 10);
+                    if (!slot || slot.status !== h.status || newDay) {
+                        slot = { window: w, status: h.status, start: i, end: i, worst: {} };
+                        slots.push(slot);
+                    }
+                    slot.end = i;
+                    Object.keys(h.checks).forEach(k => {
+                        if (h.checks[k] !== 'marginal') return;
+                        const v = h.values[k];
+                        if (!(k in slot.worst) || v > slot.worst[k]) slot.worst[k] = v;
+                    });
+                }
+            });
+            return slots.map(sl => ({
+                ...sl,
+                day: hours[sl.start].time.slice(0, 10),
+                from: hours[sl.start].time,
+                to: addHoursToLocal(hours[sl.end].time, 1),
+                hours: sl.end - sl.start + 1
+            }));
+        }
+
+        function planDayLabel(day) {
+            const fc = state.forecast;
+            const offset = fc && fc.meta ? fc.meta.utcOffsetSeconds * 1000 : 0;
+            const today = new Date(Date.now() + offset).toISOString().slice(0, 10);
+            const tomorrow = new Date(Date.now() + offset + 86400e3).toISOString().slice(0, 10);
+            const date = formatTime(day + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' });
+            if (day === today) return `${t('planToday')} · ${date}`;
+            if (day === tomorrow) return `${t('planTomorrow')} · ${date}`;
+            return date;
+        }
+
+        function planReasonText(slot) {
+            const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
+            const keyFor = { rain: 'planFactorRain', wind: 'planFactorWind', gust: 'planFactorGust', cloud: 'planFactorCloud' };
+            return ['rain', 'wind', 'gust', 'cloud'].filter(k => k in slot.worst).map(k => {
+                const v = slot.worst[k];
+                const shown = k === 'rain' ? formatPercent(v) : k === 'cloud' ? `${Math.round(v)}%` : formatValue(v, windParam);
+                return t(keyFor[k], { v: shown, u: unitLabel(windParam) });
+            }).join(' · ');
+        }
+
+        function renderPlanner() {
+            const body = document.getElementById('plannerBody');
+            const open = state.plannerOpen;
+            body.classList.toggle('hidden', !open);
+            document.getElementById('btnPlanner').setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById('plannerChevron').style.transform = open ? 'rotate(180deg)' : '';
+            document.getElementById('plannerNote').textContent = t('plannerNote', { n: state.minSlotHours });
+
+            const container = document.getElementById('plannerDays');
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            if (!hours.length) {
+                container.innerHTML = `<p class="text-xs text-slate-500">${escapeHtml(state.loading ? t('loading') : t('statNoData'))}</p>`;
+                return;
+            }
+            const slots = computePlan(hours, state.minSlotHours);
+            if (!slots.length) {
+                container.innerHTML = `<p class="text-xs text-slate-400 sm:col-span-2 xl:col-span-3"><i class="fa-solid fa-circle-xmark mr-1" style="color: ${FLIGHT_STATUS.bad.color}"></i>${escapeHtml(t('planEmpty', { n: state.minSlotHours }))}</p>`;
+                return;
+            }
+            const days = [];
+            slots.forEach(sl => {
+                let d = days.find(x => x.day === sl.day);
+                if (!d) { d = { day: sl.day, slots: [] }; days.push(d); }
+                d.slots.push(sl);
+            });
+            container.innerHTML = days.map(d => {
+                const rows = d.slots.map((sl, i) => {
+                    const st = FLIGHT_STATUS[sl.status];
+                    // A thin top rule separates different flyable windows; slots of
+                    // the same window stay visually joined.
+                    const newWindow = i > 0 && d.slots[i - 1].window !== sl.window;
+                    const reason = sl.status === 'marginal' ? planReasonText(sl) : '';
+                    return `<li class="flex items-start gap-2.5 py-1.5 ${newWindow ? 'mt-1.5 pt-2.5 border-t border-slate-800' : ''}">
+                        <span class="w-1 self-stretch rounded-full shrink-0" style="background: ${st.color}"></span>
+                        <i class="fa-solid ${st.icon} text-xs mt-0.5 shrink-0" style="color: ${st.color}" title="${escapeHtml(t(st.labelKey))}"></i>
+                        <span class="min-w-0">
+                            <span class="font-mono text-sm text-slate-100">${escapeHtml(formatHour(sl.from))}–${escapeHtml(formatHour(sl.to))}</span>
+                            <span class="text-[11px] text-slate-500 ml-1">${escapeHtml(t('windowHours', { n: sl.hours }))}</span>
+                            ${reason ? `<span class="block text-[11px] text-amber-300/90">${escapeHtml(reason)}</span>` : ''}
+                        </span>
+                    </li>`;
+                }).join('');
+                return `<div class="rounded-xl bg-slate-950/60 border border-slate-800/80 p-3">
+                    <h4 class="text-xs font-semibold text-slate-300 mb-1">${escapeHtml(planDayLabel(d.day))}</h4>
+                    <ul>${rows}</ul>
+                </div>`;
+            }).join('');
+        }
+
+        // ================= Settings drawer =================
+        // Rows of the thresholds form. Wind values are shown/entered in the
+        // current wind unit and stored in m/s.
+        const THRESHOLD_ROWS = [
+            { key: 'rain', good: 'rainGood', bad: 'rainBad', icon: 'fa-cloud-rain', labelKey: 'thrRain', goodKey: 'thrUpTo', unit: () => '%', toStore: v => v, toShow: v => v, step: 5, max: 100 },
+            { key: 'wind', good: 'windGood', bad: 'windBad', icon: 'fa-wind', labelKey: 'flightFactorWind', goodKey: 'thrBelow',
+              unit: () => UNIT_LABELS.wind[state.windUnit],
+              toStore: v => v * (WIND_TO_MS[state.windUnit] || 1),
+              toShow: v => Math.round(v / (WIND_TO_MS[state.windUnit] || 1) * 10) / 10, step: 0.5, max: 200 },
+            { key: 'cloud', good: 'cloudGood', bad: 'cloudBad', icon: 'fa-cloud', labelKey: 'flightFactorCloud', goodKey: 'thrBelow', unit: () => '%', toStore: v => v, toShow: v => v, step: 5, max: 100 }
+        ];
+
+        function renderSettingsDrawer() {
+            const R = state.flightRules;
+            const input = (row, field, colorKey) => `<label class="flex-1">
+                    <span class="block text-[10px] uppercase tracking-wider mb-1" style="color: ${FLIGHT_STATUS[colorKey].color}">${escapeHtml(t(colorKey === 'good' ? row.goodKey : 'thrFrom'))}</span>
+                    <span class="flex items-center gap-1.5">
+                        <input type="number" inputmode="decimal" min="0" max="${row.max}" step="${row.step}" data-threshold="${field}" value="${row.toShow(R[field])}"
+                            class="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 font-mono focus:outline-none focus:border-cyan-500">
+                        <span class="text-[11px] text-slate-500 shrink-0 w-8">${escapeHtml(row.unit())}</span>
+                    </span>
+                </label>`;
+            document.getElementById('thresholdRows').innerHTML = THRESHOLD_ROWS.map(row => `
+                <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                    <div class="text-xs font-medium text-slate-200 mb-2 flex items-center gap-2"><i class="fa-solid ${row.icon} text-slate-400 w-4 text-center"></i>${escapeHtml(t(row.labelKey))}</div>
+                    <div class="flex gap-3">${input(row, row.good, 'good')}${input(row, row.bad, 'bad')}</div>
+                </div>`).join('');
+            document.getElementById('minSlotSelect').innerHTML = MIN_SLOT_OPTIONS.map(h =>
+                `<option value="${h}" ${h === state.minSlotHours ? 'selected' : ''}>${escapeHtml(t('windowHours', { n: h }))}</option>`).join('');
+        }
+
+        function setSettingsDrawer(open) {
+            const drawer = document.getElementById('settingsDrawer');
+            if (open) renderSettingsDrawer();
+            drawer.classList.toggle('translate-x-full', !open);
+            drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+            document.getElementById('settingsOverlay').classList.toggle('hidden', !open);
+            document.getElementById('btnSettings').setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById('thresholdError').classList.add('hidden');
+            if (open) document.getElementById('btnSettingsClose').focus();
+        }
+
+        function applyFlightSettings() {
+            saveSettings();
+            processForecast();
+            renderAll();
+        }
+
+        function setupSettingsDrawer() {
+            document.getElementById('btnSettings').addEventListener('click', () => setSettingsDrawer(true));
+            document.getElementById('btnSettingsClose').addEventListener('click', () => setSettingsDrawer(false));
+            document.getElementById('settingsOverlay').addEventListener('click', () => setSettingsDrawer(false));
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && !document.getElementById('settingsDrawer').classList.contains('translate-x-full')) setSettingsDrawer(false);
+            });
+            document.addEventListener('click', e => {
+                if (e.target.closest('[data-open-settings]')) setSettingsDrawer(true);
+            });
+
+            document.getElementById('thresholdRows').addEventListener('change', e => {
+                const inputEl = e.target.closest('[data-threshold]');
+                if (!inputEl) return;
+                const field = inputEl.dataset.threshold;
+                const row = THRESHOLD_ROWS.find(r => r.good === field || r.bad === field);
+                const errorEl = document.getElementById('thresholdError');
+                const raw = parseFloat(String(inputEl.value).replace(',', '.'));
+                const next = { ...state.flightRules };
+                if (Number.isFinite(raw) && raw >= 0 && raw <= row.max) next[field] = row.toStore(raw);
+                if (!Number.isFinite(raw) || raw < 0 || raw > row.max || !(next[row.good] < next[row.bad])) {
+                    errorEl.textContent = t('thrError', { name: t(row.labelKey) });
+                    errorEl.classList.remove('hidden');
+                    inputEl.value = row.toShow(state.flightRules[field]);
+                    return;
+                }
+                errorEl.classList.add('hidden');
+                state.flightRules = next;
+                applyFlightSettings();
+            });
+            document.getElementById('minSlotSelect').addEventListener('change', e => {
+                state.minSlotHours = Number(e.target.value);
+                applyFlightSettings();
+            });
+            document.getElementById('btnResetSettings').addEventListener('click', () => {
+                state.flightRules = { ...DEFAULT_FLIGHT_RULES };
+                state.minSlotHours = DEFAULT_MIN_SLOT;
+                applyFlightSettings();
+                renderSettingsDrawer();
+                showToast(t('toastSettingsReset'), 'success');
+            });
+            document.getElementById('btnPlanner').addEventListener('click', () => {
+                state.plannerOpen = !state.plannerOpen;
+                saveSettings();
+                renderPlanner();
+            });
         }
 
         function renderSettingsPanel() {
@@ -2324,6 +2701,7 @@
             setupFavorites();
             setupControls();
             setupFlightStrip();
+            setupSettingsDrawer();
             setupOfflineIndicator();
             processForecast();
             renderAll();
