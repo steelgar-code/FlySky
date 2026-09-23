@@ -1,4 +1,4 @@
-# FlySky
+# FlySky Weather Forecasts
 
 Ensemble weather forecast for drone/UAV pilots. Instead of a single "best guess", FlySky shows the full spread of answers from several weather models, so you can see how likely rain, strong wind, gusts, or low clouds really are over the coming hours or week. Runs entirely in your browser, no backend required.
 
