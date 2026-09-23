@@ -2358,7 +2358,8 @@
             e.preventDefault();
             deferredInstallPrompt = e;
             try { if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return; } catch (err) {}
-            if (window.matchMedia('(display-mode: standalone)').matches) return;
+            // Already running as an installed app (Android/desktop, or iOS home screen).
+            if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) return;
             installPromptEl.classList.remove('hidden');
         });
 
