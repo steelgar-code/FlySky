@@ -345,11 +345,20 @@
     </div>
 
     <!-- Install prompt -->
-    <div id="installPrompt" class="hidden fixed bottom-32 lg:bottom-20 left-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-xs">
-        <i class="fa-solid fa-download text-cyan-400"></i>
-        <span class="text-slate-200" data-i18n="installPromptText">Install FlySky for quick access</span>
-        <button id="installBtn" class="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold transition" data-i18n="installBtn">Install</button>
-        <button id="installDismiss" class="text-slate-500 hover:text-slate-300 transition" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+    <div id="installPrompt" class="hidden fixed z-50 left-4 right-4 bottom-36 sm:left-auto sm:right-4 sm:bottom-auto sm:top-20 sm:w-80 p-4 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl shadow-black/50" role="dialog" aria-labelledby="installTitle">
+        <button type="button" id="installDismiss" class="absolute top-2 right-2 w-7 h-7 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition" data-i18n-aria-label="installDismiss" aria-label="Dismiss">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="flex items-start gap-3 pr-6">
+            <img src="icon-192.png" alt="" class="w-12 h-12 rounded-xl shrink-0">
+            <div>
+                <h3 id="installTitle" class="text-sm font-semibold text-slate-100" data-i18n="installTitle">Install FlySky</h3>
+                <p class="text-xs text-slate-400 mt-0.5" data-i18n="installDesc">Add to your home screen for quick access to the forecast</p>
+            </div>
+        </div>
+        <button type="button" id="installBtn" class="w-full mt-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-download"></i> <span data-i18n="installBtn">Install App</span>
+        </button>
     </div>
 
     <!-- Toasts -->
@@ -583,8 +592,10 @@
                 toastUsingCache: "Offline — showing the last saved forecast",
                 dataSourceLabel: "Weather data by",
                 moreAppsLabel: "More apps:",
-                installPromptText: "Install FlySky for quick access",
-                installBtn: "Install",
+                installTitle: "Install FlySky",
+                installDesc: "Add to your home screen for quick access to the forecast",
+                installDismiss: "Dismiss",
+                installBtn: "Install App",
                 removeFavorite: "Remove"
             },
             uk: {
@@ -695,8 +706,10 @@
                 toastUsingCache: "Офлайн — показано останній збережений прогноз",
                 dataSourceLabel: "Дані про погоду:",
                 moreAppsLabel: "Інші застосунки:",
-                installPromptText: "Встановіть FlySky для швидкого доступу",
-                installBtn: "Встановити",
+                installTitle: "Встановити FlySky",
+                installDesc: "Додайте на головний екран для швидкого доступу до прогнозу",
+                installDismiss: "Закрити",
+                installBtn: "Встановити застосунок",
                 removeFavorite: "Видалити"
             },
             'pt-BR': {
@@ -807,8 +820,10 @@
                 toastUsingCache: "Offline — mostrando a última previsão salva",
                 dataSourceLabel: "Dados meteorológicos por",
                 moreAppsLabel: "Mais apps:",
-                installPromptText: "Instale o FlySky para acesso rápido",
-                installBtn: "Instalar",
+                installTitle: "Instalar FlySky",
+                installDesc: "Adicione à tela inicial para acesso rápido à previsão",
+                installDismiss: "Dispensar",
+                installBtn: "Instalar aplicativo",
                 removeFavorite: "Remover"
             }
         };
@@ -2332,13 +2347,17 @@
         }
 
         // ================= Install prompt =================
+        // Per-app key: FlyLog/FlySend/FlySky share the steelgar-code.github.io
+        // origin (and so localStorage), so a generic key dismissed in one app
+        // would silently hide the prompt in all of them.
+        const INSTALL_DISMISSED_KEY = 'flysky_install_dismissed';
         let deferredInstallPrompt = null;
         const installPromptEl = document.getElementById('installPrompt');
 
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredInstallPrompt = e;
-            try { if (localStorage.getItem('pwa-install-dismissed')) return; } catch (err) {}
+            try { if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return; } catch (err) {}
             if (window.matchMedia('(display-mode: standalone)').matches) return;
             installPromptEl.classList.remove('hidden');
         });
@@ -2352,9 +2371,14 @@
             });
         });
 
+        window.addEventListener('appinstalled', () => {
+            installPromptEl.classList.add('hidden');
+            deferredInstallPrompt = null;
+        });
+
         document.getElementById('installDismiss').addEventListener('click', () => {
             installPromptEl.classList.add('hidden');
-            try { localStorage.setItem('pwa-install-dismissed', 'true'); } catch (err) {}
+            try { localStorage.setItem(INSTALL_DISMISSED_KEY, 'true'); } catch (err) {}
         });
     </script>
 </body>
