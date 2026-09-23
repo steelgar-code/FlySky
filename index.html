@@ -555,7 +555,31 @@
 
         // Variables a given API/model rejected in this session, so we don't
         // keep re-requesting them (e.g. a parameter the ensemble API lacks).
-        const unsupportedVars = { ensemble: new Set(), deterministic: new Set() };
+        // Remembered for a day, so every app start doesn't spend a request
+        // re-discovering it; after that it's tried again in case the API
+        // added it.
+        const UNSUPPORTED_VARS_KEY = 'flysky_unsupported_vars';
+        const UNSUPPORTED_VARS_TTL_MS = 24 * 60 * 60 * 1000;
+        const unsupportedVars = (() => {
+            const sets = { ensemble: new Set(), deterministic: new Set() };
+            try {
+                const saved = JSON.parse(localStorage.getItem(UNSUPPORTED_VARS_KEY) || 'null');
+                if (saved && Date.now() - saved.at < UNSUPPORTED_VARS_TTL_MS) {
+                    Object.keys(sets).forEach(mode => (saved[mode] || []).forEach(v => sets[mode].add(v)));
+                }
+            } catch (err) {}
+            return sets;
+        })();
+        function rememberUnsupportedVar(mode, v) {
+            unsupportedVars[mode].add(v);
+            try {
+                const saved = JSON.parse(localStorage.getItem(UNSUPPORTED_VARS_KEY) || 'null');
+                const at = saved && Date.now() - saved.at < UNSUPPORTED_VARS_TTL_MS ? saved.at : Date.now();
+                localStorage.setItem(UNSUPPORTED_VARS_KEY, JSON.stringify({
+                    at, ensemble: [...unsupportedVars.ensemble], deterministic: [...unsupportedVars.deterministic]
+                }));
+            } catch (err) {}
+        }
 
         // ================= Translations =================
         const LANG_KEY = 'flysky_lang';
@@ -1222,39 +1246,94 @@
             return `${MODES[mode].url}?${params.toString()}`;
         }
 
-        // Fetches one model. Each model gets its own request so a single
-        // unavailable model (or a variable one API doesn't offer) never takes
-        // the whole forecast down. When the API rejects a variable by name, it
-        // is dropped and the request retried without it.
-        async function fetchModel(mode, model, days) {
+        const MODEL_REQUEST_GAP_MS = 200;      // spacing between per-model fallback calls
+        const RATE_LIMIT_RETRY_MS = 1500;      // pause before retrying a "too many requests" reply
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // One API call for one or more models. When the API rejects a variable
+        // by name, that variable is dropped (and remembered) and the call
+        // retried; a rate-limit reply is retried once after a short pause.
+        // Network errors (and aborts) are thrown to the caller.
+        async function requestForecast(mode, models, days, signal) {
             let vars = PARAMS.map(p => p.key).filter(v => !unsupportedVars[mode].has(v));
-            try {
-                for (;;) {
-                    const res = await fetch(buildForecastUrl(mode, model, vars, days));
-                    const body = await res.json().catch(() => null);
-                    if (res.ok && body && !body.error && body.hourly) return { model, data: body };
-                    const reason = (body && body.reason) || `HTTP ${res.status}`;
-                    let bad = null;
-                    if (res.status === 400) {
-                        const m = reason.match(/value\s+['"]?([a-z0-9_]+)/i);
-                        if (m && vars.includes(m[1])) bad = m[1];
-                        if (!bad) {
-                            const hits = vars.filter(v => new RegExp(`\\b${v}\\b`).test(reason));
-                            if (hits.length === 1) bad = hits[0];
-                        }
-                    }
-                    if (bad && vars.length > 1) {
-                        console.warn(`FlySky: ${mode} API rejected "${bad}", retrying without it.`);
-                        unsupportedVars[mode].add(bad);
-                        vars = vars.filter(v => v !== bad);
-                        continue;
-                    }
-                    return { model, error: reason };
+            let rateRetried = false;
+            for (;;) {
+                const res = await fetch(buildForecastUrl(mode, models.join(','), vars, days), { signal });
+                const body = await res.json().catch(() => null);
+                if (res.ok && body && !body.error && body.hourly) return { data: body };
+                const reason = (body && body.reason) || `HTTP ${res.status}`;
+                if ((res.status === 429 || /too many/i.test(reason)) && !rateRetried) {
+                    rateRetried = true;
+                    await sleep(RATE_LIMIT_RETRY_MS);
+                    continue;
                 }
-            } catch (err) {
-                return { model, error: err.message || String(err), network: true };
+                let bad = null;
+                if (res.status === 400) {
+                    const m = reason.match(/value\s+['"]?([a-z0-9_]+)/i);
+                    if (m && vars.includes(m[1])) bad = m[1];
+                    if (!bad) {
+                        const hits = vars.filter(v => new RegExp(`\\b${v}\\b`).test(reason));
+                        if (hits.length === 1) bad = hits[0];
+                    }
+                }
+                if (bad && vars.length > 1) {
+                    console.warn(`FlySky: ${mode} API rejected "${bad}", retrying without it.`);
+                    rememberUnsupportedVar(mode, bad);
+                    vars = vars.filter(v => v !== bad);
+                    continue;
+                }
+                return { error: reason };
             }
         }
+
+        // Splits a multi-model response into one response per model. With
+        // several models the API suffixes every column with the model id
+        // ("wind_speed_10m_member01_icon_seamless"); stripping it gives the
+        // same shape as a single-model response.
+        function splitCombined(body, models) {
+            const byLength = models.slice().sort((a, b) => b.length - a.length);
+            const hourly = Object.fromEntries(models.map(id => [id, { time: body.hourly.time }]));
+            Object.keys(body.hourly).forEach(k => {
+                if (k === 'time') return;
+                const id = byLength.find(m => k.endsWith('_' + m));
+                if (id) hourly[id][k.slice(0, -(id.length + 1))] = body.hourly[k];
+            });
+            return models.map(id => ({ model: id, data: { ...body, hourly: hourly[id] } }));
+        }
+
+        // Fetches all selected models: first as one combined request; if that
+        // fails (e.g. one model is unavailable and the API rejects the whole
+        // call), one model at a time, spaced out, so a bad model is isolated
+        // without firing a burst of parallel requests.
+        async function fetchAllModels(mode, models, days, signal) {
+            if (models.length > 1) {
+                try {
+                    const r = await requestForecast(mode, models, days, signal);
+                    if (r.data) return splitCombined(r.data, models);
+                    console.warn('FlySky: combined request failed, fetching models one by one.', r.error);
+                } catch (err) {
+                    if (err.name === 'AbortError') throw err;
+                    // No network: per-model calls would fail the same way.
+                    return models.map(model => ({ model, error: err.message || String(err), network: true }));
+                }
+            }
+            const results = [];
+            for (const [i, model] of models.entries()) {
+                if (i) await sleep(MODEL_REQUEST_GAP_MS);
+                try {
+                    const r = await requestForecast(mode, [model], days, signal);
+                    results.push(r.data ? { model, data: r.data } : { model, error: r.error });
+                } catch (err) {
+                    if (err.name === 'AbortError') throw err;
+                    results.push({ model, error: err.message || String(err), network: true });
+                }
+            }
+            return results;
+        }
+
+        // The load in progress, so overlapping triggers (refresh, tab focus,
+        // timer, settings changes) share one request instead of stacking up.
+        let inflightLoad = null;
 
         async function loadForecast({ force = false } = {}) {
             if (!state.location) return;
@@ -1269,15 +1348,35 @@
                 renderAll();
                 return;
             }
+            // Same data already on its way: wait for it instead of asking again.
+            if (inflightLoad && inflightLoad.key === key && inflightLoad.days >= days) return inflightLoad.promise;
+            // Otherwise anything still running is outdated — cancel it.
+            if (inflightLoad) inflightLoad.controller.abort();
 
+            const controller = new AbortController();
+            const promise = runForecastLoad(key, days, controller);
+            inflightLoad = { key, days, controller, promise };
+            try {
+                await promise;
+            } finally {
+                if (inflightLoad && inflightLoad.controller === controller) inflightLoad = null;
+            }
+        }
+
+        async function runForecastLoad(key, days, controller) {
+            const fc = state.forecast;
             const mode = state.mode;
             const models = selectedModels().slice();
             setLoading(true);
             let results;
             try {
-                results = await Promise.all(models.map(id => fetchModel(mode, id, days)));
+                results = await fetchAllModels(mode, models, days, controller.signal);
+            } catch (err) {
+                if (err.name === 'AbortError') return;   // superseded by a newer load
+                throw err;
             } finally {
-                setLoading(false);
+                // A newer load owns the spinner once this one was cancelled.
+                if (!controller.signal.aborted) setLoading(false);
             }
             // Ignore responses for a location/mode/model set that's no longer current.
             if (forecastKey() !== key) return;
