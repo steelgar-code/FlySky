@@ -320,7 +320,7 @@
                         <i id="statsChevron" class="fa-solid fa-chevron-up text-xs transition-transform"></i>
                     </span>
                 </button>
-                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3"></div>
             </section>
 
             <!-- One chart card per weather parameter (built dynamically) -->
@@ -453,8 +453,8 @@
             ensemble: {
                 url: 'https://ensemble-api.open-meteo.com/v1/ensemble',
                 models: [
-                    { id: 'icon_seamless', name: 'DWD ICON', members: 40 },
-                    { id: 'ecmwf_ifs025', name: 'ECMWF IFS', members: 51 },
+                    { id: 'icon_eu_eps', name: 'DWD ICON-EU', members: 40 },
+                    { id: 'ecmwf_ifs_europe_ensemble', name: 'ECMWF IFS Europe', members: 51 },
                     { id: 'ecmwf_aifs025', name: 'ECMWF AIFS', members: 51 },
                     { id: 'google_weathernext2_ensemble', name: 'Google WeatherNext 2', members: 64 },
                     { id: 'gfs_seamless', name: 'NOAA GFS', members: 31 },
@@ -462,7 +462,9 @@
                     { id: 'gem_global', name: 'GEM Global', members: 21 },
                     { id: 'bom_access_global_ensemble', name: 'BOM ACCESS', members: 18 }
                 ],
-                defaults: ['icon_seamless', 'ecmwf_ifs025', 'ecmwf_aifs025', 'google_weathernext2_ensemble']
+                defaults: ['icon_eu_eps', 'ecmwf_ifs_europe_ensemble', 'ecmwf_aifs025', 'google_weathernext2_ensemble'],
+                // Earlier ids of the same models, so saved selections carry over.
+                renamed: { icon_seamless: 'icon_eu_eps', ecmwf_ifs025: 'ecmwf_ifs_europe_ensemble' }
             },
             deterministic: {
                 url: 'https://api.open-meteo.com/v1/forecast',
@@ -502,12 +504,34 @@
         // Weather parameters, one chart each. `unit` picks which unit setting
         // applies. Adding a new parameter only needs a new entry here plus its
         // translation keys.
+        // `vars` (optional) lists the API variables behind a chart per mode;
+        // several variables are pooled into one distribution. Without it the
+        // chart uses the variable named by `key`.
         const PARAMS = [
             { key: 'precipitation', unit: 'precip', icon: 'fa-cloud-rain', color: '56, 189, 248', titleKey: 'paramPrecipitation', probability: true, beginAtZero: true },
             { key: 'wind_speed_10m', unit: 'wind', icon: 'fa-wind', color: '45, 212, 191', titleKey: 'paramWindSpeed', beginAtZero: true },
             { key: 'wind_gusts_10m', unit: 'wind', icon: 'fa-tornado', color: '251, 191, 36', titleKey: 'paramWindGusts', beginAtZero: true },
-            { key: 'cloud_cover_low', unit: 'percent', icon: 'fa-cloud', color: '167, 139, 250', titleKey: 'paramLowClouds', beginAtZero: true, max: 100 }
+            { key: 'cloud_cover_low', unit: 'percent', icon: 'fa-cloud', color: '167, 139, 250', titleKey: 'paramLowClouds', beginAtZero: true, max: 100 },
+            // Wind above the surface layer, where the drone actually flies:
+            // ensemble pools the 1000 hPa (~110 m) and 925 hPa (~800 m) levels,
+            // models mode uses 950 hPa (~500 m).
+            { key: 'wind_aloft', unit: 'wind', icon: 'fa-arrow-up-wide-short', color: '244, 114, 182', beginAtZero: true,
+              titleKey: { ensemble: 'paramWindAloftEns', deterministic: 'paramWindAloftDet' }, statTitleKey: 'statWindAloftTitle',
+              vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] } }
         ];
+
+        function paramVars(param, mode = state.mode) {
+            return param.vars ? param.vars[mode] : [param.key];
+        }
+
+        function paramTitle(param) {
+            return t(typeof param.titleKey === 'string' ? param.titleKey : param.titleKey[state.mode]);
+        }
+
+        // Every API variable the current mode requests, in PARAMS order.
+        function apiVars(mode) {
+            return [...new Set(PARAMS.flatMap(p => paramVars(p, mode)))];
+        }
 
         const UNIT_LABELS = {
             wind: { ms: 'm/s', kmh: 'km/h', kn: 'kn', mph: 'mph' },
@@ -686,6 +710,9 @@
                 windowWeek: "1 week",
                 modelsCount: "{count} models",
                 paramLowClouds: "Low Cloud Cover",
+                paramWindAloftEns: "Wind 110–800 m (1000/925 hPa)",
+                paramWindAloftDet: "Wind ~500 m (950 hPa)",
+                statWindAloftTitle: "Peak Wind Aloft",
                 legendMinMaxEnsemble: "Min – max (all members)",
                 legendMinMaxModels: "Min – max (all models)",
                 tooltipModels: "Models",
@@ -827,6 +854,9 @@
                 windowWeek: "1 тиждень",
                 modelsCount: "{count} моделей",
                 paramLowClouds: "Низька хмарність",
+                paramWindAloftEns: "Вітер 110–800 м (1000/925 гПа)",
+                paramWindAloftDet: "Вітер ~500 м (950 гПа)",
+                statWindAloftTitle: "Макс. вітер на висоті",
                 legendMinMaxEnsemble: "Мін – макс (усі члени)",
                 legendMinMaxModels: "Мін – макс (усі моделі)",
                 tooltipModels: "Моделей",
@@ -968,6 +998,9 @@
                 windowWeek: "1 semana",
                 modelsCount: "{count} modelos",
                 paramLowClouds: "Nuvens baixas",
+                paramWindAloftEns: "Vento 110–800 m (1000/925 hPa)",
+                paramWindAloftDet: "Vento ~500 m (950 hPa)",
+                statWindAloftTitle: "Vento máximo em altitude",
                 legendMinMaxEnsemble: "Mín – máx (todos os membros)",
                 legendMinMaxModels: "Mín – máx (todos os modelos)",
                 tooltipModels: "Modelos",
@@ -1114,6 +1147,8 @@
         Object.keys(MODES).forEach(mode => {
             let ids = state.modelsByMode[mode];
             if (!Array.isArray(ids)) ids = [];
+            const renamed = MODES[mode].renamed || {};
+            ids = [...new Set(ids.map(id => renamed[id] || id))];
             ids = ids.filter(id => MODES[mode].models.some(m => m.id === id));
             state.modelsByMode[mode] = ids.length ? ids : MODES[mode].defaults.slice();
         });
@@ -1223,9 +1258,9 @@
         // ================= Forecast Data =================
         function forecastKey() {
             if (!state.location) return null;
-            // "v2": bumps the cache format, so forecasts saved by the version that
-            // mis-split ensemble responses are refetched instead of reused.
-            return ['v2', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
+            // Version tag: bumped whenever the saved forecast's shape changes
+            // (e.g. new variables), so older saved forecasts are refetched.
+            return ['v3', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
         }
 
         // Forecast days (counted from local midnight today) needed to cover
@@ -1257,7 +1292,7 @@
         // retried; a rate-limit reply is retried once after a short pause.
         // Network errors (and aborts) are thrown to the caller.
         async function requestForecast(mode, models, days, signal) {
-            let vars = PARAMS.map(p => p.key).filter(v => !unsupportedVars[mode].has(v));
+            let vars = apiVars(mode).filter(v => !unsupportedVars[mode].has(v));
             let rateRetried = false;
             for (;;) {
                 const res = await fetch(buildForecastUrl(mode, models.join(','), vars, days), { signal });
@@ -1294,7 +1329,6 @@
         // and, failing that, by request order.
         const RESPONSE_MODEL_ALIASES = {
             icon_seamless: ['icon_seamless_eps'],
-            ecmwf_ifs025: ['ecmwf_ifs025_ensemble'],
             ecmwf_aifs025: ['ecmwf_aifs025_ensemble'],
             gfs_seamless: ['ncep_gefs_seamless', 'gfs_seamless_ensemble'],
             gem_global: ['gem_global_ensemble']
@@ -1309,7 +1343,7 @@
         // answers in that order). Returns the per-model responses plus the
         // models no column could be attributed to.
         function splitCombined(body, models) {
-            const varsByLength = PARAMS.map(p => p.key).sort((a, b) => b.length - a.length);
+            const varsByLength = apiVars('ensemble').concat(apiVars('deterministic')).sort((a, b) => b.length - a.length);
             const columns = [];     // { base, suffix, series }
             const suffixes = [];    // distinct response model names, in order of appearance
             Object.keys(body.hourly).forEach(k => {
@@ -1497,7 +1531,7 @@
             const end = Math.min(times.length, start + state.window);
             const windowTimes = times.slice(start, end);
 
-            const paramKeys = PARAMS.map(p => p.key);
+            const allVars = [...new Set(PARAMS.flatMap(p => paramVars(p)))];
             const result = { times: windowTimes, params: {}, modelsWithData: new Set() };
 
             PARAMS.forEach(param => {
@@ -1507,10 +1541,12 @@
                     const own = hourly.time || times;
                     const aligned = own.length === times.length && own[0] === times[0];
                     const index = aligned ? null : new Map(own.map((tm, i) => [tm, i]));
+                    const own_vars = paramVars(param);
                     Object.keys(hourly).forEach(k => {
-                        if (k !== param.key && !k.startsWith(param.key + '_')) return;
-                        // Don't let a shorter param key claim a longer one's series.
-                        if (paramKeys.some(o => o !== param.key && o.startsWith(param.key) && (k === o || k.startsWith(o + '_')))) return;
+                        // Longest matching API variable, so e.g. "wind_speed_10m" never
+                        // claims a "wind_speed_1000hPa" column.
+                        const v = allVars.filter(x => k === x || k.startsWith(x + '_')).sort((a, b) => b.length - a.length)[0];
+                        if (!v || !own_vars.includes(v)) return;
                         const series = hourly[k];
                         if (!Array.isArray(series)) return;
                         const values = aligned
@@ -2235,14 +2271,14 @@
             renderStatsPanel();
             const grid = document.getElementById('statsGrid');
             if (!processed) {
-                grid.innerHTML = PARAMS.map(p => statCard({ title: t(p.titleKey), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData') })).join('');
+                grid.innerHTML = PARAMS.map(p => statCard({ title: paramTitle(p), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData') })).join('');
                 return;
             }
             grid.innerHTML = PARAMS.map(param => {
                 const data = processed.params[param.key];
                 const s = data && data.summary;
                 const unit = unitLabel(param);
-                if (!s) return statCard({ title: t(param.titleKey), icon: param.icon, color: param.color, value: '–', sub: t('statNoData') });
+                if (!s) return statCard({ title: paramTitle(param), icon: param.icon, color: param.color, value: '–', sub: t('statNoData') });
                 if (param.key === 'precipitation') {
                     return statCard({
                         title: t('statPrecipTitle', { window: windowLabel(state.window) }), icon: param.icon, color: param.color,
@@ -2267,7 +2303,7 @@
                 let peakIdx = -1;
                 med.forEach((v, i) => { if (Number.isFinite(v) && (peakIdx < 0 || v > med[peakIdx])) peakIdx = i; });
                 return statCard({
-                    title: t(param.key === 'wind_gusts_10m' ? 'statGustTitle' : 'statWindTitle'), icon: param.icon, color: param.color,
+                    title: t(param.statTitleKey || (param.key === 'wind_gusts_10m' ? 'statGustTitle' : 'statWindTitle')), icon: param.icon, color: param.color,
                     value: t('statPeakValue', { value: formatValue(s.median, param), unit }),
                     sub: t('statPeakSub', { hi: formatValue(s.p90, param), unit }),
                     extra: peakIdx >= 0 ? t('statPeakWhen', { when: formatDayHour(processed.times[peakIdx]) }) : ''
@@ -2409,7 +2445,7 @@
                 }
                 const data = processed ? processed.params[param.key] : null;
                 const hasData = !!(data && data.members.length);
-                document.getElementById(`chartTitle-${param.key}`).textContent = t(param.titleKey);
+                document.getElementById(`chartTitle-${param.key}`).textContent = paramTitle(param);
                 document.getElementById(`chartUnit-${param.key}`).textContent =
                     param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
@@ -2423,7 +2459,7 @@
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
                 const overlayText = state.loading ? t('loading') : hasData ? '' :
-                    unsupportedVars[state.mode].has(param.key) ? t('chartNotInMode') : t('chartNoData');
+                    paramVars(param).every(v => unsupportedVars[state.mode].has(v)) ? t('chartNotInMode') : t('chartNoData');
                 overlay.classList.toggle('hidden', !overlayText);
                 overlay.innerHTML = overlayText
                     ? `${state.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-2"></i>' : ''}${escapeHtml(overlayText)}`
