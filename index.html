@@ -281,7 +281,7 @@
                     <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                 </div>
-                <p id="flightSun" class="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1"></p>
+                <p id="flightSun" class="text-[11px] text-slate-400 flex items-center gap-x-3 whitespace-nowrap overflow-hidden"></p>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
 
                 <!-- Per-cause breakdown (collapsible) -->
@@ -531,6 +531,7 @@
             // models mode uses 950 hPa (~500 m).
             { key: 'wind_aloft', unit: 'wind', icon: 'fa-arrow-up-wide-short', color: '244, 114, 182', beginAtZero: true,
               titleKey: { ensemble: 'paramWindAloftEns', deterministic: 'paramWindAloftDet' }, statTitleKey: 'statWindAloftTitle',
+              note: { ensemble: '1000/925 hPa', deterministic: '950 hPa' },
               vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] } }
         ];
 
@@ -672,7 +673,6 @@
                 ruleWindAloft: "wind aloft",
                 sunRise: "Sunrise",
                 sunSet: "Sunset",
-                dayLength: "Daylight {h} h {m} min",
                 sunPolarDay: "Sun above the horizon all day",
                 sunPolarNight: "Sun below the horizon all day",
                 chartMoveUp: "Move up",
@@ -742,8 +742,8 @@
                 windowWeek: "1 week",
                 modelsCount: "{count} models",
                 paramLowClouds: "Low Cloud Cover",
-                paramWindAloftEns: "Wind 110–800 m (1000/925 hPa)",
-                paramWindAloftDet: "Wind ~500 m (950 hPa)",
+                paramWindAloftEns: "Wind 110–800 m",
+                paramWindAloftDet: "Wind ~500 m",
                 statWindAloftTitle: "Peak Wind Aloft",
                 legendMinMaxEnsemble: "Min – max (all members)",
                 legendMinMaxModels: "Min – max (all models)",
@@ -834,7 +834,6 @@
                 ruleWindAloft: "вітер на висоті",
                 sunRise: "Схід",
                 sunSet: "Захід",
-                dayLength: "Світловий день {h} год {m} хв",
                 sunPolarDay: "Сонце над горизонтом увесь день",
                 sunPolarNight: "Сонце під горизонтом увесь день",
                 chartMoveUp: "Перемістити вгору",
@@ -904,8 +903,8 @@
                 windowWeek: "1 тиждень",
                 modelsCount: "{count} моделей",
                 paramLowClouds: "Низька хмарність",
-                paramWindAloftEns: "Вітер 110–800 м (1000/925 гПа)",
-                paramWindAloftDet: "Вітер ~500 м (950 гПа)",
+                paramWindAloftEns: "Вітер 110–800 м",
+                paramWindAloftDet: "Вітер ~500 м",
                 statWindAloftTitle: "Макс. вітер на висоті",
                 legendMinMaxEnsemble: "Мін – макс (усі члени)",
                 legendMinMaxModels: "Мін – макс (усі моделі)",
@@ -996,7 +995,6 @@
                 ruleWindAloft: "vento em altitude",
                 sunRise: "Nascer do sol",
                 sunSet: "Pôr do sol",
-                dayLength: "Luz do dia {h} h {m} min",
                 sunPolarDay: "Sol acima do horizonte o dia todo",
                 sunPolarNight: "Sol abaixo do horizonte o dia todo",
                 chartMoveUp: "Mover para cima",
@@ -1066,8 +1064,8 @@
                 windowWeek: "1 semana",
                 modelsCount: "{count} modelos",
                 paramLowClouds: "Nuvens baixas",
-                paramWindAloftEns: "Vento 110–800 m (1000/925 hPa)",
-                paramWindAloftDet: "Vento ~500 m (950 hPa)",
+                paramWindAloftEns: "Vento 110–800 m",
+                paramWindAloftDet: "Vento ~500 m",
                 statWindAloftTitle: "Vento máximo em altitude",
                 legendMinMaxEnsemble: "Mín – máx (todos os membros)",
                 legendMinMaxModels: "Mín – máx (todos os modelos)",
@@ -2025,11 +2023,10 @@
                 el.innerHTML = `<span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t(sun.polar === 'day' ? 'sunPolarDay' : 'sunPolarNight'))}</span>`;
                 return;
             }
-            const mins = Math.round((sun.sunset - sun.sunrise) / 60000);
             el.innerHTML = `
+                <span class="text-slate-300 font-medium">${escapeHtml(formatTime(today + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' }))}</span>
                 <span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t('sunRise'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunrise)))}</span></span>
-                <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>
-                <span class="text-slate-500">${escapeHtml(t('dayLength', { h: Math.floor(mins / 60), m: String(mins % 60).padStart(2, '0') }))} · ${escapeHtml(formatTime(today + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' }))}</span>`;
+                <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>`;
         }
 
         // ================= Flight Window Planner =================
@@ -2495,7 +2492,8 @@
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
                         <i class="fa-solid ${param.icon}" style="color: rgb(${param.color})"></i>
-                        <span id="chartTitle-${param.key}"></span>
+                        <span id="chartTitle-${param.key}" class="whitespace-nowrap"></span>
+                        <span id="chartNote-${param.key}" class="text-[10px] font-normal text-slate-500 whitespace-nowrap"></span>
                         <span id="chartUnit-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
                     </h3>
                     <span class="flex items-center gap-2">
@@ -2701,6 +2699,7 @@
                 const data = processed ? processed.params[param.key] : null;
                 const hasData = !!(data && data.members.length);
                 document.getElementById(`chartTitle-${param.key}`).textContent = paramTitle(param);
+                document.getElementById(`chartNote-${param.key}`).textContent = param.note ? param.note[state.mode] : '';
                 document.getElementById(`chartUnit-${param.key}`).textContent =
                     param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
