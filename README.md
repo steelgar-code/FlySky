@@ -14,8 +14,10 @@ Ensemble weather forecast for drone/UAV pilots. Instead of a single "best guess"
   - *Uncertain*: any of: precipitation chance under 40%, wind or gusts 8–14 m/s, low clouds 30–60%.
   - *Not suitable*: any of: precipitation chance 40% or more, wind or gusts 14 m/s or more, low clouds 60% or more.
   Below it, a collapsible *Breakdown by cause* shows the same zones separately for precipitation, wind + gusts, and low clouds, together with the rules. Hover or tap an hour on any bar to see its values and which one set the verdict; the summary shows hours per zone and the next suitable hour. Parameters with no data (e.g. low clouds in Ensemble mode) are left out and listed.
+- **Sunrise and sunset** — today's sunrise, sunset and daylight length for the selected location, under the flight bar (computed on the device, works offline).
+- **Reorderable charts** — move chart panels with the up/down arrows, or drag them by the grip on desktop; the order is remembered.
 - **Flight Window Planner** — a collapsible timetable under the flight bar listing the flyable windows (suitable and uncertain slots) day by day, with the causes and their worst values for uncertain slots. Windows shorter than the minimum duration (1 h by default) are left out.
-- **Settings** — a side menu (sliders icon in the header) to customize the flight thresholds for rain chance, wind & gusts (in your wind unit) and low clouds, and the planner's minimum window; *Reset to defaults* restores the original values.
+- **Settings** — a side menu (☰ menu button left of the logo) with units, the wind used for the flight rules (10 m wind and gusts, or wind aloft), and the flight thresholds for rain chance, wind & gusts (in your wind unit) and low clouds, and the planner's minimum window; *Reset to defaults* restores the original values.
 - **Probability ranges** — one chart per weather parameter with the median line plus shaded 25–75% (50% likely), 10–90% (80% likely), and min–max bands, pooled across all members or models. Hover any hour for the exact numbers.
 - **Parameters** — precipitation (with an hourly chance-of-precipitation bar), wind speed at 10 m, wind gusts at 10 m, low cloud cover, and wind aloft (Ensemble: 1000 and 925 hPa pooled, roughly 110–800 m; Models: 950 hPa, roughly 500 m).
 - **Time windows** — 3 h, 8 h, 24 h (default), 48 h, 72 h, or 1 week, starting from the current hour in the location's local time. The selector sits in the floating bar next to the mode switch.
@@ -24,7 +26,7 @@ Ensemble weather forecast for drone/UAV pilots. Instead of a single "best guess"
 - **Model picker** — defaults suit Ukraine and Eastern Europe (DWD ICON-EU EPS, ECMWF IFS Europe and AIFS, plus Google WeatherNext 2 for ensembles; DWD ICON, ECMWF IFS and AIFS and Météo-France and UK Met Office for the Models mode), with NOAA GFS, GEM, JMA, and BOM also available. A model that fails to load is flagged and skipped without breaking the rest.
 - **Location search** — click the current location to open the search field, or use your current position.
 - **Favorites** — star a location to save it; favorites stay one tap away under the location name. The last selected location, mode, models, and time window are remembered.
-- **Units** — wind in m/s, km/h, knots, or mph; precipitation in mm or inches.
+- **Units** — wind in m/s, km/h, knots, or mph; precipitation in mm or inches (in the Settings menu).
 - **Offline-friendly** — installable PWA; the last loaded forecast is kept so it can still be viewed with no network.
 - **Multi-language** — available in English, Ukrainian, and Portuguese (BR).
 

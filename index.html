@@ -133,6 +133,10 @@
             background: rgb(34 211 238);
         }
 
+        /* Chart canvases always fill their panel, even if a resize was missed
+           while the app was in the background. */
+        .chart-box canvas { width: 100% !important; height: 100% !important; display: block; }
+
         .search-item.highlight { background: rgb(30 41 59 / 0.8); }
 
         .legend-swatch {
@@ -148,6 +152,9 @@
     <!-- Top Header Navigation -->
     <header class="h-16 bg-slate-900/80 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
         <div class="flex items-center gap-2">
+            <button id="btnSettings" type="button" class="text-slate-400 hover:text-white p-2 -ml-2 rounded-lg transition" data-i18n-title="settingsTitle" data-i18n-aria-label="settingsTitle" title="Settings" aria-label="Settings" aria-controls="settingsDrawer" aria-expanded="false">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
             <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20">
                 <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
             </div>
@@ -167,9 +174,6 @@
                 <option value="uk">Українська</option>
                 <option value="pt-BR">Português (BR)</option>
             </select>
-            <button id="btnSettings" type="button" class="w-8 h-8 rounded-lg bg-slate-800/60 hover:bg-slate-700 border border-slate-700/50 text-slate-300 hover:text-white transition" data-i18n-title="settingsTitle" title="Settings" aria-controls="settingsDrawer" aria-expanded="false">
-                <i class="fa-solid fa-sliders"></i>
-            </button>
             <button id="btnRefresh" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs transition shadow-lg shadow-cyan-500/20 disabled:opacity-50" data-i18n-title="refreshTitle" title="Reload forecast">
                 <i class="fa-solid fa-rotate" id="refreshIcon"></i>
                 <span class="hidden sm:inline" data-i18n="refreshBtn">Refresh</span>
@@ -238,20 +242,6 @@
                     </span>
                 </button>
                 <div id="settingsBody" class="space-y-3">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <label class="text-[11px] text-slate-400" for="windUnitSelect" data-i18n="windUnitLabel">Wind</label>
-                        <select id="windUnitSelect" class="unit-select">
-                            <option value="ms">m/s</option>
-                            <option value="kmh">km/h</option>
-                            <option value="kn">kn</option>
-                            <option value="mph">mph</option>
-                        </select>
-                        <label class="text-[11px] text-slate-400 ml-1" for="precipUnitSelect" data-i18n="precipUnitLabel">Precip.</label>
-                        <select id="precipUnitSelect" class="unit-select">
-                            <option value="mm">mm</option>
-                            <option value="inch">inch</option>
-                        </select>
-                    </div>
                     <div id="modelChips" class="flex flex-wrap gap-2"></div>
                     <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
                 </div>
@@ -262,48 +252,6 @@
                 <i class="fa-solid fa-map-location-dot text-4xl text-cyan-400"></i>
                 <h3 class="text-base font-semibold text-slate-200" data-i18n="emptyTitle">Pick a location to see the forecast</h3>
                 <p class="text-xs text-slate-400" data-i18n="emptyDesc">Search for a city above, or use your current position.</p>
-            </section>
-
-            <!-- Flight conditions timeline -->
-            <section id="flightCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
-                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-plane-departure text-emerald-400"></i>
-                    <span data-i18n="flightTitle">Flight Conditions</span>
-                </h3>
-                <div>
-                    <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
-                    <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
-                </div>
-                <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
-
-                <!-- Flight Window Planner (collapsible) -->
-                <div class="pt-2 border-t border-slate-800/80">
-                    <button type="button" id="btnPlanner" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="true" aria-controls="plannerBody">
-                        <i id="plannerChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
-                        <span data-i18n="plannerTitle">Flight Window Planner</span>
-                    </button>
-                    <div id="plannerBody" class="pt-3 space-y-3">
-                        <div id="plannerDays" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
-                        <p class="text-[11px] text-slate-500">
-                            <span id="plannerNote"></span>
-                            <button type="button" data-open-settings class="text-cyan-400 hover:text-cyan-300 ml-1" data-i18n="plannerChange">Change</button>
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Per-cause breakdown (collapsible) -->
-                <div class="pt-2 border-t border-slate-800/80">
-                    <button type="button" id="btnFlightDetails" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="flightDetailsBody">
-                        <i id="flightDetailsChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
-                        <span data-i18n="flightDetailsToggle">Breakdown by cause</span>
-                    </button>
-                    <div id="flightDetailsBody" class="hidden space-y-3 pt-3">
-                        <div id="flightFactorBars" class="space-y-2"></div>
-                        <div data-flight-axis class="relative h-5 text-[10px] text-slate-500 font-mono"></div>
-                        <p class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values of the selected models · hover or tap a bar for details</p>
-                        <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400"></div>
-                    </div>
-                </div>
             </section>
 
             <!-- Summary stat cards -->
@@ -321,6 +269,49 @@
                     </span>
                 </button>
                 <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3"></div>
+            </section>
+
+            <!-- Flight conditions timeline -->
+            <section id="flightCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
+                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plane-departure text-emerald-400"></i>
+                    <span data-i18n="flightTitle">Flight Conditions</span>
+                </h3>
+                <div>
+                    <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                    <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                </div>
+                <p id="flightSun" class="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1"></p>
+                <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
+
+                <!-- Per-cause breakdown (collapsible) -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <button type="button" id="btnFlightDetails" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="flightDetailsBody">
+                        <i id="flightDetailsChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                        <span data-i18n="flightDetailsToggle">Breakdown by cause</span>
+                    </button>
+                    <div id="flightDetailsBody" class="hidden space-y-3 pt-3">
+                        <div id="flightFactorBars" class="space-y-2"></div>
+                        <div data-flight-axis class="relative h-5 text-[10px] text-slate-500 font-mono"></div>
+                        <p class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values of the selected models · hover or tap a bar for details</p>
+                        <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400"></div>
+                    </div>
+                </div>
+
+                <!-- Flight Window Planner (collapsible) -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <button type="button" id="btnPlanner" class="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="true" aria-controls="plannerBody">
+                        <i id="plannerChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                        <span data-i18n="plannerTitle">Flight Window Planner</span>
+                    </button>
+                    <div id="plannerBody" class="pt-3 space-y-3">
+                        <div id="plannerDays" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div>
+                        <p class="text-[11px] text-slate-500">
+                            <span id="plannerNote"></span>
+                            <button type="button" data-open-settings class="text-cyan-400 hover:text-cyan-300 ml-1" data-i18n="plannerChange">Change</button>
+                        </p>
+                    </div>
+                </div>
             </section>
 
             <!-- One chart card per weather parameter (built dynamically) -->
@@ -357,7 +348,7 @@
 
     <!-- Settings drawer -->
     <div id="settingsOverlay" class="hidden fixed inset-0 z-[55] bg-slate-950/70 backdrop-blur-sm"></div>
-    <aside id="settingsDrawer" class="fixed inset-y-0 right-0 z-[60] w-full max-w-sm bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col translate-x-full transition-transform duration-200" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" aria-hidden="true">
+    <aside id="settingsDrawer" class="fixed inset-y-0 left-0 z-[60] w-full max-w-sm bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col -translate-x-full transition-transform duration-200" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" aria-hidden="true">
         <div class="h-16 px-5 flex items-center justify-between border-b border-slate-800 shrink-0">
             <h2 id="settingsDrawerTitle" class="font-semibold text-slate-100 flex items-center gap-2">
                 <i class="fa-solid fa-sliders text-cyan-400"></i> <span data-i18n="settingsTitle">Settings</span>
@@ -368,10 +359,33 @@
         </div>
         <div class="flex-1 overflow-y-auto p-5 space-y-6">
             <section class="space-y-3">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="unitsTitle">Units</h3>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span data-i18n="windUnitLabel">Wind</span>
+                    <select id="windUnitSelect" class="unit-select">
+                        <option value="ms">m/s</option>
+                        <option value="kmh">km/h</option>
+                        <option value="kn">kn</option>
+                        <option value="mph">mph</option>
+                    </select>
+                </label>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span data-i18n="precipUnitLabel">Precip.</span>
+                    <select id="precipUnitSelect" class="unit-select">
+                        <option value="mm">mm</option>
+                        <option value="inch">inch</option>
+                    </select>
+                </label>
+            </section>
+            <section class="space-y-3">
                 <div>
                     <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="thresholdsTitle">Flight thresholds</h3>
-                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="thresholdsDesc">Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to both wind speed and gusts.</p>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="thresholdsDesc">Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft.</p>
                 </div>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span data-i18n="flightWindSourceLabel">Wind for flight rules</span>
+                    <select id="flightWindSourceSelect" class="unit-select max-w-[11rem]"></select>
+                </label>
                 <div id="thresholdRows" class="space-y-3"></div>
                 <p id="thresholdError" class="hidden text-[11px] text-rose-400"></p>
             </section>
@@ -573,7 +587,7 @@
         // checks from computeFlight() that feed each bar (worst one wins).
         const FLIGHT_FACTORS = [
             { key: 'rain', checks: ['rain'], icon: 'fa-cloud-rain', labelKey: 'flightFactorRain' },
-            { key: 'wind', checks: ['wind', 'gust'], icon: 'fa-wind', labelKey: 'flightFactorWind' },
+            { key: 'wind', checks: ['wind', 'gust'], icon: 'fa-wind', labelKey: 'flightFactorWind', aloftLabelKey: 'flightFactorWindAloft' },
             { key: 'cloud', checks: ['cloud'], icon: 'fa-cloud', labelKey: 'flightFactorCloud' }
         ];
 
@@ -646,9 +660,27 @@
                 flightNextGood: "next suitable: {when}",
                 flightNoGood: "no suitable hours in this window",
                 settingsTitle: "Settings",
+                unitsTitle: "Units",
+                flightWindSourceLabel: "Wind for flight rules",
+                windSourceSurface: "10 m wind & gusts",
+                windSourceAloft: "Wind aloft",
+                flightFactorWindAloft: "Wind aloft",
+                factorWindAloft: "wind aloft {v} {u}",
+                planFactorWindAloft: "wind aloft up to {v} {u}",
+                ruleWindAnd: "wind & gusts",
+                ruleWindOr: "wind or gusts",
+                ruleWindAloft: "wind aloft",
+                sunRise: "Sunrise",
+                sunSet: "Sunset",
+                dayLength: "Daylight {h} h {m} min",
+                sunPolarDay: "Sun above the horizon all day",
+                sunPolarNight: "Sun below the horizon all day",
+                chartMoveUp: "Move up",
+                chartMoveDown: "Move down",
+                chartDrag: "Drag to reorder",
                 closeLabel: "Close",
                 thresholdsTitle: "Flight thresholds",
-                thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to both wind speed and gusts.",
+                thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft.",
                 plannerSettingsTitle: "Flight Window Planner",
                 minSlotDesc: "Flyable periods (suitable + uncertain) shorter than this are left out of the planner.",
                 minSlotLabel: "Minimum window",
@@ -672,9 +704,9 @@
                 ruleRainNone: "no rain chance",
                 ruleRainUpTo: "rain chance ≤ {r1}%",
                 ruleRainBetween: "rain chance above {r1}% and below {r2}%",
-                flightRuleGood: "{rainGood}, wind & gusts < {w1} {u}, low clouds < {c1}%",
-                flightRuleMarginal: "any of: {rainMarginal}, wind or gusts {w1}–{w2} {u}, low clouds {c1}–{c2}%",
-                flightRuleBad: "any of: rain chance ≥ {r2}%, wind or gusts ≥ {w2} {u}, low clouds ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, low clouds < {c1}%",
+                flightRuleMarginal: "any of: {rainMarginal}, {windOr} {w1}–{w2} {u}, low clouds {c1}–{c2}%",
+                flightRuleBad: "any of: rain chance ≥ {r2}%, {windOr} ≥ {w2} {u}, low clouds ≥ {c2}%",
                 flightMissing: "Not included (no data): {params}",
                 factorRain: "rain chance {v}",
                 factorWind: "wind {v} {u}",
@@ -790,9 +822,27 @@
                 flightNextGood: "наступне придатне: {when}",
                 flightNoGood: "немає придатних годин у цьому періоді",
                 settingsTitle: "Налаштування",
+                unitsTitle: "Одиниці",
+                flightWindSourceLabel: "Вітер для правил польоту",
+                windSourceSurface: "Вітер і пориви на 10 м",
+                windSourceAloft: "Вітер на висоті",
+                flightFactorWindAloft: "Вітер на висоті",
+                factorWindAloft: "вітер на висоті {v} {u}",
+                planFactorWindAloft: "вітер на висоті до {v} {u}",
+                ruleWindAnd: "вітер і пориви",
+                ruleWindOr: "вітер або пориви",
+                ruleWindAloft: "вітер на висоті",
+                sunRise: "Схід",
+                sunSet: "Захід",
+                dayLength: "Світловий день {h} год {m} хв",
+                sunPolarDay: "Сонце над горизонтом увесь день",
+                sunPolarNight: "Сонце під горизонтом увесь день",
+                chartMoveUp: "Перемістити вгору",
+                chartMoveDown: "Перемістити вниз",
+                chartDrag: "Перетягніть, щоб змінити порядок",
                 closeLabel: "Закрити",
                 thresholdsTitle: "Пороги для польоту",
-                thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру діють і для швидкості, і для поривів.",
+                thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру діють для вибраного вище вітру: 10 м (вітер і пориви) або вітер на висоті.",
                 plannerSettingsTitle: "Планувальник польотних вікон",
                 minSlotDesc: "Періоди для польоту (придатні + невизначені), коротші за цей, не показуються в планувальнику.",
                 minSlotLabel: "Мінімальне вікно",
@@ -816,9 +866,9 @@
                 ruleRainNone: "без ймовірності опадів",
                 ruleRainUpTo: "ймовірність опадів ≤ {r1}%",
                 ruleRainBetween: "ймовірність опадів понад {r1}% і нижче {r2}%",
-                flightRuleGood: "{rainGood}, вітер і пориви < {w1} {u}, низька хмарність < {c1}%",
-                flightRuleMarginal: "будь-що з: {rainMarginal}, вітер або пориви {w1}–{w2} {u}, низька хмарність {c1}–{c2}%",
-                flightRuleBad: "будь-що з: ймовірність опадів ≥ {r2}%, вітер або пориви ≥ {w2} {u}, низька хмарність ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, низька хмарність < {c1}%",
+                flightRuleMarginal: "будь-що з: {rainMarginal}, {windOr} {w1}–{w2} {u}, низька хмарність {c1}–{c2}%",
+                flightRuleBad: "будь-що з: ймовірність опадів ≥ {r2}%, {windOr} ≥ {w2} {u}, низька хмарність ≥ {c2}%",
                 flightMissing: "Не враховано (немає даних): {params}",
                 factorRain: "ймовірність опадів {v}",
                 factorWind: "вітер {v} {u}",
@@ -934,9 +984,27 @@
                 flightNextGood: "próximo adequado: {when}",
                 flightNoGood: "nenhuma hora adequada neste período",
                 settingsTitle: "Configurações",
+                unitsTitle: "Unidades",
+                flightWindSourceLabel: "Vento para as regras de voo",
+                windSourceSurface: "Vento e rajadas a 10 m",
+                windSourceAloft: "Vento em altitude",
+                flightFactorWindAloft: "Vento em altitude",
+                factorWindAloft: "vento em altitude {v} {u}",
+                planFactorWindAloft: "vento em altitude até {v} {u}",
+                ruleWindAnd: "vento e rajadas",
+                ruleWindOr: "vento ou rajadas",
+                ruleWindAloft: "vento em altitude",
+                sunRise: "Nascer do sol",
+                sunSet: "Pôr do sol",
+                dayLength: "Luz do dia {h} h {m} min",
+                sunPolarDay: "Sol acima do horizonte o dia todo",
+                sunPolarNight: "Sol abaixo do horizonte o dia todo",
+                chartMoveUp: "Mover para cima",
+                chartMoveDown: "Mover para baixo",
+                chartDrag: "Arraste para reordenar",
                 closeLabel: "Fechar",
                 thresholdsTitle: "Limites de voo",
-                thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para a velocidade e para as rajadas.",
+                thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para o vento escolhido acima: vento e rajadas a 10 m, ou vento em altitude.",
                 plannerSettingsTitle: "Planejador de janelas de voo",
                 minSlotDesc: "Períodos voáveis (adequados + incertos) mais curtos que isto não aparecem no planejador.",
                 minSlotLabel: "Janela mínima",
@@ -960,9 +1028,9 @@
                 ruleRainNone: "sem chance de chuva",
                 ruleRainUpTo: "chance de chuva ≤ {r1}%",
                 ruleRainBetween: "chance de chuva acima de {r1}% e abaixo de {r2}%",
-                flightRuleGood: "{rainGood}, vento e rajadas < {w1} {u}, nuvens baixas < {c1}%",
-                flightRuleMarginal: "qualquer um: {rainMarginal}, vento ou rajadas {w1}–{w2} {u}, nuvens baixas {c1}–{c2}%",
-                flightRuleBad: "qualquer um: chance de chuva ≥ {r2}%, vento ou rajadas ≥ {w2} {u}, nuvens baixas ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, nuvens baixas < {c1}%",
+                flightRuleMarginal: "qualquer um: {rainMarginal}, {windOr} {w1}–{w2} {u}, nuvens baixas {c1}–{c2}%",
+                flightRuleBad: "qualquer um: chance de chuva ≥ {r2}%, {windOr} ≥ {w2} {u}, nuvens baixas ≥ {c2}%",
                 flightMissing: "Não incluído (sem dados): {params}",
                 factorRain: "chance de chuva {v}",
                 factorWind: "vento {v} {u}",
@@ -1132,6 +1200,12 @@
             plannerOpen: loadFromStorage('flysky_planner_open', true) !== false,
             flightRules: sanitizeFlightRules(loadFromStorage('flysky_flight_rules', null)),
             minSlotHours: loadFromStorage('flysky_min_slot_hours', DEFAULT_MIN_SLOT),
+            // Which wind the flight rules judge: 'surface' = 10 m wind + gusts,
+            // 'aloft' = the wind-aloft chart's values for the current mode.
+            flightWindSource: loadFromStorage('flysky_flight_wind_source', 'surface'),
+            // Order of the chart panels (param keys); unknown/missing keys are
+            // appended in PARAMS order.
+            chartOrder: loadFromStorage('flysky_chart_order', []),
             // Last loaded forecast: { key, days, fetchedAt, meta, times,
             // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
@@ -1154,6 +1228,8 @@
         });
         if (!WINDOWS.includes(state.window)) state.window = DEFAULT_WINDOW;
         if (!MIN_SLOT_OPTIONS.includes(state.minSlotHours)) state.minSlotHours = DEFAULT_MIN_SLOT;
+        if (!['surface', 'aloft'].includes(state.flightWindSource)) state.flightWindSource = 'surface';
+        if (!Array.isArray(state.chartOrder)) state.chartOrder = [];
         if (!UNIT_LABELS.wind[state.windUnit]) state.windUnit = 'ms';
         if (!UNIT_LABELS.precip[state.precipUnit]) state.precipUnit = 'mm';
         if (state.forecast && (!state.forecast.key || !state.forecast.models || !Array.isArray(state.forecast.times))) state.forecast = null;
@@ -1178,6 +1254,8 @@
             saveToStorage('flysky_planner_open', state.plannerOpen);
             saveToStorage('flysky_flight_rules', state.flightRules);
             saveToStorage('flysky_min_slot_hours', state.minSlotHours);
+            saveToStorage('flysky_flight_wind_source', state.flightWindSource);
+            saveToStorage('flysky_chart_order', state.chartOrder);
         }
 
         // Chart.js instances keyed by parameter key.
@@ -1591,14 +1669,17 @@
                 return p && p.members.length ? p.stats : null;
             };
             const rain = statsOf('precipitation');
-            const wind = statsOf('wind_speed_10m');
-            const gust = statsOf('wind_gusts_10m');
+            const aloft = state.flightWindSource === 'aloft';
+            // With "wind aloft" selected, the wind-aloft chart's values replace
+            // 10 m wind and gusts in the rules.
+            const wind = statsOf(aloft ? 'wind_aloft' : 'wind_speed_10m');
+            const gust = aloft ? null : statsOf('wind_gusts_10m');
             const cloud = statsOf('cloud_cover_low');
             const toMs = WIND_TO_MS[state.windUnit] || 1;
             const missing = [];
             if (!rain) missing.push('paramPrecipitation');
-            if (!wind) missing.push('paramWindSpeed');
-            if (!gust) missing.push('paramWindGusts');
+            if (!wind) missing.push(aloft ? (state.mode === 'ensemble' ? 'paramWindAloftEns' : 'paramWindAloftDet') : 'paramWindSpeed');
+            if (!gust && !aloft) missing.push('paramWindGusts');
             if (!cloud) missing.push('paramLowClouds');
 
             const R = state.flightRules;
@@ -1665,7 +1746,7 @@
             renderModeAndWindow();
             renderModelChips();
             renderSettingsPanel();
-            if (!document.getElementById('settingsDrawer').classList.contains('translate-x-full')) renderSettingsDrawer();
+            if (!document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) renderSettingsDrawer();
             renderUnits();
             renderMeta();
             const hasLocation = !!state.location;
@@ -1690,10 +1771,16 @@
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
             if (key === 'rain') return t('factorRain', { v: formatPercent(value) });
             if (key === 'cloud') return t('factorCloud', { v: Math.round(value) });
-            return t(key === 'wind' ? 'factorWind' : 'factorGust', { v: formatValue(value, windParam), u: unitLabel(windParam) });
+            const windKey = state.flightWindSource === 'aloft' ? 'factorWindAloft' : 'factorWind';
+            return t(key === 'wind' ? windKey : 'factorGust', { v: formatValue(value, windParam), u: unitLabel(windParam) });
         }
 
         const FLIGHT_RANK = { none: -1, good: 0, marginal: 1, bad: 2 };
+
+        // Label of a breakdown bar; the wind bar is named after the wind source.
+        function factorLabel(factor) {
+            return t(state.flightWindSource === 'aloft' && factor.aloftLabelKey ? factor.aloftLabelKey : factor.labelKey);
+        }
 
         // Status of one breakdown bar for an hour: the worst of its checks.
         function factorStatus(h, factor) {
@@ -1714,7 +1801,7 @@
                     const decisive = status !== 'good' && h.checks[k] === status;
                     return decisive ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
                 });
-            const label = factor ? `${t(factor.labelKey)}: ${t(st.labelKey)}` : t(st.labelKey);
+            const label = factor ? `${factorLabel(factor)}: ${t(st.labelKey)}` : t(st.labelKey);
             return `<span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
                 <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>
                 <span class="text-slate-400">${parts.join(' · ')}</span>`;
@@ -1755,7 +1842,7 @@
                 return `<div>
                     <div class="flex items-center gap-1.5 text-[11px] text-slate-400 mb-1">
                         <i class="fa-solid ${factor.icon} w-3.5 text-center"></i>
-                        <span class="font-medium text-slate-300">${escapeHtml(t(factor.labelKey))}</span>
+                        <span class="font-medium text-slate-300">${escapeHtml(factorLabel(factor))}</span>
                         ${noData ? `<span class="text-slate-500">· ${escapeHtml(t('flightNoData'))}</span>` : ''}
                     </div>
                     <div data-flight-bar="${factor.key}" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair">${flightCellsHtml(hours, h => factorStatus(h, factor))}</div>
@@ -1764,6 +1851,7 @@
             renderFlightDetailsPanel();
             renderFlightAxis();
             renderPlanner();
+            renderFlightSun();
 
             detail.innerHTML = flightSummaryHtml();
 
@@ -1776,7 +1864,9 @@
                 w1: ms(R.windGood), w2: ms(R.windBad), u: unitLabel(windParam),
                 c1: num(R.cloudGood), c2: num(R.cloudBad), r2: num(R.rainBad),
                 rainGood: R.rainGood > 0 ? t('ruleRainUpTo', { r1: num(R.rainGood) }) : t('ruleRainNone'),
-                rainMarginal: t('ruleRainBetween', { r1: num(R.rainGood), r2: num(R.rainBad) })
+                rainMarginal: t('ruleRainBetween', { r1: num(R.rainGood), r2: num(R.rainBad) }),
+                windAnd: t(state.flightWindSource === 'aloft' ? 'ruleWindAloft' : 'ruleWindAnd'),
+                windOr: t(state.flightWindSource === 'aloft' ? 'ruleWindAloft' : 'ruleWindOr')
             };
             const legendItem = (st, key) => `<span class="flex items-start gap-1.5"><i class="fa-solid ${FLIGHT_STATUS[st].icon} mt-0.5" style="color: ${FLIGHT_STATUS[st].color}"></i>
                 <span><span class="font-semibold text-slate-200">${escapeHtml(t(FLIGHT_STATUS[st].labelKey))}:</span> ${escapeHtml(t(key, vars))}</span></span>`;
@@ -1894,6 +1984,54 @@
             document.getElementById('flightDetailsChevron').style.transform = open ? 'rotate(180deg)' : '';
         }
 
+        // ================= Sunrise / sunset =================
+        // Sun times computed on the device (standard solar-position formulas,
+        // as used by SunCalc): no extra API call, and it works offline.
+        // Sunrise/sunset = sun's upper edge at the horizon (-0.833° with
+        // refraction). Returns UTC milliseconds, or null for polar day/night.
+        function sunTimes(utcNoonMs, lat, lon) {
+            const rad = Math.PI / 180, dayMs = 86400000, J1970 = 2440588, J2000 = 2451545, J0 = 0.0009;
+            const e = rad * 23.4397;
+            const d = utcNoonMs / dayMs - 0.5 + J1970 - J2000;
+            const lw = rad * -lon, phi = rad * lat;
+            const n = Math.round(d - J0 - lw / (2 * Math.PI));
+            const ds = J0 + lw / (2 * Math.PI) + n;
+            const M = rad * (357.5291 + 0.98560028 * ds);
+            const C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+            const L = M + C + rad * 102.9372 + Math.PI;
+            const dec = Math.asin(Math.sin(e) * Math.sin(L));
+            const jNoon = J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+            const cosW = (Math.sin(-0.833 * rad) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec));
+            const toMs = j => (j + 0.5 - J1970) * dayMs;
+            if (cosW > 1) return { polar: 'night' };
+            if (cosW < -1) return { polar: 'day' };
+            const w = Math.acos(cosW);
+            const jSet = J2000 + (J0 + (w + lw) / (2 * Math.PI) + n) + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+            return { sunrise: toMs(jNoon - (jSet - jNoon)), sunset: toMs(jSet) };
+        }
+
+        function renderFlightSun() {
+            const el = document.getElementById('flightSun');
+            const loc = state.location;
+            if (!loc) { el.innerHTML = ''; return; }
+            // Location's UTC offset from the forecast; the device's until one loads.
+            const fc = state.forecast;
+            const offsetMs = fc && fc.meta ? fc.meta.utcOffsetSeconds * 1000 : -new Date().getTimezoneOffset() * 60000;
+            const today = new Date(Date.now() + offsetMs).toISOString().slice(0, 10);
+            const [y, m, d] = today.split('-').map(Number);
+            const sun = sunTimes(Date.UTC(y, m - 1, d, 12) - offsetMs, loc.latitude, loc.longitude);
+            const local = ms => new Date(ms + offsetMs).toISOString().slice(0, 16);
+            if (sun.polar) {
+                el.innerHTML = `<span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t(sun.polar === 'day' ? 'sunPolarDay' : 'sunPolarNight'))}</span>`;
+                return;
+            }
+            const mins = Math.round((sun.sunset - sun.sunrise) / 60000);
+            el.innerHTML = `
+                <span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t('sunRise'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunrise)))}</span></span>
+                <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>
+                <span class="text-slate-500">${escapeHtml(t('dayLength', { h: Math.floor(mins / 60), m: String(mins % 60).padStart(2, '0') }))} · ${escapeHtml(formatTime(today + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' }))}</span>`;
+        }
+
         // ================= Flight Window Planner =================
         // Flyable windows = runs of consecutive suitable/uncertain hours. A
         // window shorter than the minimum duration is dropped as a whole;
@@ -1951,7 +2089,7 @@
 
         function planReasonText(slot) {
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
-            const keyFor = { rain: 'planFactorRain', wind: 'planFactorWind', gust: 'planFactorGust', cloud: 'planFactorCloud' };
+            const keyFor = { rain: 'planFactorRain', wind: state.flightWindSource === 'aloft' ? 'planFactorWindAloft' : 'planFactorWind', gust: 'planFactorGust', cloud: 'planFactorCloud' };
             return ['rain', 'wind', 'gust', 'cloud'].filter(k => k in slot.worst).map(k => {
                 const v = slot.worst[k];
                 const shown = k === 'rain' ? formatPercent(v) : k === 'cloud' ? `${Math.round(v)}%` : formatValue(v, windParam);
@@ -2022,6 +2160,8 @@
 
         function renderSettingsDrawer() {
             const R = state.flightRules;
+            document.getElementById('flightWindSourceSelect').innerHTML = ['surface', 'aloft'].map(v =>
+                `<option value="${v}" ${v === state.flightWindSource ? 'selected' : ''}>${escapeHtml(t(v === 'surface' ? 'windSourceSurface' : 'windSourceAloft'))}</option>`).join('');
             const input = (row, field, colorKey) => `<label class="flex-1">
                     <span class="block text-[10px] uppercase tracking-wider mb-1" style="color: ${FLIGHT_STATUS[colorKey].color}">${escapeHtml(t(colorKey === 'good' ? row.goodKey : 'thrFrom'))}</span>
                     <span class="flex items-center gap-1.5">
@@ -2032,7 +2172,7 @@
                 </label>`;
             document.getElementById('thresholdRows').innerHTML = THRESHOLD_ROWS.map(row => `
                 <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                    <div class="text-xs font-medium text-slate-200 mb-2 flex items-center gap-2"><i class="fa-solid ${row.icon} text-slate-400 w-4 text-center"></i>${escapeHtml(t(row.labelKey))}</div>
+                    <div class="text-xs font-medium text-slate-200 mb-2 flex items-center gap-2"><i class="fa-solid ${row.icon} text-slate-400 w-4 text-center"></i>${escapeHtml(t(row.key === 'wind' && state.flightWindSource === 'aloft' ? 'flightFactorWindAloft' : row.labelKey))}</div>
                     <div class="flex gap-3">${input(row, row.good, 'good')}${input(row, row.bad, 'bad')}</div>
                 </div>`).join('');
             document.getElementById('minSlotSelect').innerHTML = MIN_SLOT_OPTIONS.map(h =>
@@ -2042,7 +2182,7 @@
         function setSettingsDrawer(open) {
             const drawer = document.getElementById('settingsDrawer');
             if (open) renderSettingsDrawer();
-            drawer.classList.toggle('translate-x-full', !open);
+            drawer.classList.toggle('-translate-x-full', !open);
             drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
             document.getElementById('settingsOverlay').classList.toggle('hidden', !open);
             document.getElementById('btnSettings').setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -2061,7 +2201,7 @@
             document.getElementById('btnSettingsClose').addEventListener('click', () => setSettingsDrawer(false));
             document.getElementById('settingsOverlay').addEventListener('click', () => setSettingsDrawer(false));
             document.addEventListener('keydown', e => {
-                if (e.key === 'Escape' && !document.getElementById('settingsDrawer').classList.contains('translate-x-full')) setSettingsDrawer(false);
+                if (e.key === 'Escape' && !document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) setSettingsDrawer(false);
             });
             document.addEventListener('click', e => {
                 if (e.target.closest('[data-open-settings]')) setSettingsDrawer(true);
@@ -2084,6 +2224,10 @@
                 }
                 errorEl.classList.add('hidden');
                 state.flightRules = next;
+                applyFlightSettings();
+            });
+            document.getElementById('flightWindSourceSelect').addEventListener('change', e => {
+                state.flightWindSource = e.target.value;
                 applyFlightSettings();
             });
             document.getElementById('minSlotSelect').addEventListener('change', e => {
@@ -2112,7 +2256,7 @@
             const summary = document.getElementById('settingsSummary');
             summary.classList.toggle('hidden', !collapsed);
             const names = modeModels().filter(m => selectedModels().includes(m.id)).map(m => m.name).join(', ');
-            summary.textContent = `${names} · ${UNIT_LABELS.wind[state.windUnit]} · ${UNIT_LABELS.precip[state.precipUnit]}`;
+            summary.textContent = names;
         }
 
         function renderLocation() {
@@ -2354,10 +2498,17 @@
                         <span id="chartTitle-${param.key}"></span>
                         <span id="chartUnit-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
                     </h3>
-                    <span id="chartMembers-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
+                    <span class="flex items-center gap-2">
+                        <span id="chartMembers-${param.key}" class="text-[11px] font-mono text-slate-500"></span>
+                        <span class="flex items-center gap-0.5 text-slate-500">
+                            <button type="button" data-chart-move="-1" data-chart-key="${param.key}" class="w-7 h-7 rounded-lg hover:bg-slate-800 hover:text-slate-200 transition disabled:opacity-30 disabled:hover:bg-transparent" aria-label="${escapeHtml(t('chartMoveUp'))}" title="${escapeHtml(t('chartMoveUp'))}"><i class="fa-solid fa-chevron-up text-xs"></i></button>
+                            <button type="button" data-chart-move="1" data-chart-key="${param.key}" class="w-7 h-7 rounded-lg hover:bg-slate-800 hover:text-slate-200 transition disabled:opacity-30 disabled:hover:bg-transparent" aria-label="${escapeHtml(t('chartMoveDown'))}" title="${escapeHtml(t('chartMoveDown'))}"><i class="fa-solid fa-chevron-down text-xs"></i></button>
+                            <span data-chart-handle="${param.key}" draggable="true" class="hidden sm:flex w-7 h-7 items-center justify-center rounded-lg hover:bg-slate-800 hover:text-slate-200 cursor-grab active:cursor-grabbing transition" title="${escapeHtml(t('chartDrag'))}"><i class="fa-solid fa-grip-vertical text-xs"></i></span>
+                        </span>
+                    </span>
                 </div>
                 <div id="chartLegend-${param.key}" class="hidden flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-300"></div>
-                <div class="h-64 sm:h-72 relative">
+                <div class="chart-box h-64 sm:h-72 relative" data-chart-key="${param.key}">
                     <canvas id="chart-${param.key}"></canvas>
                     <div id="chartOverlay-${param.key}" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 bg-slate-900/70 rounded-xl"></div>
                 </div>
@@ -2435,6 +2586,110 @@
             if (param.probability && s.chance[idx] !== null) lines.push(`${t('tooltipChance')}: ${formatPercent(s.chance[idx])}`);
             lines.push(`${t(state.mode === 'ensemble' ? 'tooltipMembers' : 'tooltipModels')}: ${s.count[idx]}`);
             return lines;
+        }
+
+        // ================= Chart panel order & sizing =================
+        function orderedParamKeys() {
+            const known = state.chartOrder.filter(k => PARAMS.some(p => p.key === k));
+            return [...new Set([...known, ...PARAMS.map(p => p.key)])];
+        }
+
+        // Puts the chart panels in the saved order (only touching the DOM when
+        // it differs) and enables/disables the move buttons at the ends.
+        function applyChartOrder() {
+            const container = document.getElementById('chartsContainer');
+            const order = orderedParamKeys();
+            const current = [...container.children].map(el => el.id.replace('chartWrap-', ''));
+            if (current.join() !== order.filter(k => current.includes(k)).join()) {
+                order.forEach(k => { const el = document.getElementById(`chartWrap-${k}`); if (el) container.appendChild(el); });
+                resizeAllCharts();
+            }
+            order.forEach((k, i) => {
+                const up = container.querySelector(`[data-chart-move="-1"][data-chart-key="${k}"]`);
+                const down = container.querySelector(`[data-chart-move="1"][data-chart-key="${k}"]`);
+                if (up) { up.disabled = i === 0; up.title = t('chartMoveUp'); up.setAttribute('aria-label', up.title); }
+                if (down) { down.disabled = i === order.length - 1; down.title = t('chartMoveDown'); down.setAttribute('aria-label', down.title); }
+                const handle = container.querySelector(`[data-chart-handle="${k}"]`);
+                if (handle) handle.title = t('chartDrag');
+            });
+        }
+
+        function setChartOrder(order) {
+            state.chartOrder = order;
+            saveSettings();
+            applyChartOrder();
+        }
+
+        function setupChartReorder() {
+            const container = document.getElementById('chartsContainer');
+            container.addEventListener('click', e => {
+                const btn = e.target.closest('[data-chart-move]');
+                if (!btn || btn.disabled) return;
+                const order = orderedParamKeys();
+                const i = order.indexOf(btn.dataset.chartKey);
+                const j = i + Number(btn.dataset.chartMove);
+                if (i < 0 || j < 0 || j >= order.length) return;
+                [order[i], order[j]] = [order[j], order[i]];
+                setChartOrder(order);
+                document.getElementById(`chartWrap-${btn.dataset.chartKey}`).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+            // Drag & drop (desktop): only the grip handle is draggable, so the
+            // chart itself stays hoverable; the whole panel moves with it.
+            let dragged = null;
+            container.addEventListener('dragstart', e => {
+                const handle = e.target.closest && e.target.closest('[data-chart-handle]');
+                if (!handle) return;
+                dragged = document.getElementById(`chartWrap-${handle.dataset.chartHandle}`);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', dragged.id);
+                try { e.dataTransfer.setDragImage(dragged, 40, 20); } catch (err) {}
+                requestAnimationFrame(() => dragged && dragged.classList.add('opacity-40'));
+            });
+            container.addEventListener('dragover', e => {
+                if (!dragged) return;
+                e.preventDefault();
+                const over = e.target.closest('[id^="chartWrap-"]');
+                if (!over || over === dragged) return;
+                const r = over.getBoundingClientRect();
+                container.insertBefore(dragged, e.clientY < r.top + r.height / 2 ? over : over.nextSibling);
+            });
+            const finish = () => {
+                if (!dragged) return;
+                dragged.classList.remove('opacity-40');
+                dragged = null;
+                setChartOrder([...container.children].map(el => el.id.replace('chartWrap-', '')));
+                resizeAllCharts();
+            };
+            container.addEventListener('dragend', finish);
+            container.addEventListener('drop', e => { e.preventDefault(); finish(); });
+        }
+
+        // Chart.js resizes charts through its own observer, but on some phones
+        // a resize that happens while the app is in the background is missed,
+        // leaving a chart drawn at its old, smaller size. Each chart box is
+        // therefore also watched here, and every chart is re-measured whenever
+        // the app comes back to the foreground, is restored, rotated or resized.
+        function resizeAllCharts() {
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                Object.values(chartInstances).forEach(c => { try { c.resize(); } catch (err) {} });
+            }));
+        }
+
+        const chartBoxObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
+            requestAnimationFrame(() => entries.forEach(entry => {
+                const c = chartInstances[entry.target.dataset.chartKey];
+                if (c) { try { c.resize(); } catch (err) {} }
+            }));
+        });
+
+        function setupChartResizing() {
+            let timer = null;
+            const soon = () => { clearTimeout(timer); timer = setTimeout(resizeAllCharts, 120); };
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') resizeAllCharts(); });
+            window.addEventListener('pageshow', resizeAllCharts);
+            window.addEventListener('focus', resizeAllCharts);
+            window.addEventListener('orientationchange', soon);
+            window.addEventListener('resize', soon);
         }
 
         function renderCharts() {
@@ -2544,10 +2799,12 @@
                     });
                     chart.$times = times;
                     chartInstances[param.key] = chart;
+                    if (chartBoxObserver) chartBoxObserver.observe(ctx.canvas.parentNode);
                 } catch (err) {
                     console.error('FlySky: chart initialization failed.', err);
                 }
             });
+            applyChartOrder();
         }
 
         function setLoading(loading) {
@@ -2905,6 +3162,8 @@
             setupFavorites();
             setupControls();
             setupFlightStrip();
+            setupChartReorder();
+            setupChartResizing();
             setupSettingsDrawer();
             setupOfflineIndicator();
             processForecast();
