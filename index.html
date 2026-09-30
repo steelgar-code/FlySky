@@ -277,8 +277,12 @@
                     <i class="fa-solid fa-plane-departure text-emerald-400"></i>
                     <span data-i18n="flightTitle">Flight Conditions</span>
                 </h3>
-                <div>
-                    <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                <div id="flightMain">
+                    <div class="relative">
+                        <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                        <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
+                    </div>
+                    <div data-daynight class="h-1.5 mt-1 rounded-full"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                 </div>
                 <p id="flightSun" class="text-[11px] text-slate-400 flex items-center gap-x-3 whitespace-nowrap overflow-hidden"></p>
@@ -292,7 +296,12 @@
                     </button>
                     <div id="flightDetailsBody" class="hidden space-y-3 pt-3">
                         <div id="flightFactorBars" class="space-y-2"></div>
-                        <div data-flight-axis class="relative h-5 text-[10px] text-slate-500 font-mono"></div>
+                        <div>
+                            <div data-daynight class="h-1.5 rounded-full"></div>
+                            <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                        </div>
+                        <!-- Details for the hour selected in the breakdown bars (independent of the main bar) -->
+                        <div id="factorDetail" class="text-xs text-slate-300 min-h-[2.5rem] rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2"></div>
                         <p class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values of the selected models · hover or tap a bar for details</p>
                         <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400"></div>
                     </div>
@@ -661,6 +670,8 @@
                 flightNextGood: "next suitable: {when}",
                 flightNoGood: "no suitable hours in this window",
                 settingsTitle: "Settings",
+                factorDetailHint: "Hover or tap a bar above to see that hour's values (tap to pin).",
+                dayNightTitle: "Day / night (sky blue = daylight, indigo = night)",
                 unitsTitle: "Units",
                 flightWindSourceLabel: "Wind for flight rules",
                 windSourceSurface: "10 m wind & gusts",
@@ -822,6 +833,8 @@
                 flightNextGood: "наступне придатне: {when}",
                 flightNoGood: "немає придатних годин у цьому періоді",
                 settingsTitle: "Налаштування",
+                factorDetailHint: "Наведіть або торкніться смуги вище, щоб побачити значення за цю годину (дотик закріплює).",
+                dayNightTitle: "День / ніч (блакитний — день, індиго — ніч)",
                 unitsTitle: "Одиниці",
                 flightWindSourceLabel: "Вітер для правил польоту",
                 windSourceSurface: "Вітер і пориви на 10 м",
@@ -983,6 +996,8 @@
                 flightNextGood: "próximo adequado: {when}",
                 flightNoGood: "nenhuma hora adequada neste período",
                 settingsTitle: "Configurações",
+                factorDetailHint: "Passe o mouse ou toque em uma barra acima para ver os valores daquela hora (toque para fixar).",
+                dayNightTitle: "Dia / noite (azul-claro = dia, índigo = noite)",
                 unitsTitle: "Unidades",
                 flightWindSourceLabel: "Vento para as regras de voo",
                 windSourceSurface: "Vento e rajadas a 10 m",
@@ -1843,13 +1858,19 @@
                         <span class="font-medium text-slate-300">${escapeHtml(factorLabel(factor))}</span>
                         ${noData ? `<span class="text-slate-500">· ${escapeHtml(t('flightNoData'))}</span>` : ''}
                     </div>
-                    <div data-flight-bar="${factor.key}" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair">${flightCellsHtml(hours, h => factorStatus(h, factor))}</div>
+                    <div class="relative">
+                        <div data-flight-bar="${factor.key}" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair">${flightCellsHtml(hours, h => factorStatus(h, factor))}</div>
+                        <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
+                    </div>
                 </div>`;
             }).join('');
             renderFlightDetailsPanel();
             renderFlightAxis();
             renderPlanner();
             renderFlightSun();
+            renderDayMarks();
+            if (factorPin && factorPin.i >= hours.length) factorPin = null;
+            renderFactorDetail();
 
             detail.innerHTML = flightSummaryHtml();
 
@@ -1950,21 +1971,34 @@
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(renderFlightAxis, 150);
             });
-            const card = document.getElementById('flightCard');
+            // Main bar: its own details line.
+            const main = document.getElementById('flightMain');
             const detail = document.getElementById('flightDetail');
-            const show = e => {
+            const showMain = e => {
+                const cell = e.target.closest('[data-flight-hour]');
+                const h = cell && processed && processed.flight && processed.flight.hours[Number(cell.dataset.flightHour)];
+                if (h) detail.innerHTML = flightHourText(h);
+            };
+            main.addEventListener('mousemove', showMain);
+            main.addEventListener('click', showMain);
+            main.addEventListener('mouseleave', () => { detail.innerHTML = flightSummaryHtml(); });
+
+            // Breakdown bars: their own details block. Hover previews an hour;
+            // click/tap pins it (tap again on the same cell to unpin).
+            const bars = document.getElementById('flightFactorBars');
+            const pick = e => {
                 const cell = e.target.closest('[data-flight-hour]');
                 const bar = cell && cell.closest('[data-flight-bar]');
-                const h = cell && processed && processed.flight && processed.flight.hours[Number(cell.dataset.flightHour)];
-                if (!h) return;
-                detail.innerHTML = flightHourText(h, FLIGHT_FACTORS.find(f => f.key === bar.dataset.flightBar));
+                return cell && bar ? { key: bar.dataset.flightBar, i: Number(cell.dataset.flightHour) } : null;
             };
-            card.addEventListener('mousemove', show);
-            card.addEventListener('click', show);
-            card.addEventListener('mouseover', e => {
-                if (!e.target.closest('[data-flight-bar]')) detail.innerHTML = flightSummaryHtml();
+            bars.addEventListener('mousemove', e => { const p = pick(e); if (p) renderFactorDetail(p); });
+            bars.addEventListener('mouseleave', () => renderFactorDetail());
+            bars.addEventListener('click', e => {
+                const p = pick(e);
+                if (!p) return;
+                factorPin = factorPin && factorPin.key === p.key && factorPin.i === p.i ? null : p;
+                renderFactorDetail();
             });
-            card.addEventListener('mouseleave', () => { detail.innerHTML = flightSummaryHtml(); });
 
             document.getElementById('btnFlightDetails').addEventListener('click', () => {
                 state.flightDetailsOpen = !state.flightDetailsOpen;
@@ -2027,6 +2061,132 @@
                 <span class="text-slate-300 font-medium">${escapeHtml(formatTime(today + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' }))}</span>
                 <span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t('sunRise'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunrise)))}</span></span>
                 <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>`;
+        }
+
+        // ================= Day / night band & day separators =================
+        // Sun altitude (degrees) at a UTC instant — same solar-position
+        // formulas as sunTimes() above.
+        function sunAltitudeDeg(utcMs, lat, lon) {
+            const rad = Math.PI / 180, e = rad * 23.4397;
+            const d = utcMs / 86400000 - 0.5 + 2440588 - 2451545;
+            const M = rad * (357.5291 + 0.98560028 * d);
+            const C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+            const L = M + C + rad * 102.9372 + Math.PI;
+            const dec = Math.asin(Math.sin(e) * Math.sin(L));
+            const ra = Math.atan2(Math.sin(L) * Math.cos(e), Math.cos(L));
+            const H = rad * (280.16 + 360.9856235 * d) - rad * -lon - ra;
+            const phi = rad * lat;
+            return Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H)) / rad;
+        }
+
+        // Day/night colors: sky blue by day, deep indigo at night, blended
+        // through civil twilight (sun between -6° and +6°). Deliberately not
+        // yellow, so the band can't be mistaken for the "uncertain" status.
+        const DAY_RGB = [125, 211, 252];     // sky-300
+        const NIGHT_RGB = [49, 46, 129];     // indigo-900
+
+        function daylightColor(utcMs, loc) {
+            const f = Math.min(1, Math.max(0, (sunAltitudeDeg(utcMs, loc.latitude, loc.longitude) + 6) / 12));
+            const c = NIGHT_RGB.map((n, i) => Math.round(n + (DAY_RGB[i] - n) * f));
+            return `rgb(${c.join(',')})`;
+        }
+
+        function localToUtcMs(localStr) {
+            const fc = state.forecast;
+            const offsetMs = fc && fc.meta ? fc.meta.utcOffsetSeconds * 1000 : 0;
+            return parseLocalTime(localStr).getTime() - offsetMs;
+        }
+
+        // CSS gradient for a band spanning [fromLocal, toLocal], sampled every
+        // 15 min (at most ~200 stops).
+        function dayNightGradient(fromLocal, toLocal) {
+            const loc = state.location;
+            if (!loc) return 'transparent';
+            const a = localToUtcMs(fromLocal), b = localToUtcMs(toLocal);
+            if (!(b > a)) return 'transparent';
+            const step = Math.max(15 * 60000, (b - a) / 200);
+            const stops = [];
+            for (let tm = a; tm <= b + 1; tm += step) stops.push(`${daylightColor(tm, loc)} ${((tm - a) / (b - a) * 100).toFixed(2)}%`);
+            return `linear-gradient(to right, ${stops.join(', ')})`;
+        }
+
+        // Dotted separators at local midnight, positioned over a bar of n hour cells.
+        function daySeparatorsHtml(hours) {
+            const n = hours.length;
+            return hours.map((h, k) => k > 0 && h.time.slice(11, 13) === '00'
+                ? `<div class="absolute -top-0.5 -bottom-0.5" style="left: calc(${(k / n * 100).toFixed(3)}% - 1px); border-left: 2px dotted rgba(241, 245, 249, 0.9)"></div>`
+                : '').join('');
+        }
+
+        function renderDayMarks() {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            const bg = hours.length ? dayNightGradient(hours[0].time, addHoursToLocal(hours[hours.length - 1].time, 1)) : 'transparent';
+            document.querySelectorAll('#flightCard [data-daynight]').forEach(el => {
+                el.style.background = bg;
+                el.title = t('dayNightTitle');
+            });
+            const seps = daySeparatorsHtml(hours);
+            document.querySelectorAll('#flightCard [data-day-seps]').forEach(el => { el.innerHTML = seps; });
+        }
+
+        // ================= Breakdown details (independent of the main bar) =================
+        let factorPin = null;   // { key, i } — hour picked by click/tap in the breakdown bars
+
+        function statLine(label, param, i, decisiveColor) {
+            const p = processed && processed.params[param.key];
+            if (!p || !p.members.length) return '';
+            const s = p.stats, u = param.unit === 'precip' ? `${unitLabel(param)}/h` : unitLabel(param);
+            const f = v => formatValue(v, param);
+            const med = `${f(s.median[i])} ${u}`;
+            return `<div><span class="text-slate-400">${escapeHtml(label)}:</span>
+                ${escapeHtml(t('tooltipMedian'))} <span class="font-mono ${decisiveColor ? 'font-semibold' : 'text-slate-100'}" ${decisiveColor ? `style="color: ${decisiveColor}"` : ''}>${escapeHtml(med)}</span>
+                <span class="text-slate-500">· ${escapeHtml(t('tooltipRange80'))} ${escapeHtml(f(s.p10[i]))}–${escapeHtml(f(s.p90[i]))} ${escapeHtml(u)}</span></div>`;
+        }
+
+        function factorDetailHtml(factor, i) {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            const h = hours[i];
+            if (!h) return `<span class="text-slate-500">${escapeHtml(t('factorDetailHint'))}</span>`;
+            const status = factorStatus(h, factor);
+            const st = FLIGHT_STATUS[status];
+            const decisive = k => status !== 'good' && status !== 'none' && h.checks[k] === status ? st.color : null;
+            const P = key => PARAMS.find(p => p.key === key);
+            let lines = '';
+            if (factor.key === 'rain') {
+                const pr = processed.params.precipitation;
+                if (pr && pr.members.length) {
+                    const color = decisive('rain');
+                    lines += `<div><span class="text-slate-400">${escapeHtml(t('tooltipChance'))}:</span>
+                        <span class="font-mono ${color ? 'font-semibold' : 'text-slate-100'}" ${color ? `style="color: ${color}"` : ''}>${escapeHtml(formatPercent(pr.stats.chance[i]))}</span></div>`;
+                }
+                lines += statLine(t('paramPrecipitation'), P('precipitation'), i, null);
+            } else if (factor.key === 'wind') {
+                if (state.flightWindSource === 'aloft') {
+                    lines += statLine(paramTitle(P('wind_aloft')), P('wind_aloft'), i, decisive('wind'));
+                } else {
+                    lines += statLine(t('paramWindSpeed'), P('wind_speed_10m'), i, decisive('wind'));
+                    lines += statLine(t('paramWindGusts'), P('wind_gusts_10m'), i, decisive('gust'));
+                }
+            } else {
+                lines += statLine(t('paramLowClouds'), P('cloud_cover_low'), i, decisive('cloud'));
+            }
+            return `<div class="mb-0.5"><span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
+                    <span class="ml-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(factorLabel(factor))}: ${escapeHtml(t(st.labelKey))}</span></div>
+                ${lines || `<span class="text-slate-500">${escapeHtml(t('flightNoData'))}</span>`}`;
+        }
+
+        // Shows the pinned (or hovered) breakdown hour and outlines its cell.
+        function renderFactorDetail(hover) {
+            const sel = hover || factorPin;
+            const factor = sel && FLIGHT_FACTORS.find(f => f.key === sel.key);
+            document.getElementById('factorDetail').innerHTML = factor
+                ? factorDetailHtml(factor, sel.i)
+                : `<span class="text-slate-500">${escapeHtml(t('factorDetailHint'))}</span>`;
+            document.querySelectorAll('#flightFactorBars [data-flight-hour]').forEach(c => { c.style.boxShadow = ''; });
+            if (factorPin) {
+                const cell = document.querySelector(`#flightFactorBars [data-flight-bar="${factorPin.key}"] [data-flight-hour="${factorPin.i}"]`);
+                if (cell) cell.style.boxShadow = 'inset 0 0 0 2px #f8fafc';
+            }
         }
 
         // ================= Flight Window Planner =================
@@ -2469,8 +2629,9 @@
                 dayStarts.forEach((idx, n) => {
                     const px = x.getPixelForValue(idx);
                     if (idx > 0) {
-                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-                        ctx.setLineDash([4, 4]);
+                        ctx.strokeStyle = 'rgba(203, 213, 225, 0.55)';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([2, 4]);
                         ctx.beginPath();
                         ctx.moveTo(px, chartArea.top);
                         ctx.lineTo(px, chartArea.bottom);
@@ -2483,6 +2644,28 @@
                         ctx.fillText(formatDayLabel(times[idx]), px + 6, chartArea.top + 4);
                     }
                 });
+                ctx.restore();
+            },
+            // Day/night band just below the plot area (in the gap above the
+            // hour labels), aligned with the chart's time axis.
+            afterDraw(chart) {
+                const times = chart.$times;
+                const loc = state.location;
+                if (!times || times.length < 2 || !loc) return;
+                const { ctx, chartArea, scales } = chart;
+                const x = scales.x;
+                const x0 = x.getPixelForValue(0), x1 = x.getPixelForValue(times.length - 1);
+                const a = localToUtcMs(times[0]), b = localToUtcMs(times[times.length - 1]);
+                if (!(x1 > x0) || !(b > a)) return;
+                const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+                const step = Math.max(15 * 60000, (b - a) / 200);
+                for (let tm = a; tm <= b + 1; tm += step) grad.addColorStop(Math.min(1, (tm - a) / (b - a)), daylightColor(tm, loc));
+                ctx.save();
+                ctx.fillStyle = grad;
+                const y = chartArea.bottom + 3, hgt = 4, r = 2;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(x0, y, x1 - x0, hgt, r); else ctx.rect(x0, y, x1 - x0, hgt);
+                ctx.fill();
                 ctx.restore();
             }
         };
@@ -2781,7 +2964,7 @@
                             scales: {
                                 x: {
                                     grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                                    ticks: { color: '#94a3b8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 } }
+                                    ticks: { color: '#94a3b8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 }, padding: 12 }
                                 },
                                 y: {
                                     beginAtZero: !!param.beginAtZero,
