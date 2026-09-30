@@ -2852,12 +2852,43 @@
         // Chart.js resizes charts through its own observer, but on some phones
         // a resize that happens while the app is in the background is missed,
         // leaving a chart drawn at its old, smaller size. Each chart box is
-        // therefore also watched here, and every chart is re-measured whenever
-        // the app comes back to the foreground, is restored, rotated or resized.
+        // therefore also watched here, and every chart is re-measured when the
+        // window is rotated or resized.
         function resizeAllCharts() {
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 Object.values(chartInstances).forEach(c => { try { c.resize(); } catch (err) {} });
             }));
+        }
+
+        // Android may throw away a canvas' pixel memory while the app sits in
+        // the background. When it comes back, the drawing context is reset —
+        // its pixel-ratio scaling included — so charts are drawn at a fraction
+        // of their size in the top-left corner. Chart.js only re-applies that
+        // scaling when the size changes, so resize() cannot repair it. Instead,
+        // after the app returns, every chart gets a brand-new canvas and is
+        // built again from the current data.
+        function rebuildAllCharts() {
+            if (typeof Chart === 'undefined') return;
+            Object.keys(chartInstances).forEach(key => {
+                const chart = chartInstances[key];
+                try { chart.destroy(); } catch (err) {}
+                delete chartInstances[key];
+                const old = document.getElementById(`chart-${key}`);
+                if (old) {
+                    const fresh = old.cloneNode(false);
+                    fresh.removeAttribute('width');
+                    fresh.removeAttribute('height');
+                    fresh.removeAttribute('style');
+                    old.replaceWith(fresh);
+                }
+            });
+            renderCharts();
+        }
+
+        let rebuildTimer = null;
+        function rebuildChartsSoon() {
+            clearTimeout(rebuildTimer);
+            rebuildTimer = setTimeout(() => requestAnimationFrame(rebuildAllCharts), 60);
         }
 
         const chartBoxObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(entries => {
@@ -2869,10 +2900,15 @@
 
         function setupChartResizing() {
             let timer = null;
+            let hidden = document.visibilityState === 'hidden';
             const soon = () => { clearTimeout(timer); timer = setTimeout(resizeAllCharts, 120); };
-            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') resizeAllCharts(); });
-            window.addEventListener('pageshow', resizeAllCharts);
-            window.addEventListener('focus', resizeAllCharts);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') { hidden = true; return; }
+                if (hidden) { hidden = false; rebuildChartsSoon(); }
+            });
+            // Restored from the back/forward cache, or the app was frozen.
+            window.addEventListener('pageshow', e => { if (e.persisted) rebuildChartsSoon(); });
+            document.addEventListener('resume', rebuildChartsSoon);
             window.addEventListener('orientationchange', soon);
             window.addEventListener('resize', soon);
         }
@@ -2986,6 +3022,8 @@
                     chart.$times = times;
                     chartInstances[param.key] = chart;
                     if (chartBoxObserver) chartBoxObserver.observe(ctx.canvas.parentNode);
+                    // Fires when the browser gives back a canvas it had discarded.
+                    ctx.canvas.addEventListener('contextrestored', rebuildChartsSoon);
                 } catch (err) {
                     console.error('FlySky: chart initialization failed.', err);
                 }
