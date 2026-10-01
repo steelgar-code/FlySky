@@ -541,7 +541,12 @@
             { key: 'wind_aloft', unit: 'wind', icon: 'fa-arrow-up-wide-short', color: '244, 114, 182', beginAtZero: true,
               titleKey: { ensemble: 'paramWindAloftEns', deterministic: 'paramWindAloftDet' }, statTitleKey: 'statWindAloftTitle',
               note: { ensemble: '1000/925 hPa', deterministic: '950 hPa' },
-              vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] } }
+              vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] },
+              // With Members on, each level's member lines get their own color.
+              levels: {
+                  wind_speed_1000hPa: { color: '163, 230, 53', label: '~110 m · 1000 hPa' },
+                  wind_speed_925hPa: { color: '96, 165, 250', label: '~800 m · 925 hPa' }
+              } }
         ];
 
         function paramVars(param, mode = state.mode) {
@@ -1645,7 +1650,7 @@
                             : windowTimes.map(tm => (index.has(tm) ? series[index.get(tm)] : null));
                         if (!values.some(v => v !== null && v !== undefined)) return;
                         result.modelsWithData.add(modelId);
-                        members.push({ key: k, model: modelId, values });
+                        members.push({ key: k, model: modelId, variable: v, values });
                     });
                 });
 
@@ -2706,6 +2711,12 @@
             return state.mode === 'deterministic' && state.showMembers;
         }
 
+        // The pressure level an ensemble member belongs to, for charts that
+        // pool several levels (wind aloft); null otherwise.
+        function memberLevel(param, member) {
+            return (state.mode === 'ensemble' && param.levels && param.levels[member.variable]) || null;
+        }
+
         function buildDatasets(param, data) {
             const c = param.color;
             if (perModelView()) {
@@ -2746,8 +2757,10 @@
             }
             if (state.showMembers && data) {
                 data.members.forEach(m => {
+                    const level = memberLevel(param, m);
                     datasets.push({
-                        ...line, label: 'member', data: m.values, fill: false, borderColor: `rgba(${c}, 0.18)`, borderWidth: 1,
+                        ...line, label: 'member', data: m.values, fill: false,
+                        borderColor: level ? `rgba(${level.color}, 0.55)` : `rgba(${c}, 0.18)`, borderWidth: 1,
                         pointHoverRadius: 0, order: 3
                     });
                 });
@@ -2928,11 +2941,15 @@
                 document.getElementById(`chartMembers-${param.key}`).textContent =
                     hasData ? countLabel(data.members.length) : '';
                 const legend = document.getElementById(`chartLegend-${param.key}`);
-                const showLegend = perModelView() && hasData;
+                const swatch = (color, text) =>
+                    `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${color}"></span>${escapeHtml(text)}</span>`;
+                const levels = hasData && state.showMembers
+                    ? [...new Set(data.members.map(m => memberLevel(param, m)).filter(Boolean))] : [];
+                const showLegend = hasData && (perModelView() || levels.length > 0);
                 legend.classList.toggle('hidden', !showLegend);
-                legend.innerHTML = showLegend ? data.members.map(m =>
-                    `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${modelColor(m.model)}"></span>${escapeHtml(modelName(m.model))}</span>`
-                ).join('') : '';
+                legend.innerHTML = !showLegend ? '' : perModelView()
+                    ? data.members.map(m => swatch(modelColor(m.model), modelName(m.model))).join('')
+                    : levels.map(l => swatch(`rgb(${l.color})`, l.label)).join('');
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
                 const overlayText = state.loading ? t('loading') : hasData ? '' :
