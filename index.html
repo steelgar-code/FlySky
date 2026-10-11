@@ -268,7 +268,7 @@
                         <i id="statsChevron" class="fa-solid fa-chevron-up text-xs transition-transform"></i>
                     </span>
                 </button>
-                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3"></div>
+                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3"></div>
             </section>
 
             <!-- Flight conditions timeline -->
@@ -389,7 +389,7 @@
             <section class="space-y-3">
                 <div>
                     <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="thresholdsTitle">Flight thresholds</h3>
-                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="thresholdsDesc">Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft.</p>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="thresholdsDesc">Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft. Visibility is the other way round: suitable above the first value, not suitable below the second.</p>
                 </div>
                 <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
                     <span data-i18n="flightWindSourceLabel">Wind for flight rules</span>
@@ -535,6 +535,9 @@
             { key: 'wind_speed_10m', unit: 'wind', icon: 'fa-wind', color: '45, 212, 191', titleKey: 'paramWindSpeed', beginAtZero: true },
             { key: 'wind_gusts_10m', unit: 'wind', icon: 'fa-tornado', color: '251, 191, 36', titleKey: 'paramWindGusts', beginAtZero: true },
             { key: 'cloud_cover_low', unit: 'percent', icon: 'fa-cloud', color: '167, 139, 250', titleKey: 'paramLowClouds', beginAtZero: true, max: 100 },
+            // The API reports visibility in meters; shown in km (`scale`).
+            // Not every model provides it — those simply add no members.
+            { key: 'visibility', unit: 'distance', icon: 'fa-eye', color: '251, 146, 60', titleKey: 'paramVisibility', beginAtZero: true, scale: 0.001 },
             // Wind above the surface layer, where the drone actually flies:
             // ensemble pools the 1000 hPa (~110 m) and 925 hPa (~800 m) levels,
             // models mode uses 950 hPa (~500 m).
@@ -564,7 +567,8 @@
 
         const UNIT_LABELS = {
             wind: { ms: 'm/s', kmh: 'km/h', kn: 'kn', mph: 'mph' },
-            precip: { mm: 'mm', inch: 'in' }
+            precip: { mm: 'mm', inch: 'in' },
+            distance: 'km'
         };
 
         // Flight suitability rules, evaluated per hour on the median values
@@ -576,16 +580,18 @@
         //  - rain chance (% of members/models): good while ≤ rainGood, bad from rainBad
         //  - wind & gusts (m/s, stored in m/s whatever the display unit): good below windGood, bad from windBad
         //  - low clouds (%): good below cloudGood, bad from cloudBad
-        const DEFAULT_FLIGHT_RULES = { rainGood: 0, rainBad: 40, windGood: 8, windBad: 14, cloudGood: 30, cloudBad: 60 };
+        //  - visibility (km): good above visGood, bad below visBad (higher is better)
+        const DEFAULT_FLIGHT_RULES = { rainGood: 0, rainBad: 40, windGood: 8, windBad: 14, cloudGood: 30, cloudBad: 60, visGood: 5, visBad: 3 };
         const MIN_SLOT_OPTIONS = [1, 2, 3, 4, 6];   // hours; forecast data is hourly
         const DEFAULT_MIN_SLOT = 1;
 
         function sanitizeFlightRules(r) {
             const out = { ...DEFAULT_FLIGHT_RULES };
             if (r && typeof r === 'object') Object.keys(out).forEach(k => { if (Number.isFinite(r[k]) && r[k] >= 0) out[k] = r[k]; });
-            // Keep every pair ordered (good < bad); fall back to defaults otherwise.
-            [['rainGood', 'rainBad'], ['windGood', 'windBad'], ['cloudGood', 'cloudBad']].forEach(([g, b]) => {
-                if (!(out[g] < out[b])) { out[g] = DEFAULT_FLIGHT_RULES[g]; out[b] = DEFAULT_FLIGHT_RULES[b]; }
+            // Keep every pair ordered (good < bad, or good > bad for visibility,
+            // where more is better); fall back to defaults otherwise.
+            [['rainGood', 'rainBad'], ['windGood', 'windBad'], ['cloudGood', 'cloudBad'], ['visBad', 'visGood']].forEach(([lo, hi]) => {
+                if (!(out[lo] < out[hi])) { out[lo] = DEFAULT_FLIGHT_RULES[lo]; out[hi] = DEFAULT_FLIGHT_RULES[hi]; }
             });
             return out;
         }
@@ -603,8 +609,11 @@
         const FLIGHT_FACTORS = [
             { key: 'rain', checks: ['rain'], icon: 'fa-cloud-rain', labelKey: 'flightFactorRain' },
             { key: 'wind', checks: ['wind', 'gust'], icon: 'fa-wind', labelKey: 'flightFactorWind', aloftLabelKey: 'flightFactorWindAloft' },
-            { key: 'cloud', checks: ['cloud'], icon: 'fa-cloud', labelKey: 'flightFactorCloud' }
+            { key: 'cloud', checks: ['cloud'], icon: 'fa-cloud', labelKey: 'flightFactorCloud' },
+            { key: 'vis', checks: ['vis'], icon: 'fa-eye', labelKey: 'flightFactorVis' }
         ];
+        // Checks where a lower value is the worse one.
+        const LOWER_IS_WORSE = new Set(['vis']);
 
         // Variables a given API/model rejected in this session, so we don't
         // keep re-requesting them (e.g. a parameter the ensemble API lacks).
@@ -667,6 +676,17 @@
                 flightFactorRain: "Precipitation",
                 flightFactorWind: "Wind + gusts",
                 flightFactorCloud: "Low clouds",
+                flightFactorVis: "Visibility",
+                paramVisibility: "Visibility",
+                factorVis: "visibility {v} {u}",
+                planFactorVis: "visibility down to {v} {u}",
+                thrAbove: "Suitable above",
+                thrBadBelow: "Not suitable below",
+                thrErrorHigher: "{name}: enter a valid number; the suitable limit must be higher than the not-suitable one.",
+                statVisTitle: "Lowest Visibility",
+                statVisValue: "{value} {unit}",
+                statVisSub: "10% chance below {lo} {unit}",
+                statVisWorst: "worst at {when}",
                 flightGood: "Suitable",
                 flightMarginal: "Uncertain",
                 flightBad: "Not suitable",
@@ -696,7 +716,7 @@
                 chartDrag: "Drag to reorder",
                 closeLabel: "Close",
                 thresholdsTitle: "Flight thresholds",
-                thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft.",
+                thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). Wind limits apply to the wind chosen above: 10 m wind and gusts, or wind aloft. Visibility is the other way round: suitable above the first value, not suitable below the second.",
                 plannerSettingsTitle: "Flight Window Planner",
                 minSlotDesc: "Flyable periods (suitable + uncertain) shorter than this are left out of the planner.",
                 minSlotLabel: "Minimum window",
@@ -720,9 +740,9 @@
                 ruleRainNone: "no rain chance",
                 ruleRainUpTo: "rain chance ≤ {r1}%",
                 ruleRainBetween: "rain chance above {r1}% and below {r2}%",
-                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, low clouds < {c1}%",
-                flightRuleMarginal: "any of: {rainMarginal}, {windOr} {w1}–{w2} {u}, low clouds {c1}–{c2}%",
-                flightRuleBad: "any of: rain chance ≥ {r2}%, {windOr} ≥ {w2} {u}, low clouds ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, low clouds < {c1}%, visibility > {v1} {vu}",
+                flightRuleMarginal: "any of: {rainMarginal}, {windOr} {w1}–{w2} {u}, low clouds {c1}–{c2}%, visibility {v2}–{v1} {vu}",
+                flightRuleBad: "any of: rain chance ≥ {r2}%, {windOr} ≥ {w2} {u}, low clouds ≥ {c2}%, visibility < {v2} {vu}",
                 flightMissing: "Not included (no data): {params}",
                 factorRain: "rain chance {v}",
                 factorWind: "wind {v} {u}",
@@ -830,6 +850,17 @@
                 flightFactorRain: "Опади",
                 flightFactorWind: "Вітер + пориви",
                 flightFactorCloud: "Низька хмарність",
+                flightFactorVis: "Видимість",
+                paramVisibility: "Видимість",
+                factorVis: "видимість {v} {u}",
+                planFactorVis: "видимість знижується до {v} {u}",
+                thrAbove: "Придатно понад",
+                thrBadBelow: "Непридатно нижче",
+                thrErrorHigher: "{name}: введіть коректне число; поріг «придатно» має бути вищим за «непридатно».",
+                statVisTitle: "Мінімальна видимість",
+                statVisValue: "{value} {unit}",
+                statVisSub: "10% ймовірність нижче {lo} {unit}",
+                statVisWorst: "найгірша о {when}",
                 flightGood: "Придатно",
                 flightMarginal: "Невизначено",
                 flightBad: "Непридатно",
@@ -859,7 +890,7 @@
                 chartDrag: "Перетягніть, щоб змінити порядок",
                 closeLabel: "Закрити",
                 thresholdsTitle: "Пороги для польоту",
-                thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру діють для вибраного вище вітру: 10 м (вітер і пориви) або вітер на висоті.",
+                thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру діють для вибраного вище вітру: 10 м (вітер і пориви) або вітер на висоті. Для видимості навпаки: придатно понад перше значення, непридатно нижче другого.",
                 plannerSettingsTitle: "Планувальник польотних вікон",
                 minSlotDesc: "Періоди для польоту (придатні + невизначені), коротші за цей, не показуються в планувальнику.",
                 minSlotLabel: "Мінімальне вікно",
@@ -883,9 +914,9 @@
                 ruleRainNone: "без ймовірності опадів",
                 ruleRainUpTo: "ймовірність опадів ≤ {r1}%",
                 ruleRainBetween: "ймовірність опадів понад {r1}% і нижче {r2}%",
-                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, низька хмарність < {c1}%",
-                flightRuleMarginal: "будь-що з: {rainMarginal}, {windOr} {w1}–{w2} {u}, низька хмарність {c1}–{c2}%",
-                flightRuleBad: "будь-що з: ймовірність опадів ≥ {r2}%, {windOr} ≥ {w2} {u}, низька хмарність ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, низька хмарність < {c1}%, видимість > {v1} {vu}",
+                flightRuleMarginal: "будь-що з: {rainMarginal}, {windOr} {w1}–{w2} {u}, низька хмарність {c1}–{c2}%, видимість {v2}–{v1} {vu}",
+                flightRuleBad: "будь-що з: ймовірність опадів ≥ {r2}%, {windOr} ≥ {w2} {u}, низька хмарність ≥ {c2}%, видимість < {v2} {vu}",
                 flightMissing: "Не враховано (немає даних): {params}",
                 factorRain: "ймовірність опадів {v}",
                 factorWind: "вітер {v} {u}",
@@ -993,6 +1024,17 @@
                 flightFactorRain: "Precipitação",
                 flightFactorWind: "Vento + rajadas",
                 flightFactorCloud: "Nuvens baixas",
+                flightFactorVis: "Visibilidade",
+                paramVisibility: "Visibilidade",
+                factorVis: "visibilidade {v} {u}",
+                planFactorVis: "visibilidade cai para {v} {u}",
+                thrAbove: "Adequado acima de",
+                thrBadBelow: "Inadequado abaixo de",
+                thrErrorHigher: "{name}: insira um número válido; o limite adequado deve ser maior que o inadequado.",
+                statVisTitle: "Visibilidade mínima",
+                statVisValue: "{value} {unit}",
+                statVisSub: "10% de chance abaixo de {lo} {unit}",
+                statVisWorst: "pior em {when}",
                 flightGood: "Adequado",
                 flightMarginal: "Incerto",
                 flightBad: "Inadequado",
@@ -1022,7 +1064,7 @@
                 chartDrag: "Arraste para reordenar",
                 closeLabel: "Fechar",
                 thresholdsTitle: "Limites de voo",
-                thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para o vento escolhido acima: vento e rajadas a 10 m, ou vento em altitude.",
+                thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para o vento escolhido acima: vento e rajadas a 10 m, ou vento em altitude. A visibilidade é o inverso: adequado acima do primeiro valor, inadequado abaixo do segundo.",
                 plannerSettingsTitle: "Planejador de janelas de voo",
                 minSlotDesc: "Períodos voáveis (adequados + incertos) mais curtos que isto não aparecem no planejador.",
                 minSlotLabel: "Janela mínima",
@@ -1046,9 +1088,9 @@
                 ruleRainNone: "sem chance de chuva",
                 ruleRainUpTo: "chance de chuva ≤ {r1}%",
                 ruleRainBetween: "chance de chuva acima de {r1}% e abaixo de {r2}%",
-                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, nuvens baixas < {c1}%",
-                flightRuleMarginal: "qualquer um: {rainMarginal}, {windOr} {w1}–{w2} {u}, nuvens baixas {c1}–{c2}%",
-                flightRuleBad: "qualquer um: chance de chuva ≥ {r2}%, {windOr} ≥ {w2} {u}, nuvens baixas ≥ {c2}%",
+                flightRuleGood: "{rainGood}, {windAnd} < {w1} {u}, nuvens baixas < {c1}%, visibilidade > {v1} {vu}",
+                flightRuleMarginal: "qualquer um: {rainMarginal}, {windOr} {w1}–{w2} {u}, nuvens baixas {c1}–{c2}%, visibilidade {v2}–{v1} {vu}",
+                flightRuleBad: "qualquer um: chance de chuva ≥ {r2}%, {windOr} ≥ {w2} {u}, nuvens baixas ≥ {c2}%, visibilidade < {v2} {vu}",
                 flightMissing: "Não incluído (sem dados): {params}",
                 factorRain: "chance de chuva {v}",
                 factorWind: "vento {v} {u}",
@@ -1307,6 +1349,7 @@
 
         function unitLabel(param) {
             if (param.unit === 'percent') return '%';
+            if (param.unit === 'distance') return UNIT_LABELS.distance;
             return param.unit === 'wind' ? UNIT_LABELS.wind[state.windUnit] : UNIT_LABELS.precip[state.precipUnit];
         }
 
@@ -1315,6 +1358,7 @@
             let digits;
             if (param.unit === 'percent') digits = 0;
             else if (param.unit === 'precip') digits = state.precipUnit === 'inch' ? 2 : 1;
+            else if (param.unit === 'distance') digits = 1;
             else digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
             return value.toLocaleString(currentLang, { minimumFractionDigits: digits, maximumFractionDigits: digits });
         }
@@ -1356,7 +1400,7 @@
             if (!state.location) return null;
             // Version tag: bumped whenever the saved forecast's shape changes
             // (e.g. new variables), so older saved forecasts are refetched.
-            return ['v3', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
+            return ['v4', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
         }
 
         // Forecast days (counted from local midnight today) needed to cover
@@ -1645,9 +1689,10 @@
                         if (!v || !own_vars.includes(v)) return;
                         const series = hourly[k];
                         if (!Array.isArray(series)) return;
-                        const values = aligned
+                        let values = aligned
                             ? series.slice(start, end)
                             : windowTimes.map(tm => (index.has(tm) ? series[index.get(tm)] : null));
+                        if (param.scale) values = values.map(x => (Number.isFinite(x) ? x * param.scale : x));
                         if (!values.some(v => v !== null && v !== undefined)) return;
                         result.modelsWithData.add(modelId);
                         members.push({ key: k, model: modelId, variable: v, values });
@@ -1693,12 +1738,14 @@
             const wind = statsOf(aloft ? 'wind_aloft' : 'wind_speed_10m');
             const gust = aloft ? null : statsOf('wind_gusts_10m');
             const cloud = statsOf('cloud_cover_low');
+            const vis = statsOf('visibility');
             const toMs = WIND_TO_MS[state.windUnit] || 1;
             const missing = [];
             if (!rain) missing.push('paramPrecipitation');
             if (!wind) missing.push(aloft ? (state.mode === 'ensemble' ? 'paramWindAloftEns' : 'paramWindAloftDet') : 'paramWindSpeed');
             if (!gust && !aloft) missing.push('paramWindGusts');
             if (!cloud) missing.push('paramLowClouds');
+            if (!vis) missing.push('paramVisibility');
 
             const R = state.flightRules;
             const known = v => v !== null && v !== undefined && Number.isFinite(v);
@@ -1706,6 +1753,8 @@
             // at all"); wind and clouds are "good" strictly below theirs.
             const rainLevel = v => !known(v) ? null : v >= R.rainBad ? 'bad' : v > R.rainGood + 1e-9 ? 'marginal' : 'good';
             const level = (v, good, bad) => !known(v) ? null : v >= bad ? 'bad' : v >= good ? 'marginal' : 'good';
+            // Visibility: good strictly above its limit, bad strictly below its own.
+            const visLevel = v => !known(v) ? null : v < R.visBad ? 'bad' : v <= R.visGood ? 'marginal' : 'good';
             const rank = { good: 0, marginal: 1, bad: 2 };
 
             const hours = result.times.map((time, i) => {
@@ -1713,13 +1762,15 @@
                     rain: rain ? rain.chance[i] : null,
                     wind: wind ? wind.median[i] : null,
                     gust: gust ? gust.median[i] : null,
-                    cloud: cloud ? cloud.median[i] : null
+                    cloud: cloud ? cloud.median[i] : null,
+                    vis: vis ? vis.median[i] : null
                 };
                 const checks = {
                     rain: rainLevel(values.rain),
                     wind: level(values.wind === null ? null : values.wind * toMs, R.windGood, R.windBad),
                     gust: level(values.gust === null ? null : values.gust * toMs, R.windGood, R.windBad),
-                    cloud: level(values.cloud, R.cloudGood, R.cloudBad)
+                    cloud: level(values.cloud, R.cloudGood, R.cloudBad),
+                    vis: visLevel(values.vis)
                 };
                 const verdicts = Object.values(checks).filter(Boolean);
                 const status = verdicts.length ? verdicts.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good') : 'none';
@@ -1752,6 +1803,11 @@
             if (param.key === 'cloud_cover_low') {
                 const means = perMember.map(vals => vals.reduce((a, b) => a + b, 0) / vals.length).sort((a, b) => a - b);
                 return { median: quantile(means, 0.5), p10: quantile(means, 0.1), p90: quantile(means, 0.9) };
+            }
+            if (param.key === 'visibility') {
+                // Lowest visibility each member reaches in the window.
+                const lows = perMember.map(vals => Math.min(...vals)).sort((a, b) => a - b);
+                return { median: quantile(lows, 0.5), p10: quantile(lows, 0.1) };
             }
             const peaks = perMember.map(vals => Math.max(...vals)).sort((a, b) => a - b);
             return { median: quantile(peaks, 0.5), p90: quantile(peaks, 0.9) };
@@ -1789,6 +1845,7 @@
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
             if (key === 'rain') return t('factorRain', { v: formatPercent(value) });
             if (key === 'cloud') return t('factorCloud', { v: Math.round(value) });
+            if (key === 'vis') { const p = PARAMS.find(x => x.key === 'visibility'); return t('factorVis', { v: formatValue(value, p), u: unitLabel(p) }); }
             const windKey = state.flightWindSource === 'aloft' ? 'factorWindAloft' : 'factorWind';
             return t(key === 'wind' ? windKey : 'factorGust', { v: formatValue(value, windParam), u: unitLabel(windParam) });
         }
@@ -1811,7 +1868,7 @@
         function flightHourText(h, factor) {
             const status = factor ? factorStatus(h, factor) : h.status;
             const st = FLIGHT_STATUS[status];
-            const keys = factor ? factor.checks : ['rain', 'wind', 'gust', 'cloud'];
+            const keys = factor ? factor.checks : ['rain', 'wind', 'gust', 'cloud', 'vis'];
             const parts = keys
                 .filter(k => h.values[k] !== null && h.values[k] !== undefined && Number.isFinite(h.values[k]))
                 .map(k => {
@@ -1887,6 +1944,7 @@
             const vars = {
                 w1: ms(R.windGood), w2: ms(R.windBad), u: unitLabel(windParam),
                 c1: num(R.cloudGood), c2: num(R.cloudBad), r2: num(R.rainBad),
+                v1: num(R.visGood), v2: num(R.visBad), vu: UNIT_LABELS.distance,
                 rainGood: R.rainGood > 0 ? t('ruleRainUpTo', { r1: num(R.rainGood) }) : t('ruleRainNone'),
                 rainMarginal: t('ruleRainBetween', { r1: num(R.rainGood), r2: num(R.rainBad) }),
                 windAnd: t(state.flightWindSource === 'aloft' ? 'ruleWindAloft' : 'ruleWindAnd'),
@@ -2172,6 +2230,8 @@
                     lines += statLine(t('paramWindSpeed'), P('wind_speed_10m'), i, decisive('wind'));
                     lines += statLine(t('paramWindGusts'), P('wind_gusts_10m'), i, decisive('gust'));
                 }
+            } else if (factor.key === 'vis') {
+                lines += statLine(t('paramVisibility'), P('visibility'), i, decisive('vis'));
             } else {
                 lines += statLine(t('paramLowClouds'), P('cloud_cover_low'), i, decisive('cloud'));
             }
@@ -2225,7 +2285,8 @@
                     Object.keys(h.checks).forEach(k => {
                         if (h.checks[k] !== 'marginal') return;
                         const v = h.values[k];
-                        if (!(k in slot.worst) || v > slot.worst[k]) slot.worst[k] = v;
+                        const worse = LOWER_IS_WORSE.has(k) ? v < slot.worst[k] : v > slot.worst[k];
+                        if (!(k in slot.worst) || worse) slot.worst[k] = v;
                     });
                 }
             });
@@ -2251,11 +2312,12 @@
 
         function planReasonText(slot) {
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
-            const keyFor = { rain: 'planFactorRain', wind: state.flightWindSource === 'aloft' ? 'planFactorWindAloft' : 'planFactorWind', gust: 'planFactorGust', cloud: 'planFactorCloud' };
-            return ['rain', 'wind', 'gust', 'cloud'].filter(k => k in slot.worst).map(k => {
+            const visParam = PARAMS.find(p => p.key === 'visibility');
+            const keyFor = { rain: 'planFactorRain', wind: state.flightWindSource === 'aloft' ? 'planFactorWindAloft' : 'planFactorWind', gust: 'planFactorGust', cloud: 'planFactorCloud', vis: 'planFactorVis' };
+            return ['rain', 'wind', 'gust', 'cloud', 'vis'].filter(k => k in slot.worst).map(k => {
                 const v = slot.worst[k];
-                const shown = k === 'rain' ? formatPercent(v) : k === 'cloud' ? `${Math.round(v)}%` : formatValue(v, windParam);
-                return t(keyFor[k], { v: shown, u: unitLabel(windParam) });
+                const shown = k === 'rain' ? formatPercent(v) : k === 'cloud' ? `${Math.round(v)}%` : formatValue(v, k === 'vis' ? visParam : windParam);
+                return t(keyFor[k], { v: shown, u: unitLabel(k === 'vis' ? visParam : windParam) });
             }).join(' · ');
         }
 
@@ -2317,7 +2379,10 @@
               unit: () => UNIT_LABELS.wind[state.windUnit],
               toStore: v => v * (WIND_TO_MS[state.windUnit] || 1),
               toShow: v => Math.round(v / (WIND_TO_MS[state.windUnit] || 1) * 10) / 10, step: 0.5, max: 200 },
-            { key: 'cloud', good: 'cloudGood', bad: 'cloudBad', icon: 'fa-cloud', labelKey: 'flightFactorCloud', goodKey: 'thrBelow', unit: () => '%', toStore: v => v, toShow: v => v, step: 5, max: 100 }
+            { key: 'cloud', good: 'cloudGood', bad: 'cloudBad', icon: 'fa-cloud', labelKey: 'flightFactorCloud', goodKey: 'thrBelow', unit: () => '%', toStore: v => v, toShow: v => v, step: 5, max: 100 },
+            // Higher is better: suitable above `good`, not suitable below `bad`.
+            { key: 'vis', good: 'visGood', bad: 'visBad', icon: 'fa-eye', labelKey: 'flightFactorVis', goodKey: 'thrAbove', badKey: 'thrBadBelow', higherIsBetter: true,
+              unit: () => UNIT_LABELS.distance, toStore: v => v, toShow: v => v, step: 0.5, max: 100 }
         ];
 
         function renderSettingsDrawer() {
@@ -2325,7 +2390,7 @@
             document.getElementById('flightWindSourceSelect').innerHTML = ['surface', 'aloft'].map(v =>
                 `<option value="${v}" ${v === state.flightWindSource ? 'selected' : ''}>${escapeHtml(t(v === 'surface' ? 'windSourceSurface' : 'windSourceAloft'))}</option>`).join('');
             const input = (row, field, colorKey) => `<label class="flex-1">
-                    <span class="block text-[10px] uppercase tracking-wider mb-1" style="color: ${FLIGHT_STATUS[colorKey].color}">${escapeHtml(t(colorKey === 'good' ? row.goodKey : 'thrFrom'))}</span>
+                    <span class="block text-[10px] uppercase tracking-wider mb-1" style="color: ${FLIGHT_STATUS[colorKey].color}">${escapeHtml(t(colorKey === 'good' ? row.goodKey : row.badKey || 'thrFrom'))}</span>
                     <span class="flex items-center gap-1.5">
                         <input type="number" inputmode="decimal" min="0" max="${row.max}" step="${row.step}" data-threshold="${field}" value="${row.toShow(R[field])}"
                             class="w-full px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-sm text-slate-100 font-mono focus:outline-none focus:border-cyan-500">
@@ -2378,8 +2443,9 @@
                 const raw = parseFloat(String(inputEl.value).replace(',', '.'));
                 const next = { ...state.flightRules };
                 if (Number.isFinite(raw) && raw >= 0 && raw <= row.max) next[field] = row.toStore(raw);
-                if (!Number.isFinite(raw) || raw < 0 || raw > row.max || !(next[row.good] < next[row.bad])) {
-                    errorEl.textContent = t('thrError', { name: t(row.labelKey) });
+                const ordered = row.higherIsBetter ? next[row.good] > next[row.bad] : next[row.good] < next[row.bad];
+                if (!Number.isFinite(raw) || raw < 0 || raw > row.max || !ordered) {
+                    errorEl.textContent = t(row.higherIsBetter ? 'thrErrorHigher' : 'thrError', { name: t(row.labelKey) });
                     errorEl.classList.remove('hidden');
                     inputEl.value = row.toShow(state.flightRules[field]);
                     return;
@@ -2603,6 +2669,17 @@
                         value: t('statCloudValue', { value: formatValue(s.median, param) }),
                         sub: t('statCloudSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param) }),
                         extra: clearIdx >= 0 ? t('statCloudClearest', { when: formatDayHour(processed.times[clearIdx]) }) : ''
+                    });
+                }
+                if (param.key === 'visibility') {
+                    // Time of the lowest point of the median curve.
+                    let lowIdx = -1;
+                    med.forEach((v, i) => { if (Number.isFinite(v) && (lowIdx < 0 || v < med[lowIdx])) lowIdx = i; });
+                    return statCard({
+                        title: t('statVisTitle'), icon: param.icon, color: param.color,
+                        value: t('statVisValue', { value: formatValue(s.median, param), unit }),
+                        sub: t('statVisSub', { lo: formatValue(s.p10, param), unit }),
+                        extra: lowIdx >= 0 ? t('statVisWorst', { when: formatDayHour(processed.times[lowIdx]) }) : ''
                     });
                 }
                 // Time of the highest point of the median curve.
