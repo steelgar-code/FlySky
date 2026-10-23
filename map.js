@@ -35,7 +35,25 @@
         },
         version: '1.3.0',
         crs: 'EPSG:3857',
-        format: 'image/png',
+        // RGB frames as JPEG on the app's background colour: ~150 KB and
+        // ~2 s each. PNG (and "jpeg-png", which falls back to PNG as soon as
+        // the view reaches past the edge of the satellite disk) is ~2 MB and
+        // 10–40 s per frame.
+        format: 'image/jpeg',
+        background: '0x020617',
+        // Mostly-transparent overlays (precipitation) stay small as 8-bit PNG.
+        overlayFormat: 'image/png; mode=8bit',
+        // Namespaces left out of the products: Metop / multimission mosaics
+        // are accumulated orbits updated every 1 h 40 min – 3 h, not suited
+        // to a 6–12 h animation.
+        // Background / boundary layers are never products.
+        excludeNamespaces: ['eps', 'mumi', 'backgrounds', 'osmgray'],
+        // Boundary lines + coastline drawn on top of the imagery, in this
+        // order of preference (white lines stay visible on every RGB).
+        borders: [
+            { name: 'backgrounds:ne_boundary_lines_land', style: 'whitelines' },
+            { name: 'backgrounds:ne_10m_coastline', style: 'whitelines' }
+        ],
         catalogKey: 'flysky_map_catalog',
         catalogTtlMs: 12 * 3600e3,
         timesTtlMs: 4 * 60e3,
@@ -74,13 +92,14 @@
         { id: 'dayMicro', role: 'day', icon: 'fa-sun', prefer: ['msg_fes:rgb_microphysics'],
           test: s => /micro/i.test(s) && !/night|24/i.test(s) },
         { id: 'natural', role: 'day', icon: 'fa-earth-europe',
-          test: s => /natural/i.test(s) },
+          test: s => /natural.?colou?r|rgb_natural/i.test(s) },
+        // MSG measures at 10.8 µm, MTG's FCI at 10.5 µm.
         { id: 'ir108', role: 'any', icon: 'fa-temperature-half',
-          test: s => /ir[_\s-]?10[._]?8|ir108|10\.8\s*µ?m/i.test(s) },
+          test: s => /ir[_\s-]?10[._]?[58]|10[.,][58]\s*[µμ]?m/i.test(s) },
         { id: 'ctth', role: 'context', icon: 'fa-arrows-up-to-line',
           test: s => /ctth|cloud.?top.?(height|temp)/i.test(s) }
     ];
-    const PRECIP = { id: 'precip', test: s => /precip|rain.?rate/i.test(s) };
+    const PRECIP = { id: 'precip', prefer: ['mtg_fd:h40b', 'msg_fes:h60b'], test: s => /precip|rain.?rate/i.test(s) };
     const BORDERS = { id: 'borders', test: s => /boundar|border|coastline/i.test(s) };
 
     // ================= Translations =================
@@ -91,8 +110,8 @@
             mapProduct_nightMicro: 'Night Microphysics RGB',
             mapProduct_dayMicro: 'Day Microphysics RGB',
             mapProduct_natural: 'Natural Colour RGB',
-            mapProduct_ir108: 'Infrared 10.8 µm',
-            mapProduct_ctth: 'Cloud top temperature / height',
+            mapProduct_ir108: 'Infrared 10.8 / 10.5 µm',
+            mapProduct_ctth: 'Cloud top height',
             mapProduct_none: 'None (precipitation only)',
             mapRole_night: 'Night',
             mapRole_day: 'Day',
@@ -175,8 +194,8 @@
             mapProduct_nightMicro: 'Нічна мікрофізика RGB',
             mapProduct_dayMicro: 'Денна мікрофізика RGB',
             mapProduct_natural: 'Природні кольори RGB',
-            mapProduct_ir108: 'Інфрачервоний 10,8 мкм',
-            mapProduct_ctth: 'Температура / висота верхньої межі хмар',
+            mapProduct_ir108: 'Інфрачервоний 10,8 / 10,5 мкм',
+            mapProduct_ctth: 'Висота верхньої межі хмар',
             mapProduct_none: 'Немає (лише опади)',
             mapRole_night: 'Ніч',
             mapRole_day: 'День',
@@ -259,8 +278,8 @@
             mapProduct_nightMicro: 'Microfísica noturna RGB',
             mapProduct_dayMicro: 'Microfísica diurna RGB',
             mapProduct_natural: 'Cor natural RGB',
-            mapProduct_ir108: 'Infravermelho 10,8 µm',
-            mapProduct_ctth: 'Temperatura / altura do topo das nuvens',
+            mapProduct_ir108: 'Infravermelho 10,8 / 10,5 µm',
+            mapProduct_ctth: 'Altura do topo das nuvens',
             mapProduct_none: 'Nenhum (só precipitação)',
             mapRole_night: 'Noite',
             mapRole_day: 'Dia',
@@ -464,12 +483,15 @@
 
     function sourceRank(layer, product, region) {
         let r = 0;
-        if (product.prefer && product.prefer.includes(layer.name)) r -= 1000;
+        // Preferred names first, in the order listed.
+        if (product.prefer && product.prefer.includes(layer.name)) r += -1000 + product.prefer.indexOf(layer.name) * 100;
         if (!covers(layer.bbox, region)) r += 100;
         const ns = layer.name.split(':')[0].toLowerCase();
-        // MSG 0° first (the reference products), then MTG, then the rest.
+        // MSG 0° first (the reference products), then MTG, MSG rapid scan
+        // (5 min, Europe), MSG Indian Ocean, then the rest.
         if (/^msg_fes|^msg$/.test(ns)) r += 0;
         else if (/mtg|fci/.test(ns)) r += 10;
+        else if (/rss/.test(ns)) r += 15;
         else if (/iodc/.test(ns)) r += 30;
         else r += 20;
         return r;
@@ -512,16 +534,17 @@
     const queue = [];
     let active = 0;
 
-    function frameKey(layer, style, t, ext) {
-        return [layer, style || '', t === null ? 'latest' : t, ext.key, `${ext.w}x${ext.h}`, MAP_CONFIG.crs].join('|');
+    function frameKey(layer, style, t, ext, format) {
+        return [layer, style || '', t === null ? 'latest' : t, ext.key, `${ext.w}x${ext.h}`, MAP_CONFIG.crs, format].join('|');
     }
 
-    function getMapUrl(layerName, style, t, ext) {
+    function getMapUrl(layerName, style, t, ext, format) {
+        const opaque = format === 'image/jpeg';
         return buildWmsUrl(MAP_CONFIG.wmsBase, {
             SERVICE: 'WMS', VERSION: MAP_CONFIG.version, REQUEST: 'GetMap',
             LAYERS: layerName, STYLES: style || '', CRS: MAP_CONFIG.crs,
             BBOX: ext.bbox3857.join(','), WIDTH: ext.w, HEIGHT: ext.h,
-            FORMAT: MAP_CONFIG.format, TRANSPARENT: 'TRUE', EXCEPTIONS: 'XML',
+            FORMAT: format, TRANSPARENT: opaque ? 'FALSE' : 'TRUE', BGCOLOR: opaque ? MAP_CONFIG.background : undefined, EXCEPTIONS: 'XML',
             TIME: t === null ? undefined : new Date(t).toISOString().replace('.000Z', 'Z')
         });
     }
@@ -595,10 +618,11 @@
         const timer = setTimeout(() => controller.abort('timeout'), MAP_CONFIG.requestTimeoutMs);
         try {
             const res = await fetch(e.src, { signal: controller.signal, mode: 'cors', credentials: 'omit' });
-            if (res.status === 429 || res.status === 503) {
+            // Rate limit or a transient gateway error: back off and retry.
+            if ([429, 502, 503, 504].includes(res.status)) {
                 clearTimeout(timer);
                 if (attempt < 2) {
-                    noteError(t('mapErrRate'), e.src);
+                    noteError(res.status === 429 ? t('mapErrRate') : `HTTP ${res.status}`, e.src);
                     await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
                     if (!cache.has(e.key)) return;
                     return load(e, attempt + 1);
@@ -692,6 +716,10 @@
         return buildWmsUrl(base, { SERVICE: 'WMS', VERSION: MAP_CONFIG.version, REQUEST: 'GetCapabilities' });
     }
 
+    function excluded(name) {
+        return MAP_CONFIG.excludeNamespaces.includes(String(name).split(':')[0].toLowerCase());
+    }
+
     function slimLayer(l) {
         return { name: l.name, title: l.title, abstract: l.abstract, bbox: l.bbox, styles: l.styles, crs3857: l.crs3857, hasTime: !!l.time };
     }
@@ -701,6 +729,8 @@
         const add = l => keep.set(l.name, l);
         layers.forEach(l => {
             const s = `${l.name} ${l.title}`;
+            if (BORDERS.test(s) && !l.time) { add(l); return; }
+            if (excluded(l.name)) return;
             if (PRODUCTS.some(p => (p.prefer || []).includes(l.name) || p.test(s)) || PRECIP.test(s) || BORDERS.test(s)) add(l);
         });
         return [...keep.values()];
@@ -771,7 +801,8 @@
     }
 
     function resolveProducts() {
-        const layers = R.catalog ? R.catalog.layers : [];
+        const all = R.catalog ? R.catalog.layers : [];
+        const layers = all.filter(l => !excluded(l.name));
         const region = MAP_CONFIG.regions.ukraine;
         R.resolved = {};
         PRODUCTS.forEach(p => {
@@ -783,9 +814,15 @@
             R.resolved[p.id] = list;
         });
         R.precipLayers = layers.filter(l => PRECIP.test(`${l.name} ${l.title}`) && l.hasTime)
-            .sort((a, b) => (covers(a.bbox, region) ? 0 : 1) - (covers(b.bbox, region) ? 0 : 1) || (/blend|mw|micro/i.test(b.title) ? 1 : 0) - (/blend|mw|micro/i.test(a.title) ? 1 : 0));
-        R.borderLayers = layers.filter(l => BORDERS.test(`${l.name} ${l.title}`) && !l.hasTime)
-            .sort((a, b) => (/land/i.test(b.name) ? 1 : 0) - (/land/i.test(a.name) ? 1 : 0));
+            .sort((a, b) => sourceRank(a, PRECIP, region) - sourceRank(b, PRECIP, region) || a.name.localeCompare(b.name));
+        // Preferred boundary/coastline layers with their white-line style;
+        // otherwise any boundary layer the service offers, default style.
+        const byName = new Map(all.map(l => [l.name, l]));
+        R.borderLayers = MAP_CONFIG.borders.filter(b => byName.has(b.name));
+        if (!R.borderLayers.length) {
+            const any = all.find(l => BORDERS.test(`${l.name} ${l.title}`) && !l.hasTime);
+            if (any) R.borderLayers = [{ name: any.name, style: '' }];
+        }
         if (!S.product || (S.product !== 'none' && !(R.resolved[S.product] || []).length) || Date.now() - S.productAt > 6 * 3600e3) {
             S.product = suggestedProduct();
         }
@@ -823,14 +860,16 @@
         const map = R.map;
         const size = map.getSize();
         if (!size.x || !size.y) return null;
-        const b = map.getBounds().pad(0.15);
+        const b = map.getBounds().pad(0.1);
         const sw = L.CRS.EPSG3857.project(L.latLng(Math.max(b.getSouth(), -85), b.getWest()));
         const ne = L.CRS.EPSG3857.project(L.latLng(Math.min(b.getNorth(), 85), b.getEast()));
         // Snap to 1 km so tiny pans reuse cached images.
         const snap = v => Math.round(v / 1000) * 1000;
         const bbox3857 = [snap(sw.x), snap(sw.y), snap(ne.x), snap(ne.y)];
-        const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-        let w = size.x * 1.3 * ratio, hh = size.y * 1.3 * ratio;
+        // The imagery is ~3 km per pixel, so beyond 1.25× device pixels
+        // only the download grows.
+        const ratio = Math.min(window.devicePixelRatio || 1, 1.25);
+        let w = size.x * 1.2 * ratio, hh = size.y * 1.2 * ratio;
         const k = Math.min(1, MAP_CONFIG.maxImageSide / Math.max(w, hh));
         w = Math.round(w * k / 16) * 16; hh = Math.round(hh * k / 16) * 16;
         const bounds = L.latLngBounds(L.CRS.EPSG3857.unproject(L.point(bbox3857[0], bbox3857[1])), L.CRS.EPSG3857.unproject(L.point(bbox3857[2], bbox3857[3])));
@@ -874,8 +913,9 @@
         const prevT = R.frames[R.index] ? R.frames[R.index].t : undefined;
         const wasLatest = R.index === R.frames.length - 1;
 
-        R.frames = satList.map(tm => ({ t: tm, key: frameKey(layer.name, satStyle, tm, ext), url: getMapUrl(layer.name, satStyle, tm, ext) }));
-        R.precipFrames = precipList.map(tm => ({ t: tm, key: frameKey(precip.name, precipStyle, tm, ext), url: getMapUrl(precip.name, precipStyle, tm, ext) }));
+        const satFmt = MAP_CONFIG.format, precipFmt = MAP_CONFIG.overlayFormat;
+        R.frames = satList.map(tm => ({ t: tm, key: frameKey(layer.name, satStyle, tm, ext, satFmt), url: getMapUrl(layer.name, satStyle, tm, ext, satFmt) }));
+        R.precipFrames = precipList.map(tm => ({ t: tm, key: frameKey(precip.name, precipStyle, tm, ext, precipFmt), url: getMapUrl(precip.name, precipStyle, tm, ext, precipFmt) }));
 
         const wanted = new Set(R.frames.map(f => f.key).concat(R.precipFrames.map(f => f.key)));
         cancelExcept(wanted);
@@ -1065,12 +1105,12 @@
     // above the imagery (only when the service offers such a layer).
     function updateBorders() {
         if (!R.map) return;
-        const layer = R.borderLayers[0];
-        const want = S.borders && layer;
-        if (R.bordersLayer && (!want || R.bordersLayer.options.layers !== layer.name)) { R.map.removeLayer(R.bordersLayer); R.bordersLayer = null; }
+        const names = R.borderLayers.map(b => b.name).join(',');
+        const want = S.borders && names;
+        if (R.bordersLayer && (!want || R.bordersLayer.options.layers !== names)) { R.map.removeLayer(R.bordersLayer); R.bordersLayer = null; }
         if (want && !R.bordersLayer) {
             R.bordersLayer = L.tileLayer.wms(MAP_CONFIG.wmsBase, {
-                layers: layer.name, styles: '', format: 'image/png', transparent: true, version: MAP_CONFIG.version,
+                layers: names, styles: R.borderLayers.map(b => b.style).join(','), format: 'image/png', transparent: true, version: MAP_CONFIG.version,
                 pane: 'borders', attribution: MAP_CONFIG.eumetsatAttribution, opacity: 0.9
             }).addTo(R.map);
         }
