@@ -71,24 +71,21 @@
             ukraine: [22, 44, 41, 53],
             europe: [-12, 34, 45, 63]
         },
+        // Key-free basemaps only (CARTO's tiles now need an API key).
         basemaps: {
-            dark: { url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', subdomains: 'abcd', maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>' },
             osm: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }
         },
-        // Same attribution string as the dark basemap, so Leaflet shows it once.
-        labels: { url: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', subdomains: 'abcd', maxZoom: 19 },
         eumetsatAttribution: '&copy; <a href="https://www.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a>'
     };
 
     // Products, in priority order. `test` runs on "<name> <title>" of every
     // layer in the capabilities; `prefer` names win when present.
     const PRODUCTS = [
+        // EUMETView's "Fog / Low Clouds RGB" is the Night Microphysics RGB
+        // (EUMETSAT quick guide: "also sometimes referred to as the Fog RGB").
         { id: 'fog', role: 'night', icon: 'fa-smog', prefer: ['msg_fes:rgb_fog'],
-          test: s => /rgb_fog|\bfog\b/i.test(s) && !/micro/i.test(s) },
-        { id: 'nightMicro', role: 'night', icon: 'fa-moon',
-          test: s => /night.?micro|micro\w*.?night/i.test(s) },
+          test: s => /rgb_fog|\bfog\b|night.?micro/i.test(s) && !/day.?micro/i.test(s) },
         { id: 'dayMicro', role: 'day', icon: 'fa-sun', prefer: ['msg_fes:rgb_microphysics'],
           test: s => /micro/i.test(s) && !/night|24/i.test(s) },
         { id: 'natural', role: 'day', icon: 'fa-earth-europe',
@@ -99,6 +96,18 @@
         { id: 'ctth', role: 'context', icon: 'fa-arrows-up-to-line',
           test: s => /ctth|cloud.?top.?(height|temp)/i.test(s) }
     ];
+    // Colour keys from EUMETSAT's RGB quick guides; swatches sampled from
+    // the official colour-interpretation charts. Texts: mapKey_<id>.
+    const GUIDE = 'https://user.eumetsat.int/resources/user-guides/';
+    const RGB_KEYS = {
+        fog: { guide: GUIDE + 'night-microphysics-rgb-quick-guide',
+            colors: [['#785af0', '#b06fd9'], '#9cd0d9', '#aad7b0', '#a6797b', '#820a14', 'dots', '#1b009c', '#7800c8', '#c80078'] },
+        dayMicro: { guide: GUIDE + 'day-microphysics-rgb-quick-guide',
+            colors: ['#b4d878', '#8665ac', '#54a28c', '#e6661b', '#a34448', '#ce4698', '#5d9eba', '#064ab5'] },
+        natural: { guide: GUIDE + 'natural-colour-rgb-quick-guide',
+            colors: ['#f2f2f2', '#dae3f4', '#6bd4c6', '#57f6da', '#7b8745', '#b99774', '#156c7d', '#131d29'] }
+    };
+
     const PRECIP = { id: 'precip', prefer: ['mtg_fd:h40b', 'msg_fes:h60b'], test: s => /precip|rain.?rate/i.test(s) };
     const BORDERS = { id: 'borders', test: s => /boundar|border|coastline/i.test(s) };
 
@@ -106,8 +115,42 @@
     const MAP_I18N = {
         en: {
             mapProductTitle: 'Satellite product',
-            mapProduct_fog: 'Fog / Low Clouds RGB',
-            mapProduct_nightMicro: 'Night Microphysics RGB',
+            mapKeyTitle: 'Colour key',
+            mapKeySource: 'EUMETSAT quick guide',
+            mapKeyAngle: 'Colours also vary with viewing angle, season and latitude.',
+            mapKey_fog: [
+                'Cloud-free land and sea (blue or pink, by surface temperature and moisture)',
+                'Warm, thick fog / low cloud, small droplets (aqua)',
+                'Cold, thick fog / low cloud (greenish; pinkish grey if thin or large droplets)',
+                'Thick mid-level cloud (tan)',
+                'Thick ice cloud (reddish brown)',
+                'Very cold thick ice cloud (reddish brown with green dots)',
+                'Thin cirrus (dark blue)',
+                'Very thin cirrus (magenta / violet)',
+                'Any cloud in daylight — this RGB is night-only (magenta, red or blue)'
+            ],
+            mapKey_fog_note: 'Fog and low cloud look the same; fog under cirrus may not show. The thinner the fog, the more it takes the pink ground colour.',
+            mapKey_dayMicro: [
+                'Low / mid-level thick water cloud, small droplets (incl. fog)',
+                'Thick low-level water cloud, large droplets',
+                'Semi-transparent ice cloud',
+                'Thick ice cloud with small ice crystals on top',
+                'Thick ice cloud with large ice particles',
+                'Snow and ice on the ground',
+                'Cloud-free land',
+                'Sea and lakes'
+            ],
+            mapKey_natural: [
+                'Water cloud (fog or stratus)',
+                'Mixed-phase cloud or cloud with a cirrus veil',
+                'Thick ice cloud with large ice crystals',
+                'Snow and ice on the ground',
+                'Green vegetation',
+                'Desert, bare soil or dry vegetation',
+                'Sea ice without snow',
+                'Sea and lakes'
+            ],
+            mapProduct_fog: 'Fog / Low Clouds RGB (Night Microphysics)',
             mapProduct_dayMicro: 'Day Microphysics RGB',
             mapProduct_natural: 'Natural Colour RGB',
             mapProduct_ir108: 'Infrared 10.8 / 10.5 µm',
@@ -139,10 +182,8 @@
             mapSaveName: 'Name for this area',
             mapDeleteRegion: 'Delete saved area',
             mapBaseTitle: 'Map',
-            mapBase_dark: 'Dark',
             mapBase_osm: 'OSM',
             mapBase_none: 'None',
-            mapLabels: 'Place names on top',
             mapBorders: 'Borders on top',
             mapTimeTitle: 'Animation',
             mapWindowHours: '{n} h',
@@ -190,8 +231,42 @@
         },
         uk: {
             mapProductTitle: 'Супутниковий продукт',
-            mapProduct_fog: 'Туман / низька хмарність RGB',
-            mapProduct_nightMicro: 'Нічна мікрофізика RGB',
+            mapKeyTitle: 'Пояснення кольорів',
+            mapKeySource: 'Довідник EUMETSAT',
+            mapKeyAngle: 'Кольори також залежать від кута огляду, сезону та широти.',
+            mapKey_fog: [
+                'Безхмарні суходіл і море (синій або рожевий — залежно від температури поверхні й вологості)',
+                'Теплий щільний туман / низька хмарність, дрібні краплі (аква)',
+                'Холодний щільний туман / низька хмарність (зеленуватий; рожево-сірий, якщо тонкий або великі краплі)',
+                'Щільна хмарність середнього ярусу (бежевий)',
+                'Щільна льодяна хмарність (червоно-коричневий)',
+                'Дуже холодна щільна льодяна хмарність (червоно-коричневий із зеленими цятками)',
+                'Тонкі перисті хмари (темно-синій)',
+                'Дуже тонкі перисті хмари (пурпурово-фіолетовий)',
+                'Будь-яка хмарність удень — цей RGB лише нічний (пурпуровий, червоний або синій)'
+            ],
+            mapKey_fog_note: 'Туман і низьку хмарність за кольором не розрізнити; під перистими хмарами туман може бути не видно. Що тонший туман, то більше він набуває рожевого кольору поверхні.',
+            mapKey_dayMicro: [
+                'Щільна водяна хмарність нижнього / середнього ярусу, дрібні краплі (зокрема туман)',
+                'Щільна водяна хмарність нижнього ярусу, великі краплі',
+                'Напівпрозора льодяна хмарність',
+                'Щільна льодяна хмарність із дрібними кристалами вгорі',
+                'Щільна льодяна хмарність із великими частинками льоду',
+                'Сніг і лід на поверхні',
+                'Безхмарний суходіл',
+                'Море та озера'
+            ],
+            mapKey_natural: [
+                'Водяна хмарність (туман або шарувата)',
+                'Змішана хмарність або хмари під пеленою перистих',
+                'Щільна льодяна хмарність із великими кристалами',
+                'Сніг і лід на поверхні',
+                'Зелена рослинність',
+                'Пустеля, оголений ґрунт або суха рослинність',
+                'Морський лід без снігу',
+                'Море та озера'
+            ],
+            mapProduct_fog: 'Туман / низька хмарність RGB (нічна мікрофізика)',
             mapProduct_dayMicro: 'Денна мікрофізика RGB',
             mapProduct_natural: 'Природні кольори RGB',
             mapProduct_ir108: 'Інфрачервоний 10,8 / 10,5 мкм',
@@ -223,10 +298,8 @@
             mapSaveName: 'Назва області',
             mapDeleteRegion: 'Видалити збережену область',
             mapBaseTitle: 'Карта',
-            mapBase_dark: 'Темна',
             mapBase_osm: 'OSM',
             mapBase_none: 'Немає',
-            mapLabels: 'Назви місць зверху',
             mapBorders: 'Кордони зверху',
             mapTimeTitle: 'Анімація',
             mapWindowHours: '{n} год',
@@ -274,8 +347,42 @@
         },
         'pt-BR': {
             mapProductTitle: 'Produto de satélite',
-            mapProduct_fog: 'Nevoeiro / Nuvens baixas RGB',
-            mapProduct_nightMicro: 'Microfísica noturna RGB',
+            mapKeyTitle: 'Legenda de cores',
+            mapKeySource: 'Guia rápido da EUMETSAT',
+            mapKeyAngle: 'As cores também variam com o ângulo de visada, a estação e a latitude.',
+            mapKey_fog: [
+                'Terra e mar sem nuvens (azul ou rosa, conforme temperatura da superfície e umidade)',
+                'Nevoeiro / nuvem baixa espessa e quente, gotas pequenas (água-marinha)',
+                'Nevoeiro / nuvem baixa espessa e fria (esverdeado; cinza-rosado se fino ou com gotas grandes)',
+                'Nuvem média espessa (bege)',
+                'Nuvem de gelo espessa (marrom-avermelhado)',
+                'Nuvem de gelo espessa muito fria (marrom-avermelhado com pontos verdes)',
+                'Cirrus fino (azul-escuro)',
+                'Cirrus muito fino (magenta / violeta)',
+                'Qualquer nuvem de dia — este RGB é só noturno (magenta, vermelho ou azul)'
+            ],
+            mapKey_fog_note: 'Nevoeiro e nuvem baixa têm a mesma cor; nevoeiro sob cirrus pode não aparecer. Quanto mais fino o nevoeiro, mais ele assume a cor rosada do solo.',
+            mapKey_dayMicro: [
+                'Nuvem de água espessa baixa / média, gotas pequenas (inclui nevoeiro)',
+                'Nuvem de água espessa baixa, gotas grandes',
+                'Nuvem de gelo semitransparente',
+                'Nuvem de gelo espessa com cristais pequenos no topo',
+                'Nuvem de gelo espessa com partículas de gelo grandes',
+                'Neve e gelo no solo',
+                'Terra sem nuvens',
+                'Mar e lagos'
+            ],
+            mapKey_natural: [
+                'Nuvem de água (nevoeiro ou estrato)',
+                'Nuvem de fase mista ou com véu de cirrus',
+                'Nuvem de gelo espessa com cristais grandes',
+                'Neve e gelo no solo',
+                'Vegetação verde',
+                'Deserto, solo exposto ou vegetação seca',
+                'Gelo marinho sem neve',
+                'Mar e lagos'
+            ],
+            mapProduct_fog: 'Nevoeiro / Nuvens baixas RGB (microfísica noturna)',
             mapProduct_dayMicro: 'Microfísica diurna RGB',
             mapProduct_natural: 'Cor natural RGB',
             mapProduct_ir108: 'Infravermelho 10,8 / 10,5 µm',
@@ -307,10 +414,8 @@
             mapSaveName: 'Nome para esta área',
             mapDeleteRegion: 'Excluir área salva',
             mapBaseTitle: 'Mapa',
-            mapBase_dark: 'Escuro',
             mapBase_osm: 'OSM',
             mapBase_none: 'Nenhum',
-            mapLabels: 'Nomes de lugares por cima',
             mapBorders: 'Fronteiras por cima',
             mapTimeTitle: 'Animação',
             mapWindowHours: '{n} h',
@@ -500,13 +605,14 @@
     // ================= Persistent settings =================
     const defaults = {
         product: null, productAt: 0, sources: {}, opacity: 1, precipOn: false, precipOpacity: 0.85,
-        basemap: 'dark', labels: true, borders: true, windowH: 6, utc: true, speed: 1,
-        view: null, region: 'ukraine', panelOpen: null, diagOpen: false
+        basemap: 'osm', borders: true, windowH: 6, utc: true, speed: 1,
+        view: null, region: 'ukraine', panelOpen: null, diagOpen: false, keyOpen: true
     };
     const S = Object.assign({}, defaults, loadFromStorage(MAP_CONFIG.settingsKey, {}) || {});
     if (!MAP_CONFIG.windows.includes(S.windowH)) S.windowH = 6;
     if (!MAP_CONFIG.speeds.includes(S.speed)) S.speed = 1;
-    if (!['dark', 'osm', 'none'].includes(S.basemap)) S.basemap = 'dark';
+    if (!['osm', 'none'].includes(S.basemap)) S.basemap = 'osm';
+    delete S.labels;
     let savedRegions = loadFromStorage(MAP_CONFIG.regionsKey, []);
     if (!Array.isArray(savedRegions)) savedRegions = [];
     const save = () => saveToStorage(MAP_CONFIG.settingsKey, S);
@@ -524,7 +630,7 @@
         precipFrames: [],
         index: -1, playing: false, playTimer: null,
         extent: null,             // { key, bounds, bbox3857, w, h }
-        overlay: null, precipOverlay: null, bordersLayer: null, baseLayer: null, labelsLayer: null, locMarker: null,
+        overlay: null, precipOverlay: null, bordersLayer: null, baseLayer: null, locMarker: null,
         lastOk: null, lastError: null, requestMode: 'fetch', fetchWorked: false,
         refreshTimer: null, moveTimer: null, drawing: null, gen: 0
     };
@@ -851,7 +957,7 @@
     function suggestedProduct() {
         const has = id => (R.resolved[id] || []).length > 0;
         const sun = sunState();
-        const order = sun === 'day' ? ['dayMicro', 'natural', 'fog', 'ir108'] : sun === 'night' ? ['fog', 'nightMicro', 'ir108', 'dayMicro'] : ['fog', 'dayMicro', 'ir108'];
+        const order = sun === 'day' ? ['dayMicro', 'natural', 'fog', 'ir108'] : sun === 'night' ? ['fog', 'ir108', 'dayMicro'] : ['fog', 'dayMicro', 'ir108'];
         return order.find(has) || PRODUCTS.map(p => p.id).find(has) || 'fog';
     }
 
@@ -919,15 +1025,45 @@
 
         const wanted = new Set(R.frames.map(f => f.key).concat(R.precipFrames.map(f => f.key)));
         cancelExcept(wanted);
-        // Latest first (that is what opens), then newest → oldest.
+        // Opens on the latest image; only it is loaded until another time
+        // is picked (showFrame() then loads from there forward).
         const timeline = timelineFrames();
         let idx = prevT === undefined || wasLatest ? timeline.length - 1 : timeline.findIndex(f => f.t === prevT);
         if (idx < 0) idx = timeline.length - 1;
         R.index = idx;
-        [...R.frames].reverse().forEach((f, i) => ensureFrame(f, i === 0));
-        [...R.precipFrames].reverse().forEach((f, i) => ensureFrame(f, i === 0 && !layer));
         renderAllMapUi();
         showFrame(R.index);
+    }
+
+    // Frames needed once frame `from` is selected: that frame, then every
+    // later one up to the latest (with their precipitation frames).
+    function framesFrom(from) {
+        const tl = timelineFrames();
+        const withPrecip = !!(activeLayer() && activePrecipLayer());
+        const out = [], seen = new Set();
+        const add = f => { if (f && !seen.has(f.key)) { seen.add(f.key); out.push(f); } };
+        for (let i = Math.max(0, from); i < tl.length; i++) {
+            add(tl[i]);
+            if (withPrecip) add(precipFrameFor(tl[i].t));
+        }
+        return out;
+    }
+
+    // Loads the selected frame first, then the following ones in time order.
+    // Earlier frames are never preloaded; queued requests that are no longer
+    // ahead of the selection are dropped (ones already sent may finish).
+    function loadFrom(from) {
+        const want = framesFrom(from);
+        const keys = new Set(want.map(f => f.key));
+        for (let i = queue.length - 1; i >= 0; i--) {
+            if (!keys.has(queue[i].key)) { cache.delete(queue[i].key); queue.splice(i, 1); }
+        }
+        want.forEach(f => {
+            const e = cache.get(f.key);
+            if (!e) ensureFrame(f, false);
+            else if (e.status === 'queued') { queue.splice(queue.indexOf(e), 1); queue.push(e); }
+        });
+        renderProgress();
     }
 
     function styleOf(layer) {
@@ -956,8 +1092,10 @@
         const tl = timelineFrames();
         if (!tl.length || i < 0) { setOverlay('overlay', null); setOverlay('precipOverlay', null); renderTimeLabel(); return; }
         R.index = Math.max(0, Math.min(i, tl.length - 1));
+        loadFrom(R.index);
         renderSlider();
         renderTimeLabel();
+        renderProgress();   // moves the current-frame marker
         const f = tl[R.index];
         const gen = R.gen;
         const satFrame = activeLayer() ? f : null;
@@ -1000,12 +1138,15 @@
         if (!R.playing) return;
         const tl = timelineFrames();
         if (tl.length < 2) { play(false); return; }
-        // Next frame that has loaded; failed ones are skipped, pending ones waited for.
+        // Next frame that has loaded; failed ones are skipped, pending ones
+        // waited for. After the latest it wraps to the start of the window,
+        // which (like any selection) loads from there forward.
         let next = (R.index + 1) % tl.length;
         for (let n = 0; n < tl.length; n++) {
-            const e = cache.get(tl[next].key);
+            let e = cache.get(tl[next].key);
+            if (!e) { loadFrom(next); e = cache.get(tl[next].key); }
             if (e && e.status === 'ok') break;
-            if (e && (e.status === 'loading' || e.status === 'queued')) { R.playTimer = setTimeout(tick, 250); return; }
+            if (e && (e.status === 'loading' || e.status === 'queued')) { R.playTimer = setTimeout(tick, 200); return; }
             next = (next + 1) % tl.length;
         }
         showFrame(next);
@@ -1051,7 +1192,7 @@
         R.map = map;
         L.control.zoom({ position: 'topright' }).addTo(map);
         map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
-        [['sat', 410], ['precip', 420], ['borders', 600], ['labels', 610], ['loc', 650]].forEach(([name, z]) => {
+        [['sat', 410], ['precip', 420], ['borders', 600], ['loc', 650]].forEach(([name, z]) => {
             const pane = map.createPane(name);
             pane.style.zIndex = z;
             if (name !== 'loc') pane.style.pointerEvents = 'none';
@@ -1087,18 +1228,7 @@
         const cfg = MAP_CONFIG.basemaps[id];
         if (cfg) R.baseLayer = L.tileLayer(cfg.url, { subdomains: cfg.subdomains || 'abc', maxZoom: cfg.maxZoom, attribution: cfg.attribution, detectRetina: false }).addTo(R.map);
         $('satMap').style.background = id === 'osm' ? '#aad3df' : '#020617';
-        updateLabels();
         if (!init) { save(); renderPanel(); }
-    }
-
-    function updateLabels() {
-        const want = S.labels;
-        if (want && !R.labelsLayer) {
-            const c = MAP_CONFIG.labels;
-            R.labelsLayer = L.tileLayer(c.url, { subdomains: c.subdomains, maxZoom: c.maxZoom, attribution: MAP_CONFIG.basemaps.dark.attribution, pane: 'labels' }).addTo(R.map);
-        } else if (!want && R.labelsLayer) {
-            R.map.removeLayer(R.labelsLayer); R.labelsLayer = null;
-        }
     }
 
     // Boundary lines from the same service, drawn as transparent WMS tiles
@@ -1251,6 +1381,7 @@
             <section>${sectionTitle('fa-satellite', 'mapProductTitle')}
                 <div class="space-y-1">${productRows}</div>${sourceSelect}${styleSelect}
                 ${layer ? opacity('sat', S.opacity) : ''}
+                ${layer ? colourKeyHtml(layer) : ''}
                 <p class="text-[10px] text-slate-500 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>${h(t('mapDisclaimer'))}</p>
             </section>
             <section>${sectionTitle('fa-cloud-showers-heavy', 'mapPrecipTitle')}${precipBlock}</section>
@@ -1264,8 +1395,7 @@
                 <form data-map-saveform class="hidden mt-2 flex gap-1.5"><input name="name" maxlength="40" placeholder="${h(t('mapSaveName'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"><button class="chip py-1"><i class="fa-solid fa-check"></i></button></form>
             </section>
             <section>${sectionTitle('fa-map', 'mapBaseTitle')}
-                ${seg('basemap', [['dark', h(t('mapBase_dark'))], ['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
-                <label class="flex items-center gap-2 mt-2 cursor-pointer"><input type="checkbox" data-map-labels ${S.labels ? 'checked' : ''} class="accent-cyan-500 w-4 h-4"> ${h(t('mapLabels'))}</label>
+                ${seg('basemap', [['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
                 ${R.borderLayers.length ? `<label class="flex items-center gap-2 mt-1.5 cursor-pointer"><input type="checkbox" data-map-borders ${S.borders ? 'checked' : ''} class="accent-cyan-500 w-4 h-4"> ${h(t('mapBorders'))}</label>` : ''}
             </section>
             <section>${sectionTitle('fa-film', 'mapTimeTitle')}
@@ -1283,6 +1413,36 @@
             <p class="text-[10px] text-slate-500">${h(t('mapAttrNote'))}</p>`;
         renderDiagnostics();
         renderPrecipInfo();
+    }
+
+    // Colour key of the active product: EUMETSAT's interpretation for the
+    // RGBs, the service's own legend image for quantitative layers (CTH).
+    function colourKeyHtml(layer) {
+        const key = RGB_KEYS[S.product];
+        let body = '';
+        if (key) {
+            const texts = t('mapKey_' + S.product);
+            const swatch = c => {
+                const bg = c === 'dots' ? 'radial-gradient(circle, #9be05a 24%, transparent 30%) 0 0 / 5px 5px, #a02700'
+                    : Array.isArray(c) ? `linear-gradient(90deg, ${c[0]} 50%, ${c[1]} 50%)` : c;
+                return `<span class="w-5 h-3.5 rounded-sm shrink-0 mt-px border border-white/10" style="background: ${bg}"></span>`;
+            };
+            body = `<ul class="space-y-1">${key.colors.map((c, i) => `<li class="flex items-start gap-2">${swatch(c)}<span>${h(texts[i] || '')}</span></li>`).join('')}</ul>
+                ${translations.en['mapKey_' + S.product + '_note'] ? `<p class="mt-1.5 text-slate-400">${h(t('mapKey_' + S.product + '_note'))}</p>` : ''}
+                <p class="mt-1 text-slate-500">${h(t('mapKeyAngle'))} <a href="${h(key.guide)}" target="_blank" rel="noopener" class="text-cyan-400 hover:text-cyan-300">${h(t('mapKeySource'))} <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a></p>`;
+        } else {
+            // Only real legends: RGB layers advertise a 20×20 placeholder.
+            const s = (layer.styles || []).find(x => x.legend && !/width=20\b/.test(x.legend));
+            if (!s) return '';
+            body = `<img src="${h(s.legend)}" alt="" class="max-w-full rounded bg-white/90 p-1" loading="lazy" onerror="this.closest('[data-map-keybox]').remove()">`;
+        }
+        return `<div data-map-keybox class="mt-2 rounded-lg border border-slate-800 bg-slate-950/50">
+            <button type="button" data-map-key class="w-full flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300" aria-expanded="${S.keyOpen}">
+                <i class="fa-solid fa-palette text-slate-500"></i><span class="flex-1 text-left">${h(t('mapKeyTitle'))}</span>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform" style="${S.keyOpen ? 'transform: rotate(180deg)' : ''}"></i>
+            </button>
+            ${S.keyOpen ? `<div class="px-2.5 pb-2 text-[10.5px] leading-snug text-slate-300">${body}</div>` : ''}
+        </div>`;
     }
 
     function legendUrl(layer) {
@@ -1374,17 +1534,22 @@
         const ticks = $('mapTicks');
         const prog = $('mapProgress');
         if (!ticks || !prog) return;
-        let done = 0, failed = 0;
+        // Loaded / loading / not requested / failed; the current frame is
+        // the bright one (outlined while it is still loading).
+        let done = 0, failed = 0, pending = 0;
         ticks.innerHTML = tl.map((f, i) => {
             const e = cache.get(f.key);
-            const st = e ? e.status : 'queued';
+            const st = e ? e.status : 'idle';
             if (st === 'ok') done++;
-            if (st === 'error') failed++;
-            const color = st === 'ok' ? (i === R.index ? '#22d3ee' : '#155e75') : st === 'error' ? '#d03b3b' : '#334155';
-            return `<span class="flex-1" style="background:${color}" title="${h(fmtTime(f.t))}${e && e.error ? ' — ' + h(e.error) : ''}"></span>`;
+            else if (st === 'error') failed++;
+            else if (st !== 'idle') pending++;
+            const current = i === R.index;
+            const color = st === 'ok' ? (current ? '#22d3ee' : '#155e75') : st === 'error' ? '#d03b3b' : st === 'idle' ? '#1e293b' : '#475569';
+            const mark = current && st !== 'ok' ? 'box-shadow: inset 0 0 0 1px #22d3ee;' : '';
+            return `<span class="flex-1" ${current ? 'data-current' : ''} style="background:${color};${mark}" title="${h(fmtTime(f.t))}${e && e.error ? ' — ' + h(e.error) : ''}"></span>`;
         }).join('');
         const parts = [t('mapFrameOf', { i: Math.max(1, R.index + 1), n: tl.length })];
-        if (done + failed < tl.length) parts.push(`<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('mapLoadingFrames', { done, n: tl.length }))}`);
+        if (pending) parts.push(`<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('mapLoadingFrames', { done: done + failed, n: done + failed + pending }))}`);
         if (failed) parts.push(`<span class="text-rose-300">${h(t('mapFailedFrames', { n: failed }))}</span>`);
         prog.innerHTML = tl.length ? parts.join(' · ') : '';
         if (S.diagOpen) renderDiagnostics();
@@ -1413,7 +1578,7 @@
             }
             if (!covers(layer.bbox, regionBbox())) notes.push(pill('bg-amber-950/90 border border-amber-800/60 text-amber-200', 'fa-crop', t('mapPartial')));
             const sun = sunState();
-            const recommended = sun === 'night' ? ['fog', 'nightMicro'] : sun === 'day' ? ['dayMicro', 'natural'] : null;
+            const recommended = sun === 'night' ? ['fog'] : sun === 'day' ? ['dayMicro', 'natural'] : null;
             if (recommended && !recommended.includes(S.product)) {
                 const target = recommended.find(id => (R.resolved[id] || []).length);
                 if (target) notes.push(pill('bg-indigo-950/90 border border-indigo-800/60 text-indigo-100', sun === 'night' ? 'fa-moon' : 'fa-sun',
@@ -1460,6 +1625,7 @@
                 saveToStorage(MAP_CONFIG.regionsKey, savedRegions);
                 S.region = 'custom'; save(); renderPanel();
             } else if (q('[data-map-diag]')) { S.diagOpen = !S.diagOpen; save(); renderPanel(); }
+            else if (q('[data-map-key]')) { S.keyOpen = !S.keyOpen; save(); renderPanel(); }
             else if (q('[data-map-recatalog]')) loadCatalog(true);
         });
         view.addEventListener('change', e => {
@@ -1470,8 +1636,7 @@
                 S.sources[`${el.dataset.mapStyle}#style`] = el.value; save(); reloadFrames();
             } else if (el.matches('[data-map-precip]')) {
                 S.precipOn = el.checked; save(); renderAllMapUi(); reloadFrames();
-            } else if (el.matches('[data-map-labels]')) {
-                S.labels = el.checked; save(); updateLabels();
+
             } else if (el.matches('[data-map-borders]')) {
                 S.borders = el.checked; save(); updateBorders();
             } else if (el.matches('[data-map-region]')) {

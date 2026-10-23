@@ -102,7 +102,7 @@ self.addEventListener('fetch', (event) => {
     // would only grow the cache.
     const host = new URL(event.request.url).hostname;
     if (host.endsWith('open-meteo.com') || host === 'view.eumetsat.int' ||
-        host.endsWith('basemaps.cartocdn.com') || host === 'tile.openstreetmap.org') return;
+        host === 'tile.openstreetmap.org') return;
 
     event.respondWith(
         fetch(event.request)
