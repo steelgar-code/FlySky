@@ -227,6 +227,26 @@
             mapErrFrame: 'Image failed: {msg}',
             mapAttrNote: 'Imagery © EUMETSAT, via EUMETView. Check EUMETSAT data policy before public or commercial use.',
             mapPanelToggle: 'Layers & settings',
+            mapProbeToggle: 'Point readout (crosshair)',
+            mapCenterLoc: 'Centre on forecast location',
+            mapProbeSat: 'Satellite',
+            mapProbeClose: 'close colour match',
+            mapProbeApprox: 'approximate match',
+            mapProbeOr: 'or',
+            mapProbeUnclear: 'unclear colour — nearest: {label}',
+            mapProbeNoKey: 'pixel colour (no colour key for this product)',
+            mapProbeRain: 'Precipitation',
+            mapProbeRainValue: '{v} {u}/h',
+            mapProbeQuality: 'quality {q}%',
+            mapProbeModel: 'Model',
+            mapProbeModelValues: 'low clouds {c}% · visibility {v} km · precip {p} {u}',
+            mapProbeNoData: 'no data at this point',
+            mapProbeNoValue: 'colour only, no value',
+            mapProbePlaying: 'Pause the animation to read values',
+            mapProbeLoading: 'Reading…',
+            mapProbeError: 'could not read ({msg})',
+            mapGoForecast: 'Forecast here',
+            mapProbeCollapse: 'Collapse / expand',
             mapNow: 'latest available'
         },
         uk: {
@@ -343,6 +363,26 @@
             mapErrFrame: 'Помилка зображення: {msg}',
             mapAttrNote: 'Знімки © EUMETSAT, через EUMETView. Перед публічним чи комерційним використанням перевірте політику даних EUMETSAT.',
             mapPanelToggle: 'Шари та налаштування',
+            mapProbeToggle: 'Дані в точці (приціл)',
+            mapCenterLoc: 'Центрувати на локації прогнозу',
+            mapProbeSat: 'Супутник',
+            mapProbeClose: 'колір близький',
+            mapProbeApprox: 'приблизний збіг',
+            mapProbeOr: 'або',
+            mapProbeUnclear: 'колір неоднозначний — найближче: {label}',
+            mapProbeNoKey: 'колір пікселя (для цього продукту немає пояснення кольорів)',
+            mapProbeRain: 'Опади',
+            mapProbeRainValue: '{v} {u}/год',
+            mapProbeQuality: 'якість {q}%',
+            mapProbeModel: 'Модель',
+            mapProbeModelValues: 'низька хмарність {c}% · видимість {v} км · опади {p} {u}',
+            mapProbeNoData: 'немає даних у цій точці',
+            mapProbeNoValue: 'лише колір, без значення',
+            mapProbePlaying: 'Поставте анімацію на паузу, щоб побачити значення',
+            mapProbeLoading: 'Читаю…',
+            mapProbeError: 'не вдалося прочитати ({msg})',
+            mapGoForecast: 'Прогноз тут',
+            mapProbeCollapse: 'Згорнути / розгорнути',
             mapNow: 'останнє доступне'
         },
         'pt-BR': {
@@ -459,6 +499,26 @@
             mapErrFrame: 'Falha na imagem: {msg}',
             mapAttrNote: 'Imagens © EUMETSAT, via EUMETView. Verifique a política de dados da EUMETSAT antes de uso público ou comercial.',
             mapPanelToggle: 'Camadas e ajustes',
+            mapProbeToggle: 'Leitura no ponto (mira)',
+            mapCenterLoc: 'Centralizar no local da previsão',
+            mapProbeSat: 'Satélite',
+            mapProbeClose: 'cor muito próxima',
+            mapProbeApprox: 'correspondência aproximada',
+            mapProbeOr: 'ou',
+            mapProbeUnclear: 'cor incerta — mais próxima: {label}',
+            mapProbeNoKey: 'cor do pixel (sem legenda de cores para este produto)',
+            mapProbeRain: 'Precipitação',
+            mapProbeRainValue: '{v} {u}/h',
+            mapProbeQuality: 'qualidade {q}%',
+            mapProbeModel: 'Modelo',
+            mapProbeModelValues: 'nuvens baixas {c}% · visibilidade {v} km · precip. {p} {u}',
+            mapProbeNoData: 'sem dados neste ponto',
+            mapProbeNoValue: 'só cor, sem valor',
+            mapProbePlaying: 'Pause a animação para ler os valores',
+            mapProbeLoading: 'Lendo…',
+            mapProbeError: 'não foi possível ler ({msg})',
+            mapGoForecast: 'Previsão aqui',
+            mapProbeCollapse: 'Recolher / expandir',
             mapNow: 'mais recente'
         }
     };
@@ -606,7 +666,7 @@
     const defaults = {
         product: null, productAt: 0, sources: {}, opacity: 1, precipOn: false, precipOpacity: 0.85,
         basemap: 'osm', borders: true, windowH: 6, utc: true, speed: 1,
-        view: null, region: 'ukraine', panelOpen: null, diagOpen: false, keyOpen: true
+        view: null, region: 'ukraine', panelOpen: null, diagOpen: false, keyOpen: true, probe: true, probeOpen: true
     };
     const S = Object.assign({}, defaults, loadFromStorage(MAP_CONFIG.settingsKey, {}) || {});
     if (!MAP_CONFIG.windows.includes(S.windowH)) S.windowH = 6;
@@ -1107,6 +1167,7 @@
         if (precipEntry) whenReady(precipEntry).then(e => { if (gen === R.gen && timelineFrames()[R.index] === f && e.status === 'ok') setOverlay('precipOverlay', e.url); });
         else setOverlay('precipOverlay', null);
         renderPrecipInfo(precipFrame);
+        if (!R.playing) scheduleProbe();
     }
 
     function setOverlay(which, url) {
@@ -1132,6 +1193,7 @@
         clearTimeout(R.playTimer);
         renderControls();
         if (on) tick();
+        scheduleProbe();
     }
 
     function tick() {
@@ -1186,7 +1248,20 @@
                 <i class="fa-solid fa-layer-group text-cyan-400"></i><span id="mapPanelBtnLabel" class="max-w-[11rem] truncate"></span><i id="mapPanelChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform"></i>
             </button>
             <div id="mapPanel" class="hidden absolute top-14 left-3 z-[500] w-[min(22rem,calc(100vw-1.5rem))] max-h-[calc(100%-12rem)] overflow-y-auto p-3 space-y-4 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md text-xs text-slate-300"></div>
-            <div id="mapStatus" class="absolute bottom-36 left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] space-y-1.5 pointer-events-none"></div>
+            <div id="mapCrosshair" class="hidden absolute left-1/2 top-1/2 z-[420] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                    <g stroke="#020617" stroke-width="4" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
+                    <g stroke="#f8fafc" stroke-width="2" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
+                </svg>
+            </div>
+            <div class="absolute top-[5.75rem] right-[10px] z-[500] flex flex-col gap-1.5">
+                <button type="button" id="mapProbeBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-crosshairs"></i></button>
+                <button type="button" id="mapCenterBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-location-dot"></i></button>
+            </div>
+            <div class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
+                <div id="mapStatus" class="space-y-1.5"></div>
+                <div id="mapProbe" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
+            </div>
             <div id="mapBar" class="absolute bottom-7 left-1/2 -translate-x-1/2 z-[500] w-[min(44rem,calc(100vw-1rem))] p-2 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-2xl backdrop-blur-md"></div>`;
         const map = L.map('satMap', { zoomControl: false, worldCopyJump: false, minZoom: 3, maxZoom: 11, attributionControl: true });
         R.map = map;
@@ -1197,12 +1272,17 @@
             pane.style.zIndex = z;
             if (name !== 'loc') pane.style.pointerEvents = 'none';
         });
-        if (S.view && S.view.center) map.setView(S.view.center, S.view.zoom);
+        if (state.location) {
+            R.anchor = L.latLng(state.location.latitude, state.location.longitude);
+            map.setView(R.anchor, S.view && S.view.zoom ? S.view.zoom : 6);
+            R.centeredLoc = locKey();
+        } else if (S.view && S.view.center) map.setView(S.view.center, S.view.zoom);
         else fitRegion(MAP_CONFIG.regions.ukraine, false);
         setBasemap(S.basemap, true);
         updateLocationMarker();
 
         map.on('movestart', () => clearTimeout(R.moveTimer));
+        map.on('move', renderProbeHeader);
         map.on('moveend', () => {
             S.view = { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() };
             save();
@@ -1211,6 +1291,9 @@
                 if (!extentStillGood()) reloadFrames({ newExtent: true });
                 renderStatus();
             }, 450);
+            // Moved away from the forecast location: follow the crosshair.
+            if (R.anchor && !anchorCentred()) R.anchor = null;
+            scheduleProbe();
         });
         setupDrawing();
         setupUiEvents();
@@ -1599,10 +1682,13 @@
         renderPanel();
         renderControls();
         renderStatus();
+        renderProbe();
     }
 
     function setupUiEvents() {
         $('mapPanelBtn').addEventListener('click', () => setPanel(!S.panelOpen));
+        $('mapProbeBtn').addEventListener('click', () => { S.probe = !S.probe; save(); renderProbe(); scheduleProbe(0); });
+        $('mapCenterBtn').addEventListener('click', () => centerOnLocation(true));
         const view = $('mapView');
         view.addEventListener('click', e => {
             const q = sel => e.target.closest(sel);
@@ -1626,6 +1712,8 @@
                 S.region = 'custom'; save(); renderPanel();
             } else if (q('[data-map-diag]')) { S.diagOpen = !S.diagOpen; save(); renderPanel(); }
             else if (q('[data-map-key]')) { S.keyOpen = !S.keyOpen; save(); renderPanel(); }
+            else if (q('[data-map-probemin]')) { S.probeOpen = !S.probeOpen; save(); renderProbe(); }
+            else if (q('[data-map-goforecast]')) forecastHere();
             else if (q('[data-map-recatalog]')) loadCatalog(true);
         });
         view.addEventListener('change', e => {
@@ -1678,6 +1766,262 @@
         window.addEventListener('offline', renderStatus);
     }
 
+    // ================= Point readout (crosshair) =================
+    // Values under the crosshair (= map centre) for the frame on screen,
+    // read with WMS GetFeatureInfo:
+    //  - RGB products only return the displayed colour, which is matched to
+    //    EUMETSAT's colour key (CIE Lab distance) and shown as "likely";
+    //  - MTG precipitation (h40b) returns the actual rain rate + quality;
+    //  - plus the Open-Meteo model forecast at the same point and hour.
+    const P = { timer: null, seq: 0, controller: null, gfi: new Map(), model: new Map(), result: null, loading: false };
+    const MATCH_CLOSE = 15, MATCH_APPROX = 30, MATCH_TIE = 6;   // ΔE thresholds, tuned on live imagery
+
+    function locKey() {
+        return state.location ? `${state.location.latitude},${state.location.longitude}` : '';
+    }
+
+    function centerOnLocation(animate) {
+        if (!R.map || !state.location) return;
+        R.centeredLoc = locKey();
+        R.anchor = L.latLng(state.location.latitude, state.location.longitude);
+        R.map.setView(R.anchor, Math.max(R.map.getZoom(), 6), { animate });
+    }
+
+    // Leaflet keeps the centre on whole pixels, so after centring on the
+    // forecast location the crosshair can sit ~1 km off it. Until the map is
+    // moved away, the readout uses the exact location instead.
+    function anchorCentred() {
+        if (!R.anchor || !R.map) return false;
+        const a = R.map.latLngToContainerPoint(R.anchor), c = R.map.getSize().divideBy(2);
+        return Math.abs(a.x - c.x) <= 3 && Math.abs(a.y - c.y) <= 3;
+    }
+
+    function probePoint() {
+        return anchorCentred() ? { ll: R.anchor, name: state.location && state.location.name } : { ll: R.map.getCenter(), name: null };
+    }
+
+    function fmtCoord(ll) {
+        const f = (v, pos, neg) => `${Math.abs(v).toFixed(3)}°${v >= 0 ? pos : neg}`;
+        return `${f(ll.lat, 'N', 'S')} ${f(ll.lng, 'E', 'W')}`;
+    }
+
+    function toLab([r, g, b]) {
+        const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+        const [R_, G_, B_] = [lin(r), lin(g), lin(b)];
+        const f = v => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+        const x = f((R_ * 0.4124 + G_ * 0.3576 + B_ * 0.1805) / 0.95047);
+        const y = f(R_ * 0.2126 + G_ * 0.7152 + B_ * 0.0722);
+        const z = f((R_ * 0.0193 + G_ * 0.1192 + B_ * 0.9505) / 1.08883);
+        return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+    }
+    const hexRgb = hx => [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+
+    // Nearest colour-key entries for a pixel, best first: [{ i, d }].
+    function matchKey(productId, rgb) {
+        const key = RGB_KEYS[productId];
+        if (!key) return null;
+        const lab = toLab(rgb);
+        const dist = hex => Math.hypot(...toLab(hexRgb(hex)).map((v, k) => v - lab[k]));
+        return key.colors.map((c, i) => {
+            const list = c === 'dots' ? ['#a02700'] : Array.isArray(c) ? c : [c];
+            return { i, d: Math.min(...list.map(dist)) };
+        }).sort((a, b) => a.d - b.d);
+    }
+
+    function featureInfoUrl(layerName, tm, ll) {
+        const p = L.CRS.EPSG3857.project(ll), d = 500;
+        return buildWmsUrl(MAP_CONFIG.wmsBase, {
+            SERVICE: 'WMS', VERSION: MAP_CONFIG.version, REQUEST: 'GetFeatureInfo',
+            LAYERS: layerName, QUERY_LAYERS: layerName, STYLES: '', CRS: MAP_CONFIG.crs,
+            BBOX: [p.x - d, p.y - d, p.x + d, p.y + d].map(Math.round).join(','), WIDTH: 3, HEIGHT: 3, I: 1, J: 1,
+            INFO_FORMAT: 'application/json', FEATURE_COUNT: 1,
+            TIME: tm === null || tm === undefined ? undefined : new Date(tm).toISOString().replace('.000Z', 'Z')
+        });
+    }
+
+    async function featureInfo(layerName, tm, ll, signal) {
+        const url = featureInfoUrl(layerName, tm, ll);
+        const key = `${layerName}|${tm}|${ll.lat.toFixed(3)},${ll.lng.toFixed(3)}`;
+        if (P.gfi.has(key)) return P.gfi.get(key);
+        const res = await fetch(url, { signal, credentials: 'omit' });
+        const text = await res.text();
+        if (!res.ok) throw new Error(parseServiceException(text) || `HTTP ${res.status}`);
+        let data;
+        try { data = JSON.parse(text); } catch (err) { throw new Error(parseServiceException(text) || 'bad response'); }
+        const props = data.features && data.features[0] ? data.features[0].properties : null;
+        if (P.gfi.size > 300) P.gfi.clear();
+        P.gfi.set(key, props);
+        return props;
+    }
+
+    // Open-Meteo best-match forecast at a point (hourly, UTC), cached 15 min.
+    async function modelAt(ll, signal) {
+        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit}`;
+        const hit = P.model.get(key);
+        if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
+        const url = buildWmsUrl('https://api.open-meteo.com/v1/forecast', {
+            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: 'cloud_cover_low,visibility,precipitation',
+            past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined
+        }, []);
+        const res = await fetch(url, { signal });
+        const body = await res.json();
+        if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
+        P.model.set(key, { at: Date.now(), data: body.hourly });
+        return body.hourly;
+    }
+
+    function precipTimeFor(name, tm) {
+        const info = R.times[name];
+        if (!info || !info.list.length) return null;
+        if (tm === null || tm === undefined) return info.list[info.list.length - 1];
+        let best = null;
+        info.list.forEach(v => { if (v <= tm + 5 * 60e3 && tm - v <= 30 * 60e3 && (best === null || Math.abs(v - tm) < Math.abs(best - tm))) best = v; });
+        return best;
+    }
+
+    function scheduleProbe(delay = 350) {
+        clearTimeout(P.timer);
+        if (!R.built || !R.visible || !S.probe) return;
+        P.timer = setTimeout(runProbe, delay);
+    }
+
+    async function runProbe() {
+        if (!S.probe || !R.visible) return;
+        if (R.playing) { P.result = { playing: true }; renderProbe(); return; }
+        const { ll } = probePoint();
+        const frame = timelineFrames()[R.index];
+        const tm = frame ? frame.t : null;
+        const layer = activeLayer();
+        const rainLayer = R.precipLayers.find(l => l.name === 'mtg_fd:h40b') || R.precipLayers[0] || null;
+        try { P.controller && P.controller.abort(); } catch (err) {}
+        const controller = new AbortController();
+        P.controller = controller;
+        const id = ++P.seq;
+        P.loading = true;
+        renderProbe();
+        const sat = layer ? featureInfo(layer.name, tm, ll, controller.signal) : Promise.resolve(undefined);
+        const rain = rainLayer ? refreshTimes(rainLayer.name).then(() => {
+            const pt = precipTimeFor(rainLayer.name, tm);
+            return pt === null ? null : featureInfo(rainLayer.name, pt, ll, controller.signal).then(props => ({ props, t: pt }));
+        }) : Promise.resolve(undefined);
+        const model = navigator.onLine ? modelAt(ll, controller.signal) : Promise.reject(new Error(t('mapOffline')));
+        const [s, r, m] = await Promise.allSettled([sat, rain, model]);
+        if (id !== P.seq) return;
+        P.loading = false;
+        P.result = { ll, tm, layer, rainLayer, sat: s, rain: r, model: m };
+        renderProbe();
+    }
+
+    function renderProbeHeader() {
+        const el = $('mapProbeCoord');
+        if (!el || !R.map) return;
+        const { ll, name } = probePoint();
+        el.textContent = name && name !== fmtCoord(ll) ? `${name} · ${fmtCoord(ll)}` : fmtCoord(ll);
+    }
+
+    function renderProbe() {
+        if (!R.built) return;
+        const on = !!S.probe;
+        $('mapCrosshair').classList.toggle('hidden', !on);
+        const btn = $('mapProbeBtn');
+        btn.classList.toggle('!bg-cyan-500', on);
+        btn.title = t('mapProbeToggle'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        const cbtn = $('mapCenterBtn');
+        cbtn.title = t('mapCenterLoc'); cbtn.setAttribute('aria-label', cbtn.title);
+        cbtn.classList.toggle('hidden', !state.location);
+        const card = $('mapProbe');
+        card.classList.toggle('hidden', !on);
+        if (!on) return;
+        const res = P.result;
+        const errText = reason => h(t('mapProbeError', { msg: reason instanceof TypeError ? t('mapErrNetwork') : (reason && reason.message) || '' }));
+        const row = (icon, label, html) => `<div class="flex items-start gap-2"><i class="fa-solid ${icon} w-3.5 mt-0.5 text-center text-slate-500"></i><span class="text-slate-400 shrink-0">${h(label)}:</span><span class="min-w-0">${html}</span></div>`;
+        let rows = '';
+        if (P.loading && !res) rows = `<div class="text-slate-500">${h(t('mapProbeLoading'))}</div>`;
+        else if (res && res.playing) rows = `<div class="text-slate-500">${h(t('mapProbePlaying'))}</div>`;
+        else if (res) {
+            // Satellite colour → colour key
+            if (res.layer) {
+                let html;
+                if (res.sat.status === 'rejected') html = errText(res.sat.reason);
+                else if (!res.sat.value) html = h(t('mapProbeNoData'));
+                else {
+                    const p = res.sat.value;
+                    const rgb = ['RED_BAND', 'GREEN_BAND', 'BLUE_BAND'].map(k => p[k]);
+                    if (rgb.every(Number.isFinite)) {
+                        const sw = `<span class="inline-block w-3.5 h-3 rounded-sm align-[-2px] mr-1 border border-white/20" style="background: rgb(${rgb.join(',')})"></span>`;
+                        const m = matchKey(S.product, rgb);
+                        const texts = t('mapKey_' + S.product);
+                        if (!m) html = sw + h(t('mapProbeNoKey'));
+                        else if (m[0].d > MATCH_APPROX) html = sw + h(t('mapProbeUnclear', { label: texts[m[0].i] }));
+                        else {
+                            const second = m[1] && m[1].d - m[0].d < MATCH_TIE && m[1].d <= MATCH_APPROX ? ` <span class="text-slate-400">${h(t('mapProbeOr'))} ${h(texts[m[1].i])}</span>` : '';
+                            html = `${sw}<span class="text-slate-100">${h(texts[m[0].i])}</span>${second} <span class="text-slate-500">· ${h(t(m[0].d <= MATCH_CLOSE ? 'mapProbeClose' : 'mapProbeApprox'))}</span>`;
+                        }
+                    } else {
+                        html = h(Object.entries(p).map(([k, v]) => `${k} ${v}`).join(' · '));
+                    }
+                }
+                rows += row('fa-satellite', t('mapProbeSat'), html);
+            }
+            // Satellite precipitation
+            if (res.rainLayer) {
+                let html;
+                if (res.rain.status === 'rejected') html = errText(res.rain.reason);
+                else if (!res.rain.value || !res.rain.value.props) html = h(t('mapProbeNoData'));
+                else {
+                    const p = res.rain.value.props;
+                    const rate = p.Instantaneous_rain_rate ?? p.instantaneous_rain_rate ?? p.rain_rate;
+                    if (Number.isFinite(rate)) {
+                        const inch = state.precipUnit === 'inch';
+                        const v = inch ? rate / 25.4 : rate;
+                        const q = p.Quality_index ?? p.quality_index;
+                        html = `<span class="text-slate-100 font-mono">${h(t('mapProbeRainValue', { v: v.toLocaleString(currentLang, { maximumFractionDigits: inch ? 2 : 1, minimumFractionDigits: inch ? 2 : 1 }), u: inch ? 'in' : 'mm' }))}</span>${Number.isFinite(q) ? ` <span class="text-slate-500">· ${h(t('mapProbeQuality', { q }))}</span>` : ''} <span class="text-slate-500">· ${h(fmtTime(res.rain.value.t))}</span>`;
+                    } else html = h(t('mapProbeNoValue'));
+                }
+                rows += row('fa-cloud-rain', t('mapProbeRain'), html);
+            }
+            // Model forecast for the same hour
+            {
+                let html;
+                if (res.model.status === 'rejected') html = errText(res.model.reason);
+                else {
+                    const hr = res.model.value;
+                    const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
+                    const i = hr.time.findIndex(x => x.slice(0, 13) === target);
+                    if (i < 0) html = h(t('mapProbeNoData'));
+                    else {
+                        const num = (v, d) => (Number.isFinite(v) ? v.toLocaleString(currentLang, { maximumFractionDigits: d, minimumFractionDigits: d }) : '–');
+                        html = `<span class="text-slate-100">${h(t('mapProbeModelValues', {
+                            c: num(hr.cloud_cover_low[i], 0), v: num(hr.visibility[i] / 1000, 1),
+                            p: num(hr.precipitation[i], state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
+                        }))}</span> <span class="text-slate-500">· ${h(fmtTime(Date.parse(hr.time[i] + 'Z')))}</span>`;
+                    }
+                }
+                rows += row('fa-chart-area', t('mapProbeModel'), html);
+            }
+        }
+        card.innerHTML = `
+            <div class="flex items-center gap-2 px-3 py-1.5">
+                <i class="fa-solid fa-crosshairs text-cyan-400"></i>
+                <span id="mapProbeCoord" class="font-mono text-slate-100 truncate"></span>
+                ${P.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i>' : ''}
+                <span class="flex-1"></span>
+                <button type="button" data-map-goforecast class="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 font-semibold"><i class="fa-solid fa-chart-area mr-1"></i>${h(t('mapGoForecast'))}</button>
+                <button type="button" data-map-probemin class="shrink-0 w-6 h-6 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t('mapProbeCollapse'))}" aria-label="${h(t('mapProbeCollapse'))}" aria-expanded="${S.probeOpen}"><i class="fa-solid fa-chevron-down text-[10px] transition-transform" style="${S.probeOpen ? '' : 'transform: rotate(180deg)'}"></i></button>
+            </div>
+            ${S.probeOpen && rows ? `<div class="px-3 pb-2 space-y-1 leading-snug">${rows}</div>` : ''}`;
+        renderProbeHeader();
+    }
+
+    // Opens the forecast for the point under the crosshair.
+    function forecastHere() {
+        const { ll: c, name } = probePoint();
+        if (name) { setView('forecast'); return; }   // already the forecast location
+        const round = v => Math.round(v * 1e4) / 1e4;
+        selectLocation({ name: fmtCoord(c), latitude: round(c.lat), longitude: round(c.lng) });
+        setView('forecast');
+    }
+
     // ================= Public API =================
     function show() {
         R.visible = true;
@@ -1686,6 +2030,8 @@
             renderAllMapUi();
             loadCatalog(false);
         } else {
+            // A new forecast location since the map was last shown: go there.
+            if (state.location && R.centeredLoc !== locKey()) centerOnLocation(false);
             R.map.invalidateSize();
             renderStatus();
             reloadFrames();
@@ -1718,6 +2064,7 @@
         if (!R.built) return;
         updateLocationMarker();
         renderPanel();
+        if (R.visible) centerOnLocation(true);
     }
 
     document.addEventListener('visibilitychange', () => {
