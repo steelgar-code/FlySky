@@ -12,16 +12,18 @@
 // On activation, anything the new cache is missing is also carried over from
 // older FlySky caches before they are deleted.
 //
-// Open-Meteo API requests are deliberately NOT cached here: every forecast
+// Open-Meteo API requests, EUMETSAT satellite images and map tiles are
+// deliberately NOT cached here: every forecast/image
 // URL is unique, so caching them would only grow the cache. The app keeps
 // its own copy of the last forecast in localStorage for offline viewing.
 
 const CACHE_PREFIX = 'flysky-cache-';
-const CACHE_NAME = CACHE_PREFIX + 'v5';
+const CACHE_NAME = CACHE_PREFIX + 'v6';
 
 const APP_FILES = [
     './',
     './index.html',
+    './map.js?v=1',
     './manifest.json',
     './favicon.png',
     './icon-192.png',
@@ -36,7 +38,10 @@ const APP_FILES = [
 const CDN_NO_CORS = [
     'https://cdn.tailwindcss.com',
     'https://cdn.jsdelivr.net/npm/chart.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    // Satellite map view (loaded on demand by index.html)
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
 ];
 const CDN_CORS = [
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2',
@@ -92,8 +97,12 @@ self.addEventListener('fetch', (event) => {
     // Only handle simple GET requests; let everything else pass through normally.
     if (event.request.method !== 'GET') return;
     if (!event.request.url.startsWith('http')) return;
-    // Let API calls go straight to the network.
-    if (new URL(event.request.url).hostname.endsWith('open-meteo.com')) return;
+    // Let API calls, satellite images and map tiles go straight to the
+    // network: their URLs are endless (time, area, zoom), so caching them
+    // would only grow the cache.
+    const host = new URL(event.request.url).hostname;
+    if (host.endsWith('open-meteo.com') || host === 'view.eumetsat.int' ||
+        host.endsWith('basemaps.cartocdn.com') || host === 'tile.openstreetmap.org') return;
 
     event.respondWith(
         fetch(event.request)

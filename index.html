@@ -68,6 +68,12 @@
             background: #475569;
         }
 
+        /* Phones: the Forecast / Map switch needs the room of the wordmark. */
+        @media (max-width: 440px) {
+            #appHeader { padding-left: 0.75rem; padding-right: 0.75rem; }
+            #appHeader .brand-word { display: none; }
+            #appHeader .lang-select { max-width: 6.75rem; }
+        }
         .lang-select, .unit-select {
             background: rgb(30 41 59 / 0.6);
             border: 1px solid rgb(51 65 85 / 0.5);
@@ -150,7 +156,7 @@
 <body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
 
     <!-- Top Header Navigation -->
-    <header class="h-16 bg-slate-900/80 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
+    <header id="appHeader" class="h-16 bg-slate-900/80 border-b border-slate-800 px-4 sm:px-6 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
         <div class="flex items-center gap-2">
             <button id="btnSettings" type="button" class="text-slate-400 hover:text-white p-2 -ml-2 rounded-lg transition" data-i18n-title="settingsTitle" data-i18n-aria-label="settingsTitle" title="Settings" aria-label="Settings" aria-controls="settingsDrawer" aria-expanded="false">
                 <i class="fa-solid fa-bars text-lg"></i>
@@ -158,13 +164,17 @@
             <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20">
                 <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
             </div>
-            <div>
+            <div class="brand-word">
                 <span class="font-bold tracking-tight text-white text-lg">FLY<span class="text-cyan-400">SKY</span></span>
                 <span class="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono">MULTI-MODEL WX</span>
             </div>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div id="viewSwitch" class="seg" role="group" data-i18n-aria-label="viewSwitchLabel" aria-label="View">
+                <button type="button" data-view="forecast" data-i18n-title="viewForecast" title="Forecast"><i class="fa-solid fa-chart-area"></i><span class="hidden md:inline" data-i18n="viewForecast">Forecast</span></button>
+                <button type="button" data-view="map" data-i18n-title="viewMap" title="Satellite map"><i class="fa-solid fa-satellite"></i><span class="hidden md:inline" data-i18n="viewMap">Satellite map</span></button>
+            </div>
             <div id="offlineBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-800/50 text-xs text-amber-300 font-medium">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <span class="hidden sm:inline" data-i18n="offlineBadge">Offline — showing cached forecast</span>
@@ -182,7 +192,7 @@
     </header>
 
     <!-- Main Scrollable Content -->
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-36 lg:pb-24 bg-slate-950">
+    <main id="forecastView" class="flex-1 overflow-y-auto p-4 sm:p-6 pb-36 lg:pb-24 bg-slate-950">
         <div class="max-w-7xl mx-auto space-y-6">
 
             <!-- Location card: current location (click to search), favorites -->
@@ -354,6 +364,10 @@
             </footer>
         </div>
     </main>
+
+    <!-- Satellite map view (EUMETSAT imagery); built by map.js, which is
+         loaded together with Leaflet the first time the view is opened. -->
+    <div id="mapView" class="hidden flex-1 relative overflow-hidden bg-slate-950"></div>
 
     <!-- Settings drawer -->
     <div id="settingsOverlay" class="hidden fixed inset-0 z-[55] bg-slate-950/70 backdrop-blur-sm"></div>
@@ -650,6 +664,11 @@
                 langSelectorAriaLabel: "Language",
                 offlineBadge: "Offline — showing cached forecast",
                 refreshBtn: "Refresh",
+                viewForecast: "Forecast",
+                viewMap: "Satellite map",
+                viewSwitchLabel: "View",
+                mapLoadFailed: "Could not load the map. Check your connection and try again.",
+                refreshMapTitle: "Reload satellite images",
                 refreshTitle: "Reload forecast",
                 currentLocationLabel: "Location",
                 changeLocationTitle: "Change location",
@@ -824,6 +843,11 @@
                 langSelectorAriaLabel: "Мова",
                 offlineBadge: "Офлайн — показано збережений прогноз",
                 refreshBtn: "Оновити",
+                viewForecast: "Прогноз",
+                viewMap: "Супутникова карта",
+                viewSwitchLabel: "Вигляд",
+                mapLoadFailed: "Не вдалося завантажити карту. Перевірте з’єднання та спробуйте ще раз.",
+                refreshMapTitle: "Перезавантажити супутникові знімки",
                 refreshTitle: "Перезавантажити прогноз",
                 currentLocationLabel: "Місце",
                 changeLocationTitle: "Змінити місце",
@@ -998,6 +1022,11 @@
                 langSelectorAriaLabel: "Idioma",
                 offlineBadge: "Offline — mostrando previsão salva",
                 refreshBtn: "Atualizar",
+                viewForecast: "Previsão",
+                viewMap: "Mapa de satélite",
+                viewSwitchLabel: "Visualização",
+                mapLoadFailed: "Não foi possível carregar o mapa. Verifique a conexão e tente novamente.",
+                refreshMapTitle: "Recarregar imagens de satélite",
                 refreshTitle: "Recarregar previsão",
                 currentLocationLabel: "Local",
                 changeLocationTitle: "Mudar local",
@@ -1214,6 +1243,8 @@
             applyStaticTranslations();
             document.getElementById('langSelect').value = currentLang;
             renderAll();
+            renderViewSwitch();
+            if (window.FlySkyMap) window.FlySkyMap.onLangChange();
         }
 
         // ================= Storage =================
@@ -3153,6 +3184,7 @@
             processForecast();
             renderAll();
             loadForecast();
+            if (window.FlySkyMap) window.FlySkyMap.onLocationChange();
         }
 
         function toggleFavorite() {
@@ -3417,7 +3449,10 @@
                 renderModelChips();
                 renderCharts();
             });
-            document.getElementById('btnRefresh').addEventListener('click', () => loadForecast({ force: true }));
+            document.getElementById('btnRefresh').addEventListener('click', () => {
+                if (currentView === 'map') { if (window.FlySkyMap) window.FlySkyMap.refresh(); }
+                else loadForecast({ force: true });
+            });
             document.getElementById('btnStatsToggle').addEventListener('click', () => {
                 state.statsCollapsed = !state.statsCollapsed;
                 saveSettings();
@@ -3484,6 +3519,7 @@
             setupChartResizing();
             setupSettingsDrawer();
             setupOfflineIndicator();
+            setupViewSwitch();
             processForecast();
             renderAll();
             loadForecast();
@@ -3495,6 +3531,78 @@
                 if (document.visibilityState === 'visible') loadForecast();
             });
         });
+
+        // ================= Forecast / satellite map view =================
+        // The map code (map.js) and Leaflet are only downloaded the first
+        // time the map is opened, so the forecast stays as light as before.
+        const VIEW_KEY = 'flysky_view';
+        const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+        const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+        const MAP_JS = 'map.js?v=1';
+        let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
+        let mapAssetsPromise = null;
+
+        function loadAsset(tag, attrs) {
+            return new Promise((resolve, reject) => {
+                const el = document.createElement(tag);
+                Object.assign(el, attrs);
+                el.onload = () => resolve();
+                el.onerror = () => { el.remove(); reject(new Error(`Failed to load ${attrs.src || attrs.href}`)); };
+                document.head.appendChild(el);
+            });
+        }
+
+        function loadMapAssets() {
+            if (window.FlySkyMap) return Promise.resolve();
+            if (!mapAssetsPromise) {
+                mapAssetsPromise = Promise.all([
+                    loadAsset('link', { rel: 'stylesheet', href: LEAFLET_CSS }),
+                    (window.L ? Promise.resolve() : loadAsset('script', { src: LEAFLET_JS }))
+                        .then(() => loadAsset('script', { src: MAP_JS }))
+                ]).catch(err => { mapAssetsPromise = null; throw err; });
+            }
+            return mapAssetsPromise;
+        }
+
+        function renderViewSwitch() {
+            document.querySelectorAll('#viewSwitch [data-view]').forEach(btn => {
+                const on = btn.dataset.view === currentView;
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+            const refresh = document.getElementById('btnRefresh');
+            refresh.title = t(currentView === 'map' ? 'refreshMapTitle' : 'refreshTitle');
+        }
+
+        function setView(view) {
+            currentView = view === 'map' ? 'map' : 'forecast';
+            saveToStorage(VIEW_KEY, currentView);
+            const isMap = currentView === 'map';
+            document.getElementById('forecastView').classList.toggle('hidden', isMap);
+            document.getElementById('modeDock').classList.toggle('hidden', isMap);
+            document.getElementById('mapView').classList.toggle('hidden', !isMap);
+            renderViewSwitch();
+            if (isMap) {
+                loadMapAssets()
+                    .then(() => { if (currentView === 'map') window.FlySkyMap.show(); })
+                    .catch(err => {
+                        console.error('FlySky: map failed to load.', err);
+                        showToast(t('mapLoadFailed'), 'warning');
+                        setView('forecast');
+                    });
+            } else {
+                if (window.FlySkyMap) window.FlySkyMap.hide();
+                resizeAllCharts();
+            }
+        }
+
+        function setupViewSwitch() {
+            document.getElementById('viewSwitch').addEventListener('click', e => {
+                const btn = e.target.closest('[data-view]');
+                if (btn && btn.dataset.view !== currentView) setView(btn.dataset.view);
+            });
+            setView(currentView);
+        }
 
         // ================= Install prompt =================
         // Per-app key: FlyLog/FlySend/FlySky share the steelgar-code.github.io
