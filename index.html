@@ -463,6 +463,9 @@
                 <p class="text-[11px] text-slate-500" data-i18n="hazardSettingDesc">A chip on the flight card when satellite data shows lightning or rain within 50 km of the forecast location.</p>
                 <p id="hazardStatus" class="text-[11px] text-slate-400"></p>
             </section>
+            <button type="button" id="btnFullscreen" class="hidden w-full py-2 rounded-xl border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">
+                <i class="fa-solid fa-expand mr-1"></i> <span>Full screen</span>
+            </button>
             <button type="button" id="btnResetSettings" class="w-full py-2 rounded-xl border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">
                 <i class="fa-solid fa-rotate-left mr-1"></i> <span data-i18n="resetDefaults">Reset to defaults</span>
             </button>
@@ -801,6 +804,8 @@
                 hazardSettingLabel: "Lightning & rain alerts",
                 hazardSettingDesc: "A chip on the flight card (and on the map) when satellite data shows lightning or rain within 50 km of the forecast location, with direction and, once a few images have been seen, how fast it is coming. Only the latest small EUMETSAT image is checked, every 5 min while the app is open.",
                 flightOnMap: "Map",
+                fullscreenOn: "Full screen",
+                fullscreenOff: "Exit full screen",
                 flightOnMapTitle: "Open the satellite map for this hour (later hours: latest image + forecast wind)",
                 ruleRainNone: "no rain chance",
                 ruleRainUpTo: "rain chance ≤ {r1}%",
@@ -985,6 +990,8 @@
                 hazardSettingLabel: "Попередження про блискавки й опади",
                 hazardSettingDesc: "Позначка на картці польоту (і на карті), коли супутникові дані показують блискавки чи опади в межах 50 км від локації прогнозу — з напрямком і, після кількох знімків, швидкістю наближення. Перевіряється лише останній невеликий знімок EUMETSAT, кожні 5 хв, поки застосунок відкритий.",
                 flightOnMap: "Карта",
+                fullscreenOn: "Повний екран",
+                fullscreenOff: "Вийти з повного екрана",
                 flightOnMapTitle: "Відкрити супутникову карту для цієї години (пізніші години: останній знімок + прогноз вітру)",
                 ruleRainNone: "без ймовірності опадів",
                 ruleRainUpTo: "ймовірність опадів ≤ {r1}%",
@@ -1169,6 +1176,8 @@
                 hazardSettingLabel: "Alertas de raios e chuva",
                 hazardSettingDesc: "Um aviso no cartão de voo (e no mapa) quando os dados de satélite mostram raios ou chuva a até 50 km do local da previsão, com a direção e, depois de algumas imagens, a velocidade de aproximação. Só a imagem pequena mais recente da EUMETSAT é verificada, a cada 5 min com o app aberto.",
                 flightOnMap: "Mapa",
+                fullscreenOn: "Tela cheia",
+                fullscreenOff: "Sair da tela cheia",
                 flightOnMapTitle: "Abrir o mapa de satélite para esta hora (horas futuras: imagem mais recente + vento previsto)",
                 ruleRainNone: "sem chance de chuva",
                 ruleRainUpTo: "chance de chuva ≤ {r1}%",
@@ -1302,6 +1311,7 @@
             renderViewSwitch();
             if (window.FlySkyMap) window.FlySkyMap.onLangChange();
             if (window.FlySkyHazard) window.FlySkyHazard.onLangChange();
+            renderFullscreenButton();
         }
 
         // ================= Storage =================
@@ -3631,6 +3641,7 @@
             setupOfflineIndicator();
             setupViewSwitch();
             setupHazardToggle();
+            setupFullscreen();
             processForecast();
             renderAll();
             loadForecast();
@@ -3653,7 +3664,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=6';
+        const MAP_JS = 'map.js?v=7';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
@@ -3679,9 +3690,40 @@
             return mapAssetsPromise;
         }
 
+        // ---- Full screen (whole app; not offered where the browser can't,
+        // e.g. iPhone Safari)
+        function fullscreenSupported() {
+            return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+        }
+
+        function isFullscreen() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement);
+        }
+
+        function toggleFullscreen() {
+            const el = document.documentElement;
+            const p = isFullscreen()
+                ? (document.exitFullscreen || document.webkitExitFullscreen).call(document)
+                : (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+            if (p && p.catch) p.catch(err => console.warn('FlySky: full screen not available.', err));
+        }
+
+        function renderFullscreenButton() {
+            const btn = document.getElementById('btnFullscreen');
+            const full = isFullscreen();
+            btn.classList.toggle('hidden', !fullscreenSupported());
+            btn.innerHTML = `<i class="fa-solid ${full ? 'fa-compress' : 'fa-expand'} mr-1"></i> <span>${escapeHtml(t(full ? 'fullscreenOff' : 'fullscreenOn'))}</span>`;
+        }
+
+        function setupFullscreen() {
+            document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+            ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, renderFullscreenButton));
+            renderFullscreenButton();
+        }
+
         // ---- Nearby-hazard alerts (hazard.js, loaded only while switched on)
         const HAZARD_KEY = 'flysky_hazard';
-        const HAZARD_JS = 'hazard.js?v=3';
+        const HAZARD_JS = 'hazard.js?v=4';
         let hazardPromise = null;
 
         function hazardEnabled() {

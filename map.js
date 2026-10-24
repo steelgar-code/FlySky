@@ -1029,7 +1029,7 @@
         product: null, productAt: 0, sources: {}, opacity: 0.4,
         overlays: { precip: { on: false, opacity: 0.4 }, lightning: { on: false, opacity: 0.9 }, fire: { on: false, opacity: 0.9 } },
         wind: { on: false, level: '10m' },
-        basemap: 'osmDark', labels: true, borders: true, rings: true, favs: true, windowH: 6, utc: true, speed: 1,
+        basemap: 'osmDark', labels: true, borders: true, rings: true, favs: true, hazardMin: false, windowH: 6, utc: true, speed: 1,
         view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true
     };
     const stored = loadFromStorage(MAP_CONFIG.settingsKey, {}) || {};
@@ -1398,11 +1398,11 @@
             const any = all.find(l => BORDERS.test(`${l.name} ${l.title}`) && !l.hasTime);
             if (any) R.borderLayers = [{ name: any.name, style: '' }];
         }
-        // A product picked by hand gives way to the time-of-day suggestion
-        // after 6 h; "Auto" follows the sun by itself, so it stays.
+        // New users (nothing picked by hand yet) start on "Auto"; a product
+        // picked by hand stays as picked.
         const unavailable = S.product === 'auto' ? !autoAvailable() : S.product !== 'none' && !(R.resolved[S.product] || []).length;
-        if (!S.product || unavailable || (S.product !== 'auto' && Date.now() - S.productAt > 6 * 3600e3)) {
-            S.product = suggestedProduct();
+        if (!S.product || !S.productAt || unavailable) {
+            S.product = autoAvailable() ? 'auto' : suggestedProduct();
         }
         updateBorders();
         renderAllMapUi();
@@ -1811,6 +1811,8 @@
             <div id="mapTools" class="absolute top-[5.75rem] right-[10px] z-[500] flex flex-col gap-1.5">
                 <button type="button" id="mapProbeBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-crosshairs"></i></button>
                 <button type="button" id="mapCenterBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-location-dot"></i></button>
+                <button type="button" id="mapFullBtn" class="hidden w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-expand"></i></button>
+                <div id="mapHazardIcons" class="contents"></div>
             </div>
             <div id="mapSide" class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
                 <div id="mapStatus" class="space-y-1.5"></div>
@@ -2480,8 +2482,11 @@
             notes.push(pill('bg-cyan-950/90 border border-cyan-800/60 text-cyan-100', 'fa-wind', t('mapWindForecast', { time: fmtTime(W.forecastHour) }),
                 `<button type="button" data-map-windclear class="w-6 h-6 -mr-1.5 rounded-md hover:bg-cyan-500/30" title="${h(t('mapWindForecastClear'))}" aria-label="${h(t('mapWindForecastClear'))}"><i class="fa-solid fa-xmark"></i></button>`));
         }
-        // Nearby lightning / rain first: it matters most.
-        const hazards = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard.chipsHtml('map') : '';
+        // Nearby lightning / rain first: it matters most. A tap folds the
+        // chips into icons in the button column (and back).
+        const hz = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard : null;
+        const hazards = hz && !S.hazardMin ? hz.chipsHtml('map') : '';
+        $('mapHazardIcons').innerHTML = hz && S.hazardMin ? hz.chipsHtml('icon') : '';
         el.innerHTML = hazards + notes.join('');
     }
 
@@ -2500,6 +2505,9 @@
         $('mapPanelBtn').addEventListener('click', () => { if (typeof setSettingsDrawer === 'function') setSettingsDrawer(true); });
         $('mapProbeBtn').addEventListener('click', () => { S.probe = !S.probe; save(); renderProbe(); scheduleProbe(0); });
         $('mapCenterBtn').addEventListener('click', () => centerOnLocation(true));
+        $('mapFullBtn').addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', renderFullBtn);
+        document.addEventListener('webkitfullscreenchange', renderFullBtn);
         const view = $('mapView');
         // Map controls live both on the map and in the side menu.
         [view, $('drawerMap')].filter(Boolean).forEach(root => bindUi(root));
@@ -2534,7 +2542,7 @@
             else if (q('[data-map-next]')) step(1);
             else if (q('[data-map-latest]')) { clearForecastHour(); play(false); showFrame(timelineFrames().length - 1); }
             else if (q('[data-map-windclear]')) clearForecastHour();
-            else if ((el = q('[data-hazard]'))) focusHazard(el.dataset.hazard);
+            else if (q('[data-hazard]')) { S.hazardMin = !S.hazardMin; save(); renderStatus(); }
             else if (q('[data-map-draw]')) startDrawing();
             else if (q('[data-map-saveview]')) { const f = $('drawerMap').querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
             else if (q('[data-map-delregion]')) {
@@ -2545,7 +2553,7 @@
             } else if (q('[data-map-diag]')) { S.diagOpen = !S.diagOpen; save(); renderPanel(); }
             else if (q('[data-map-key]')) { S.keyOpen = !S.keyOpen; save(); renderPanel(); }
             else if (q('[data-map-probemin]')) { S.probeOpen = !S.probeOpen; save(); renderProbe(); }
-            else if (q('[data-map-goforecast]')) forecastHere();
+            else if (q('[data-map-goforecast]')) setLocationHere();
             else if (q('[data-map-recatalog]')) loadCatalog(true);
         });
         view.addEventListener('change', e => {
@@ -2802,6 +2810,9 @@
         if (!el || !R.map) return;
         const { ll, name } = probePoint();
         el.textContent = name && name !== fmtCoord(ll) ? `${name} · ${fmtCoord(ll)}` : fmtCoord(ll);
+        // Nothing to set while the crosshair is on the forecast location.
+        const btn = $('mapProbe').querySelector('[data-map-goforecast]');
+        if (btn) btn.classList.toggle('hidden', !!name);
     }
 
     function renderProbe() {
@@ -2814,6 +2825,7 @@
         const cbtn = $('mapCenterBtn');
         cbtn.title = t('mapCenterLoc'); cbtn.setAttribute('aria-label', cbtn.title);
         cbtn.classList.toggle('hidden', !state.location);
+        renderFullBtn();
         const card = $('mapProbe');
         card.classList.toggle('hidden', !on);
         if (!on) return;
@@ -2921,13 +2933,26 @@
         renderProbeHeader();
     }
 
-    // Opens the forecast for the point under the crosshair.
-    function forecastHere() {
+    function renderFullBtn() {
+        const btn = $('mapFullBtn');
+        if (!btn) return;
+        const full = isFullscreen();
+        btn.classList.toggle('hidden', !fullscreenSupported());
+        btn.innerHTML = `<i class="fa-solid ${full ? 'fa-compress' : 'fa-expand'}"></i>`;
+        btn.title = t(full ? 'fullscreenOff' : 'fullscreenOn');
+        btn.setAttribute('aria-label', btn.title);
+        btn.setAttribute('aria-pressed', full ? 'true' : 'false');
+    }
+
+    // Makes the point under the crosshair the forecast location (staying
+    // on the map).
+    function setLocationHere() {
         const { ll: c, name } = probePoint();
-        if (name) { setView('forecast'); return; }   // already the forecast location
+        if (name) return;   // already the forecast location
         const round = v => Math.round(v * 1e4) / 1e4;
         selectLocation({ name: fmtCoord(c), latitude: round(c.lat), longitude: round(c.lng) });
-        setView('forecast');
+        showToast(t('mapFavSelected', { name: fmtCoord(c) }), 'success');
+        renderProbeHeader();
     }
 
     // ================= Public API =================

@@ -56,9 +56,9 @@
 
     const KINDS = [
         { id: 'lightning', icon: 'fa-bolt', layers: ['mtg_fd:li_afa'],
-          cls: 'bg-yellow-950/90 border-yellow-700/60 text-yellow-100', accent: 'text-yellow-300' },
+          cls: 'bg-yellow-950/90 border-yellow-700/60 text-yellow-100', accent: 'text-yellow-300', iconCls: 'bg-yellow-300 text-slate-950' },
         { id: 'rain', icon: 'fa-cloud-showers-heavy', layers: ['mtg_fd:h40b', 'msg_fes:h60b'],
-          cls: 'bg-sky-950/90 border-sky-700/60 text-sky-100', accent: 'text-sky-300' }
+          cls: 'bg-sky-950/90 border-sky-700/60 text-sky-100', accent: 'text-sky-300', iconCls: 'bg-sky-400 text-slate-950' }
     ];
 
     // ================= Translations =================
@@ -83,6 +83,8 @@
             hzHourMin: '{h} h {m} min',
             hzCompass: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
             hzOpenMap: 'Show on the satellite map',
+            hzCollapse: 'Tap to fold into an icon',
+            hzExpand: 'tap to show',
             hzStatusIdle: 'Not checked yet.',
             hzStatusClear: 'Checked {time}: no lightning or rain within {r} km.',
             hzStatusAlert: 'Checked {time}.',
@@ -109,6 +111,8 @@
             hzHourMin: '{h} год {m} хв',
             hzCompass: ['Пн', 'ПнСх', 'Сх', 'ПдСх', 'Пд', 'ПдЗх', 'Зх', 'ПнЗх'],
             hzOpenMap: 'Показати на супутниковій карті',
+            hzCollapse: 'Натисніть, щоб згорнути в значок',
+            hzExpand: 'натисніть, щоб показати',
             hzStatusIdle: 'Ще не перевірено.',
             hzStatusClear: 'Перевірено {time}: блискавок і опадів у межах {r} км немає.',
             hzStatusAlert: 'Перевірено {time}.',
@@ -135,6 +139,8 @@
             hzHourMin: '{h} h {m} min',
             hzCompass: ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'],
             hzOpenMap: 'Mostrar no mapa de satélite',
+            hzCollapse: 'Toque para recolher em um ícone',
+            hzExpand: 'toque para mostrar',
             hzStatusIdle: 'Ainda não verificado.',
             hzStatusClear: 'Verificado às {time}: sem raios nem chuva a até {r} km.',
             hzStatusAlert: 'Verificado às {time}.',
@@ -480,10 +486,15 @@
             const sub = [ageText(a.t), motionText(a)].filter(Boolean).join(' · ');
             const title = `${t('hzOpenMap')} — ${clockTime(a.t)}`;
             const head = `<i class="fa-solid ${kind.icon} ${kind.accent}"></i><span class="font-semibold">${h(label.charAt(0).toUpperCase() + label.slice(1))} ${h(where)}</span>`;
+            // Folded on the map: an icon in the map's button column.
+            if (variant === 'icon') {
+                const full = `${label.charAt(0).toUpperCase() + label.slice(1)} ${where} · ${sub} — ${t('hzExpand')}`;
+                return `<button type="button" data-hazard="${kind.id}" title="${h(full)}" aria-label="${h(full)}" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 flex items-center justify-center shadow-lg transition hover:brightness-110 ${kind.iconCls}"><i class="fa-solid ${kind.icon}"></i></button>`;
+            }
             // Two lines on the map: what and where, then age and movement
-            // (wrapping, never cut off).
+            // (wrapping, never cut off). A tap folds them into icons.
             if (variant === 'map') {
-                return `<button type="button" data-hazard="${kind.id}" title="${h(title)}" class="pointer-events-auto w-full flex items-start gap-2 px-3 py-1.5 rounded-xl text-[11px] leading-snug text-left shadow-lg backdrop-blur-md border ${kind.cls}">
+                return `<button type="button" data-hazard="${kind.id}" title="${h(t('hzCollapse'))}" class="pointer-events-auto w-full flex items-start gap-2 px-3 py-1.5 rounded-xl text-[11px] leading-snug text-left shadow-lg backdrop-blur-md border ${kind.cls}">
                     <i class="fa-solid ${kind.icon} ${kind.accent} mt-0.5"></i><span class="flex-1 min-w-0"><span class="block font-semibold">${h(label.charAt(0).toUpperCase() + label.slice(1))} ${h(where)}</span><span class="block opacity-80">${h(sub)}</span></span></button>`;
             }
             return `<button type="button" data-hazard="${kind.id}" title="${h(title)}" class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2.5 py-1 rounded-lg text-xs text-left border ${kind.cls} hover:brightness-125 transition">
