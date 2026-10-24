@@ -110,9 +110,7 @@
           test: s => /(^|:)clm\b|cloud.?mask/i.test(s) },
         // MSG measures at 10.8 µm, MTG's FCI at 10.5 µm.
         { id: 'ir108', role: 'any', icon: 'fa-temperature-half',
-          test: s => /ir[_\s-]?10[._]?[58]|10[.,][58]\s*[µμ]?m/i.test(s) },
-        { id: 'ctth', role: 'context', icon: 'fa-arrows-up-to-line',
-          test: s => /ctth|cloud.?top.?(height|temp)/i.test(s) }
+          test: s => /ir[_\s-]?10[._]?[58]|10[.,][58]\s*[µμ]?m/i.test(s) }
     ];
     // Colour keys from EUMETSAT's RGB quick guides; swatches sampled from
     // the official colour-interpretation charts. Texts: mapKey_<id>.
@@ -232,10 +230,11 @@
             mapOv_precip: 'Precipitation',
             mapOv_lightning: 'Lightning',
             mapOv_fire: 'Fires',
-            mapOvKind_lightning: 'Flashes seen by MTG’s Lightning Imager during the 30 min up to each image.',
-            mapOvKind_fire: 'Fires and hot spots detected by satellite, from the start of the animation window up to each image — shows active risk areas. Smoke can lower visibility.',
+            mapOvKind_lightning: 'Flashes seen by MTG’s Lightning Imager during the 30 min up to each image (counted from the selected image).',
+            mapOvKind_fire: 'Fires and hot spots detected by satellite, from the selected image up to each image — pick an earlier time and play to see risk areas build up. Smoke can lower visibility.',
             mapOvNone: 'Not offered by the service.',
             mapOvImages: '{n} images · {from} – {to}',
+            mapOvImage: 'Image: {time}',
             mapOv_wind: 'Forecast wind',
             mapWindLevel_10m: '10 m',
             mapWindLevel_925: '~800 m (925 hPa)',
@@ -292,7 +291,6 @@
             mapProduct_dayMicro: 'Day Microphysics RGB',
             mapProduct_natural: 'Natural Colour RGB',
             mapProduct_ir108: 'Infrared 10.8 / 10.5 µm',
-            mapProduct_ctth: 'Cloud top height',
             mapProduct_none: 'None (precipitation only)',
             mapRole_night: 'Night',
             mapRole_day: 'Day',
@@ -442,10 +440,11 @@
             mapOv_precip: 'Опади',
             mapOv_lightning: 'Блискавки',
             mapOv_fire: 'Пожежі',
-            mapOvKind_lightning: 'Спалахи, зафіксовані блискавковим сенсором MTG за 30 хв до кожного знімка.',
-            mapOvKind_fire: 'Пожежі та гарячі точки, виявлені супутником, від початку вікна анімації до кожного знімка — показує активні зони ризику. Дим може погіршувати видимість.',
+            mapOvKind_lightning: 'Спалахи, зафіксовані блискавковим сенсором MTG за 30 хв до кожного знімка (від вибраного знімка).',
+            mapOvKind_fire: 'Пожежі та гарячі точки, виявлені супутником, від вибраного знімка до кожного наступного — оберіть ранніший час і відтворіть, щоб побачити, як накопичуються зони ризику. Дим може погіршувати видимість.',
             mapOvNone: 'Сервіс не надає.',
             mapOvImages: '{n} знімків · {from} – {to}',
+            mapOvImage: 'Знімок: {time}',
             mapOv_wind: 'Прогноз вітру',
             mapWindLevel_10m: '10 м',
             mapWindLevel_925: '~800 м (925 гПа)',
@@ -502,7 +501,6 @@
             mapProduct_dayMicro: 'Денна мікрофізика RGB',
             mapProduct_natural: 'Природні кольори RGB',
             mapProduct_ir108: 'Інфрачервоний 10,8 / 10,5 мкм',
-            mapProduct_ctth: 'Висота верхньої межі хмар',
             mapProduct_none: 'Немає (лише опади)',
             mapRole_night: 'Ніч',
             mapRole_day: 'День',
@@ -652,10 +650,11 @@
             mapOv_precip: 'Precipitação',
             mapOv_lightning: 'Raios',
             mapOv_fire: 'Incêndios',
-            mapOvKind_lightning: 'Descargas vistas pelo Lightning Imager do MTG nos 30 min até cada imagem.',
-            mapOvKind_fire: 'Incêndios e pontos quentes detectados por satélite, do início da janela de animação até cada imagem — mostra áreas de risco ativas. A fumaça pode reduzir a visibilidade.',
+            mapOvKind_lightning: 'Descargas vistas pelo Lightning Imager do MTG nos 30 min até cada imagem (a partir da imagem selecionada).',
+            mapOvKind_fire: 'Incêndios e pontos quentes detectados por satélite, da imagem selecionada até cada imagem — escolha um horário anterior e reproduza para ver as áreas de risco se acumularem. A fumaça pode reduzir a visibilidade.',
             mapOvNone: 'Não oferecido pelo serviço.',
             mapOvImages: '{n} imagens · {from} – {to}',
+            mapOvImage: 'Imagem: {time}',
             mapOv_wind: 'Vento previsto',
             mapWindLevel_10m: '10 m',
             mapWindLevel_925: '~800 m (925 hPa)',
@@ -712,7 +711,6 @@
             mapProduct_dayMicro: 'Microfísica diurna RGB',
             mapProduct_natural: 'Cor natural RGB',
             mapProduct_ir108: 'Infravermelho 10,8 / 10,5 µm',
-            mapProduct_ctth: 'Altura do topo das nuvens',
             mapProduct_none: 'Nenhum (só precipitação)',
             mapRole_night: 'Noite',
             mapRole_day: 'Dia',
@@ -1453,7 +1451,7 @@
         if (idx < 0) idx = timeline.length - 1;
         R.index = idx;
         renderAllMapUi();
-        showFrame(R.index);
+        showFrame(R.index, true);
     }
 
     // Frames needed once frame `from` is selected: that frame, then every
@@ -1513,14 +1511,25 @@
             list.forEach(f => { if (upTo(f) && tm - f.t <= 30 * 60e3 && (!best || Math.abs(f.t - tm) < Math.abs(best.t - tm))) best = f; });
             return best ? [best] : [];
         }
-        if (o.show === 'window') return list.filter(upTo);
-        return list.filter(f => upTo(f) && f.t > tm - o.show * 60e3);
+        // Stacks start at the selected image (R.anchorT): from the overlay
+        // image nearest to it, so nothing earlier is ever loaded.
+        let from = -Infinity;
+        if (R.anchorT !== null && R.anchorT !== undefined) {
+            const before = list.filter(f => f.t !== null && f.t <= R.anchorT + 5 * 60e3);
+            from = before.length ? before[before.length - 1].t : R.anchorT;
+        }
+        if (o.show === 'window') return list.filter(f => upTo(f) && f.t >= from);
+        return list.filter(f => upTo(f) && f.t >= from && f.t > tm - o.show * 60e3);
     }
 
-    async function showFrame(i) {
+    // keepAnchor: moving forward from the selection (next / play) keeps the
+    // start of the lightning / fire stacks; any other pick starts a new one.
+    async function showFrame(i, keepAnchor = false) {
         const tl = timelineFrames();
         if (!tl.length || i < 0) { setOverlay('overlay', null); OVERLAYS.forEach(o => showOverlayFrames(o, [])); renderTimeLabel(); return; }
         R.index = Math.max(0, Math.min(i, tl.length - 1));
+        const ft = tl[R.index].t;
+        if (!keepAnchor || R.anchorT === null || R.anchorT === undefined || ft === null || ft < R.anchorT) R.anchorT = ft;
         loadFrom(R.index);
         renderSlider();
         renderTimeLabel();
@@ -1605,7 +1614,7 @@
             if (e && (e.status === 'loading' || e.status === 'queued')) { R.playTimer = setTimeout(tick, 200); return; }
             next = (next + 1) % tl.length;
         }
-        showFrame(next);
+        showFrame(next, next !== 0);   // wrapping to the start begins a new stack
         const hold = next === tl.length - 1 ? 1500 : 0;   // pause on the newest image
         R.playTimer = setTimeout(tick, MAP_CONFIG.baseFrameMs / S.speed + hold);
     }
@@ -1613,7 +1622,7 @@
     function step(d) {
         play(false);
         const tl = timelineFrames();
-        if (tl.length) showFrame((R.index + d + tl.length) % tl.length);
+        if (tl.length) { const n = (R.index + d + tl.length) % tl.length; showFrame(n, d > 0 && n !== 0); }
     }
 
     // ================= Formatting =================
@@ -2097,7 +2106,7 @@
             if (!activeOverlay(o.id)) { el.textContent = ''; return; }
             const frames = overlayFramesFor(o, f ? f.t : null);
             if (!frames.length) { el.textContent = (R.ovFrames[o.id] || []).length ? t('mapPrecipNoFrame') : ''; return; }
-            el.textContent = frames.length === 1 ? t('mapPrecipAt', { time: fmtTime(frames[0].t) })
+            el.textContent = frames.length === 1 ? t('mapOvImage', { time: fmtTime(frames[0].t) })
                 : t('mapOvImages', { n: frames.length, from: fmtTime(frames[0].t), to: fmtTime(frames[frames.length - 1].t) });
         });
     }
