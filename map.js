@@ -664,11 +664,15 @@
 
     // ================= Persistent settings =================
     const defaults = {
-        product: null, productAt: 0, sources: {}, opacity: 1, precipOn: false, precipOpacity: 0.85,
+        product: null, productAt: 0, sources: {}, opacity: 0.4, precipOn: false, precipOpacity: 0.4,
         basemap: 'osm', borders: true, windowH: 6, utc: true, speed: 1,
         view: null, region: 'ukraine', panelOpen: null, diagOpen: false, keyOpen: true, probe: true, probeOpen: true
     };
     const S = Object.assign({}, defaults, loadFromStorage(MAP_CONFIG.settingsKey, {}) || {});
+    // Opacity defaults to 40%; only a value the user actually set is kept
+    // (earlier versions stored the old 100% / 85% defaults unasked).
+    if (!S.opacitySet) S.opacity = defaults.opacity;
+    if (!S.precipOpacitySet) S.precipOpacity = defaults.precipOpacity;
     if (!MAP_CONFIG.windows.includes(S.windowH)) S.windowH = 6;
     if (!MAP_CONFIG.speeds.includes(S.speed)) S.speed = 1;
     if (!['osm', 'none'].includes(S.basemap)) S.basemap = 'osm';
@@ -1738,8 +1742,8 @@
             if (el.id === 'mapSlider') { play(false); showFrame(Number(el.value)); }
             else if (el.matches('[data-map-opacity]')) {
                 const v = Number(el.value);
-                if (el.dataset.mapOpacity === 'sat') { S.opacity = v; if (R.overlay) R.overlay.setOpacity(v); }
-                else { S.precipOpacity = v; if (R.precipOverlay) R.precipOverlay.setOpacity(v); }
+                if (el.dataset.mapOpacity === 'sat') { S.opacity = v; S.opacitySet = true; if (R.overlay) R.overlay.setOpacity(v); }
+                else { S.precipOpacity = v; S.precipOpacitySet = true; if (R.precipOverlay) R.precipOverlay.setOpacity(v); }
                 save();
             }
         });

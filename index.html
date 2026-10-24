@@ -68,9 +68,14 @@
             background: #475569;
         }
 
+        /* Forecast / Map switch: same size as the Refresh button. */
+        .view-btn { background: rgb(30 41 59 / 0.8); color: rgb(148 163 184); box-shadow: inset 0 0 0 1px rgb(51 65 85 / 0.8); }
+        .view-btn:hover { color: rgb(241 245 249); }
+        .view-btn.active { background: rgb(6 182 212 / 0.18); color: rgb(103 232 249); box-shadow: inset 0 0 0 1px rgb(6 182 212 / 0.7); }
         /* Phones: the Forecast / Map switch needs the room of the wordmark. */
         @media (max-width: 440px) {
             #appHeader { padding-left: 0.75rem; padding-right: 0.75rem; }
+            #appHeader > div { gap: 0.5rem; }
             #appHeader .brand-word { display: none; }
             #appHeader .lang-select { max-width: 6.75rem; }
         }
@@ -171,9 +176,9 @@
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3">
-            <div id="viewSwitch" class="seg" role="group" data-i18n-aria-label="viewSwitchLabel" aria-label="View">
-                <button type="button" data-view="forecast" data-i18n-title="viewForecast" title="Forecast"><i class="fa-solid fa-chart-area"></i><span class="hidden md:inline" data-i18n="viewForecast">Forecast</span></button>
-                <button type="button" data-view="map" data-i18n-title="viewMap" title="Satellite map"><i class="fa-solid fa-satellite"></i><span class="hidden md:inline" data-i18n="viewMap">Satellite map</span></button>
+            <div id="viewSwitch" class="flex items-center gap-1" role="group" data-i18n-aria-label="viewSwitchLabel" aria-label="View">
+                <button type="button" data-view="forecast" class="view-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs transition" data-i18n-title="viewForecast" title="Forecast"><i class="fa-solid fa-chart-area"></i><span class="hidden md:inline" data-i18n="viewForecast">Forecast</span></button>
+                <button type="button" data-view="map" class="view-btn flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs transition" data-i18n-title="viewMap" title="Satellite map"><i class="fa-solid fa-satellite"></i><span class="hidden md:inline" data-i18n="viewMap">Satellite map</span></button>
             </div>
             <div id="offlineBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950/60 border border-amber-800/50 text-xs text-amber-300 font-medium">
                 <i class="fa-solid fa-triangle-exclamation"></i>
