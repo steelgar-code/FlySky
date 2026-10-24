@@ -156,6 +156,16 @@
             height: 10px;
             border-radius: 2px;
         }
+
+        /* On/off switch (sr-only checkbox + this span), also used by map.js. */
+        .fs-switch { position: relative; width: 34px; height: 20px; border-radius: 9999px; background: #334155; transition: background 0.15s; flex-shrink: 0; }
+        .fs-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 9999px; background: #e2e8f0; transition: transform 0.15s; }
+        input:checked + .fs-switch { background: #06b6d4; }
+        input:checked + .fs-switch::after { transform: translateX(14px); background: #fff; }
+        input:focus-visible + .fs-switch { outline: 2px solid #22d3ee; outline-offset: 2px; }
+
+        /* Hour pinned on the main flight bar. */
+        #flightStrip [data-pinned] { box-shadow: inset 0 0 0 2px #f8fafc; }
     </style>
 </head>
 <body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
@@ -292,6 +302,8 @@
                     <i class="fa-solid fa-plane-departure text-emerald-400"></i>
                     <span data-i18n="flightTitle">Flight Conditions</span>
                 </h3>
+                <!-- Nearby lightning / rain (hazard.js) -->
+                <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
                 <div id="flightMain">
                     <div class="relative">
                         <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
@@ -430,6 +442,15 @@
                     <span data-i18n="minSlotLabel">Minimum window</span>
                     <select id="minSlotSelect" class="unit-select"></select>
                 </label>
+            </section>
+            <section class="space-y-2">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="hazardSettingsTitle">Nearby hazards</h3>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300 cursor-pointer select-none">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-bolt text-yellow-300 w-4 text-center"></i><span data-i18n="hazardSettingLabel">Lightning &amp; rain alerts</span></span>
+                    <input type="checkbox" id="hazardToggle" class="sr-only"><span class="fs-switch" aria-hidden="true"></span>
+                </label>
+                <p class="text-[11px] text-slate-500" data-i18n="hazardSettingDesc">A chip on the flight card when satellite data shows lightning or rain within 50 km of the forecast location.</p>
+                <p id="hazardStatus" class="text-[11px] text-slate-400"></p>
             </section>
             <button type="button" id="btnResetSettings" class="w-full py-2 rounded-xl border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">
                 <i class="fa-solid fa-rotate-left mr-1"></i> <span data-i18n="resetDefaults">Reset to defaults</span>
@@ -765,6 +786,11 @@
                 thrFrom: "Not suitable from",
                 thrError: "{name}: enter a valid number; the suitable limit must be lower than the not-suitable one.",
                 toastSettingsReset: "Settings reset to defaults",
+                hazardSettingsTitle: "Nearby hazards",
+                hazardSettingLabel: "Lightning & rain alerts",
+                hazardSettingDesc: "A chip on the flight card (and on the map) when satellite data shows lightning or rain within 50 km of the forecast location, with direction and, once a few images have been seen, how fast it is coming. Only the latest small EUMETSAT image is checked, every 5 min while the app is open.",
+                flightOnMap: "Map",
+                flightOnMapTitle: "Open the satellite map for this hour (later hours: latest image + forecast wind)",
                 ruleRainNone: "no rain chance",
                 ruleRainUpTo: "rain chance ≤ {r1}%",
                 ruleRainBetween: "rain chance above {r1}% and below {r2}%",
@@ -944,6 +970,11 @@
                 thrFrom: "Непридатно від",
                 thrError: "{name}: введіть коректне число; поріг «придатно» має бути нижчим за «непридатно».",
                 toastSettingsReset: "Налаштування скинуто до типових",
+                hazardSettingsTitle: "Небезпека поруч",
+                hazardSettingLabel: "Попередження про блискавки й опади",
+                hazardSettingDesc: "Позначка на картці польоту (і на карті), коли супутникові дані показують блискавки чи опади в межах 50 км від локації прогнозу — з напрямком і, після кількох знімків, швидкістю наближення. Перевіряється лише останній невеликий знімок EUMETSAT, кожні 5 хв, поки застосунок відкритий.",
+                flightOnMap: "Карта",
+                flightOnMapTitle: "Відкрити супутникову карту для цієї години (пізніші години: останній знімок + прогноз вітру)",
                 ruleRainNone: "без ймовірності опадів",
                 ruleRainUpTo: "ймовірність опадів ≤ {r1}%",
                 ruleRainBetween: "ймовірність опадів понад {r1}% і нижче {r2}%",
@@ -1123,6 +1154,11 @@
                 thrFrom: "Inadequado a partir de",
                 thrError: "{name}: insira um número válido; o limite adequado deve ser menor que o inadequado.",
                 toastSettingsReset: "Configurações restauradas",
+                hazardSettingsTitle: "Perigos próximos",
+                hazardSettingLabel: "Alertas de raios e chuva",
+                hazardSettingDesc: "Um aviso no cartão de voo (e no mapa) quando os dados de satélite mostram raios ou chuva a até 50 km do local da previsão, com a direção e, depois de algumas imagens, a velocidade de aproximação. Só a imagem pequena mais recente da EUMETSAT é verificada, a cada 5 min com o app aberto.",
+                flightOnMap: "Mapa",
+                flightOnMapTitle: "Abrir o mapa de satélite para esta hora (horas futuras: imagem mais recente + vento previsto)",
                 ruleRainNone: "sem chance de chuva",
                 ruleRainUpTo: "chance de chuva ≤ {r1}%",
                 ruleRainBetween: "chance de chuva acima de {r1}% e abaixo de {r2}%",
@@ -1254,6 +1290,7 @@
             renderAll();
             renderViewSwitch();
             if (window.FlySkyMap) window.FlySkyMap.onLangChange();
+            if (window.FlySkyHazard) window.FlySkyHazard.onLangChange();
         }
 
         // ================= Storage =================
@@ -1944,6 +1981,34 @@
                 <span class="text-slate-400">${escapeHtml(nextGood ? t('flightNextGood', { when: formatDayHour(nextGood.time) }) : t('flightNoGood'))}</span>`;
         }
 
+        // Hour pinned on the main bar (by its local time, so it survives the
+        // window moving on): its details stay put, with a button to the map.
+        let mainPin = null;
+
+        function mainDetailHtml(hover) {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            const pinned = mainPin ? hours.find(h => h.time === mainPin) : null;
+            if (!pinned) mainPin = null;
+            const shown = hover || pinned;
+            if (!shown) return flightSummaryHtml();
+            if (shown !== pinned) return flightHourText(shown);
+            return `${flightHourText(shown)} <button type="button" data-flight-map="${escapeHtml(shown.time)}" title="${escapeHtml(t('flightOnMapTitle'))}"
+                class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold align-middle transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>`;
+        }
+
+        function markMainPin() {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            const i = mainPin ? hours.findIndex(h => h.time === mainPin) : -1;
+            document.querySelectorAll('#flightStrip [data-flight-hour]').forEach(cell => cell.toggleAttribute('data-pinned', Number(cell.dataset.flightHour) === i));
+        }
+
+        // Satellite map at a forecast hour (local time of the location).
+        function openMapAt(localTime) {
+            const ms = localToUtcMs(localTime);
+            setView('map');
+            loadMapAssets().then(() => { if (window.FlySkyMap) window.FlySkyMap.showHour(ms); }).catch(() => {});
+        }
+
         function renderFlight() {
             const strip = document.getElementById('flightStrip');
             const detail = document.getElementById('flightDetail');
@@ -1974,7 +2039,8 @@
             if (factorPin && factorPin.i >= hours.length) factorPin = null;
             renderFactorDetail();
 
-            detail.innerHTML = flightSummaryHtml();
+            detail.innerHTML = mainDetailHtml();
+            markMainPin();
 
             const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
             // Thresholds in the current wind unit, without trailing zeros (8, not 8.0).
@@ -2074,17 +2140,27 @@
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(renderFlightAxis, 150);
             });
-            // Main bar: its own details line.
+            // Main bar: its own details line. Hover previews an hour; a click /
+            // tap pins it (again on the same hour to unpin).
             const main = document.getElementById('flightMain');
             const detail = document.getElementById('flightDetail');
-            const showMain = e => {
+            const hourAt = e => {
                 const cell = e.target.closest('[data-flight-hour]');
-                const h = cell && processed && processed.flight && processed.flight.hours[Number(cell.dataset.flightHour)];
-                if (h) detail.innerHTML = flightHourText(h);
+                return cell && processed && processed.flight ? processed.flight.hours[Number(cell.dataset.flightHour)] : null;
             };
-            main.addEventListener('mousemove', showMain);
-            main.addEventListener('click', showMain);
-            main.addEventListener('mouseleave', () => { detail.innerHTML = flightSummaryHtml(); });
+            main.addEventListener('mousemove', e => { const h = hourAt(e); if (h) detail.innerHTML = mainDetailHtml(h); });
+            main.addEventListener('click', e => {
+                const h = hourAt(e);
+                if (!h) return;
+                mainPin = mainPin === h.time ? null : h.time;
+                detail.innerHTML = mainDetailHtml(mainPin ? h : null);
+                markMainPin();
+            });
+            main.addEventListener('mouseleave', () => { detail.innerHTML = mainDetailHtml(); });
+            detail.addEventListener('click', e => {
+                const btn = e.target.closest('[data-flight-map]');
+                if (btn) openMapAt(btn.dataset.flightMap);
+            });
 
             // Breakdown bars: their own details block. Hover previews an hour;
             // click/tap pins it (tap again on the same cell to unpin).
@@ -3206,6 +3282,8 @@
             renderAll();
             loadForecast();
             if (window.FlySkyMap) window.FlySkyMap.onLocationChange();
+            if (window.FlySkyHazard) window.FlySkyHazard.onLocationChange();
+            else if (hazardEnabled()) loadHazard();
         }
 
         function toggleFavorite() {
@@ -3541,16 +3619,21 @@
             setupSettingsDrawer();
             setupOfflineIndicator();
             setupViewSwitch();
+            setupHazardToggle();
             processForecast();
             renderAll();
             loadForecast();
-            // Keep the 72-hour window sliding forward while the page stays open.
+            // Keep the 72-hour window sliding forward while the page stays
+            // open. Not while the map is shown: the forecast catches up when
+            // it is opened again (setView).
             setInterval(() => {
-                if (document.visibilityState === 'visible') loadForecast();
+                if (document.visibilityState === 'visible' && currentView === 'forecast') loadForecast();
             }, 10 * 60 * 1000);
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') loadForecast();
+                if (document.visibilityState === 'visible' && currentView === 'forecast') loadForecast();
             });
+            // Nearby-hazard alerts load once the forecast is on its way.
+            if (hazardEnabled()) setTimeout(loadHazard, 1500);
         });
 
         // ================= Forecast / satellite map view =================
@@ -3559,7 +3642,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=3';
+        const MAP_JS = 'map.js?v=4';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
@@ -3585,6 +3668,44 @@
             return mapAssetsPromise;
         }
 
+        // ---- Nearby-hazard alerts (hazard.js, loaded only while switched on)
+        const HAZARD_KEY = 'flysky_hazard';
+        const HAZARD_JS = 'hazard.js?v=1';
+        let hazardPromise = null;
+
+        function hazardEnabled() {
+            const s = loadFromStorage(HAZARD_KEY, null);
+            return !s || s.on !== false;
+        }
+
+        function loadHazard() {
+            if (!state.location || !hazardEnabled()) return Promise.resolve();
+            if (!hazardPromise) {
+                hazardPromise = loadAsset('script', { src: HAZARD_JS })
+                    .then(() => window.FlySkyHazard.start())
+                    .catch(err => { hazardPromise = null; console.error('FlySky: hazard alerts failed to load.', err); });
+            }
+            return hazardPromise;
+        }
+
+        // Shared by the settings menu here and the map's settings.
+        function setHazardEnabled(on) {
+            saveToStorage(HAZARD_KEY, { on: !!on });
+            document.getElementById('hazardToggle').checked = !!on;
+            if (window.FlySkyHazard) window.FlySkyHazard.setEnabled(on);
+            else if (on) loadHazard();
+            if (!on) {
+                document.getElementById('hazardChips').classList.add('hidden');
+                document.getElementById('hazardStatus').textContent = '';
+            }
+        }
+
+        function setupHazardToggle() {
+            const toggle = document.getElementById('hazardToggle');
+            toggle.checked = hazardEnabled();
+            toggle.addEventListener('change', () => setHazardEnabled(toggle.checked));
+        }
+
         function renderViewSwitch() {
             document.querySelectorAll('#viewSwitch [data-view]').forEach(btn => {
                 const on = btn.dataset.view === currentView;
@@ -3597,6 +3718,7 @@
 
         function setView(view) {
             if (!document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) setSettingsDrawer(false);
+            const fromMap = currentView === 'map';
             currentView = view === 'map' ? 'map' : 'forecast';
             saveToStorage(VIEW_KEY, currentView);
             const isMap = currentView === 'map';
@@ -3614,6 +3736,9 @@
                     });
             } else {
                 if (window.FlySkyMap) window.FlySkyMap.hide();
+                // Redraws with the current hour if the window has moved on
+                // (or fetches, if the forecast got old) while on the map.
+                if (fromMap) loadForecast();
                 resizeAllCharts();
             }
         }
