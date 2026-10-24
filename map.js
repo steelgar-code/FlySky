@@ -393,7 +393,7 @@
             mapProbePlaying: 'Pause the animation to read values',
             mapProbeLoading: 'Reading…',
             mapProbeError: 'could not read ({msg})',
-            mapGoForecast: 'Forecast here',
+            mapGoForecast: 'Set location',
             mapProbeCollapse: 'Collapse / expand',
             mapNow: 'latest available',
             mapProduct_auto: 'Auto (day / night)',
@@ -614,7 +614,7 @@
             mapProbePlaying: 'Поставте анімацію на паузу, щоб побачити значення',
             mapProbeLoading: 'Читаю…',
             mapProbeError: 'не вдалося прочитати ({msg})',
-            mapGoForecast: 'Прогноз тут',
+            mapGoForecast: 'Встановити локацію',
             mapProbeCollapse: 'Згорнути / розгорнути',
             mapNow: 'останнє доступне',
             mapProduct_auto: 'Авто (день / ніч)',
@@ -835,7 +835,7 @@
             mapProbePlaying: 'Pause a animação para ler os valores',
             mapProbeLoading: 'Lendo…',
             mapProbeError: 'não foi possível ler ({msg})',
-            mapGoForecast: 'Previsão aqui',
+            mapGoForecast: 'Definir local',
             mapProbeCollapse: 'Recolher / expandir',
             mapNow: 'mais recente',
             mapProduct_auto: 'Automático (dia / noite)',
@@ -869,9 +869,7 @@
             .fs-ring-label { font: 600 10px/1 Inter, system-ui, sans-serif; color: #f8fafc; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; white-space: nowrap; pointer-events: none; }
             .fs-fav { display: flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer; }
             .fs-fav i { color: #fbbf24; font-size: 12px; filter: drop-shadow(0 0 1.5px #020617) drop-shadow(0 0 1px #020617); }
-            .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }
-            .leaflet-top.leaflet-left .leaflet-control-scale { margin: 58px 0 0 12px; }
-            .leaflet-control-scale-line { background: rgba(15, 23, 42, 0.8); color: #e2e8f0; border-color: #e2e8f0; font: 600 10px/1.4 Inter, system-ui, sans-serif; }`;
+            .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }`;
         document.head.appendChild(st);
     })();
 
@@ -1678,6 +1676,9 @@
         else setOverlay('overlay', null);
         OVERLAYS.forEach(o => showOverlayFrames(o, activeOverlay(o.id) ? overlayFramesFor(o, f.t) : []));
         renderOverlayInfo();
+        // A nearby-hazard alert tracks movement from this image forward
+        // (like the frames themselves, never earlier ones).
+        if (window.FlySkyHazard) window.FlySkyHazard.track(tl.slice(R.index).map(x => x.t).filter(x => x !== null));
         // "Auto" switched product with this image: its colour key follows.
         if (R.shownProduct !== shownProduct()) { R.shownProduct = shownProduct(); renderPanel(); }
         if (windShown() && windHour() !== W.hour) updateWind();
@@ -1819,7 +1820,6 @@
             R.centeredLoc = locKey();
         } else if (S.view && S.view.center) map.setView(S.view.center, S.view.zoom);
         else fitRegion(MAP_CONFIG.regions.ukraine, false);
-        L.control.scale({ position: 'topleft', imperial: false, maxWidth: 110 }).addTo(map);
         setBasemap(S.basemap, true);
         updateLocationMarker();
         updatePlaces();
@@ -2902,7 +2902,7 @@
                 <span id="mapProbeCoord" class="font-mono text-slate-100 truncate"></span>
                 ${P.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i>' : ''}
                 <span class="flex-1"></span>
-                <button type="button" data-map-goforecast class="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 font-semibold"><i class="fa-solid fa-chart-area mr-1"></i>${h(t('mapGoForecast'))}</button>
+                <button type="button" data-map-goforecast class="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 font-semibold"><i class="fa-solid fa-location-dot mr-1"></i>${h(t('mapGoForecast'))}</button>
                 <button type="button" data-map-probemin class="shrink-0 w-6 h-6 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t('mapProbeCollapse'))}" aria-label="${h(t('mapProbeCollapse'))}" aria-expanded="${S.probeOpen}"><i class="fa-solid fa-chevron-down text-[10px] transition-transform" style="${S.probeOpen ? '' : 'transform: rotate(180deg)'}"></i></button>
             </div>
             ${S.probeOpen && rows ? `<div class="px-3 pb-2 space-y-1 leading-snug">${rows}</div>` : ''}`;
@@ -2953,6 +2953,16 @@
         renderStatus();
         const st = $('mapHazardStatus');
         if (st && window.FlySkyHazard) st.textContent = window.FlySkyHazard.statusText();
+    }
+
+    // Measures every lightning / precipitation image already loaded again
+    // (forecast location changed, or the alert started after they loaded).
+    function replayHazard() {
+        if (!R.built || !window.FlySkyHazard || R.requestMode !== 'fetch') return;
+        R.ovMeta.forEach((m, key) => {
+            const e = cache.get(key);
+            if (e && e.status === 'ok' && e.url) window.FlySkyHazard.feed(m.id === 'precip' ? 'rain' : m.id, m.layer, m.t, e.url, m.ext.bbox3857, m.ext.w, m.ext.h);
+        });
     }
 
     // Opens on the location with the overlay of that hazard switched on.
@@ -3022,7 +3032,7 @@
         if (document.visibilityState === 'visible' && R.visible) reloadFrames({ forceTimes: false });
     });
 
-    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, focusHazard, showHour, renderDrawer: () => renderPanel(),
+    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, replayHazard, focusHazard, showHour, renderDrawer: () => renderPanel(),
         // exposed for tests / diagnostics
         _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, W, cache } };
 })();
