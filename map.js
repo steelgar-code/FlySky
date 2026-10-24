@@ -869,7 +869,19 @@
             .fs-ring-label { font: 600 10px/1 Inter, system-ui, sans-serif; color: #f8fafc; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; white-space: nowrap; pointer-events: none; }
             .fs-fav { display: flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer; }
             .fs-fav i { color: #fbbf24; font-size: 12px; filter: drop-shadow(0 0 1.5px #020617) drop-shadow(0 0 1px #020617); }
-            .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }`;
+            .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }
+            /* Phones in landscape: timeline bottom-left, notes + readout in a
+               scrolling column bottom-right (left of the map buttons), so
+               the middle of the map (crosshair) stays clear. */
+            @media (max-height: 520px) and (orientation: landscape) {
+                #mapBar { left: 0.5rem; bottom: 0.5rem; transform: none; translate: none; width: min(26rem, calc(50vw - 1rem)); padding: 0.375rem; border-radius: 0.875rem; }
+                #mapBar #mapTicks { margin-bottom: 0.25rem; }
+                #mapBar button { width: 2rem; height: 2rem; }
+                #mapSide { left: auto; right: 3.5rem; bottom: 0.5rem; transform: none; translate: none; width: min(22rem, calc(50vw - 4.5rem)); max-height: calc(100% - 1rem); overflow-y: auto; pointer-events: auto; scrollbar-width: thin; }
+                #mapPanelBtn { top: 0.5rem; left: 0.5rem; }
+                #mapView .leaflet-top.leaflet-right .leaflet-control-zoom { margin-top: 0.5rem; }
+                #mapTools { top: 5rem; }
+            }`;
         document.head.appendChild(st);
     })();
 
@@ -1796,11 +1808,11 @@
                     <g stroke="#f8fafc" stroke-width="2" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
                 </svg>
             </div>
-            <div class="absolute top-[5.75rem] right-[10px] z-[500] flex flex-col gap-1.5">
+            <div id="mapTools" class="absolute top-[5.75rem] right-[10px] z-[500] flex flex-col gap-1.5">
                 <button type="button" id="mapProbeBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-crosshairs"></i></button>
                 <button type="button" id="mapCenterBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-location-dot"></i></button>
             </div>
-            <div class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
+            <div id="mapSide" class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
                 <div id="mapStatus" class="space-y-1.5"></div>
                 <div id="mapProbe" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
             </div>
