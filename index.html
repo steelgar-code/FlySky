@@ -372,20 +372,24 @@
 
     <!-- Satellite map view (EUMETSAT imagery); built by map.js, which is
          loaded together with Leaflet the first time the view is opened. -->
-    <div id="mapView" class="hidden flex-1 relative overflow-hidden bg-slate-950"></div>
+    <!-- "isolate": the map's own layers (crosshair, timeline …) stay below
+         the side menu and other page overlays. -->
+    <div id="mapView" class="hidden flex-1 relative isolate overflow-hidden bg-slate-950"></div>
 
     <!-- Settings drawer -->
     <div id="settingsOverlay" class="hidden fixed inset-0 z-[55] bg-slate-950/70 backdrop-blur-sm"></div>
     <aside id="settingsDrawer" class="fixed inset-y-0 left-0 z-[60] w-full max-w-sm bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col -translate-x-full transition-transform duration-200" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle" aria-hidden="true">
         <div class="h-16 px-5 flex items-center justify-between border-b border-slate-800 shrink-0">
             <h2 id="settingsDrawerTitle" class="font-semibold text-slate-100 flex items-center gap-2">
-                <i class="fa-solid fa-sliders text-cyan-400"></i> <span data-i18n="settingsTitle">Settings</span>
+                <i class="fa-solid fa-sliders text-cyan-400"></i> <span id="settingsDrawerTitleText" data-i18n="settingsTitle">Settings</span>
             </h2>
             <button type="button" id="btnSettingsClose" class="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" data-i18n-aria-label="closeLabel" aria-label="Close">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-        <div class="flex-1 overflow-y-auto p-5 space-y-6">
+        <!-- Map view: map.js renders its settings here instead. -->
+        <div id="drawerMap" class="hidden flex-1 overflow-y-auto p-5 space-y-6 text-xs text-slate-300"></div>
+        <div id="drawerForecast" class="flex-1 overflow-y-auto p-5 space-y-6">
             <section class="space-y-3">
                 <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="unitsTitle">Units</h3>
                 <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
@@ -2444,7 +2448,19 @@
 
         function setSettingsDrawer(open) {
             const drawer = document.getElementById('settingsDrawer');
-            if (open) renderSettingsDrawer();
+            // The menu shows forecast settings, or map settings in the map view.
+            const mapMode = currentView === 'map' && !!window.FlySkyMap;
+            document.getElementById('drawerForecast').classList.toggle('hidden', mapMode);
+            document.getElementById('drawerMap').classList.toggle('hidden', !mapMode);
+            const title = document.getElementById('settingsDrawerTitleText');
+            title.setAttribute('data-i18n', mapMode ? 'mapSettingsTitle' : 'settingsTitle');
+            title.textContent = t(mapMode ? 'mapSettingsTitle' : 'settingsTitle');
+            // Over the map the backdrop stays light, so changes show live.
+            const overlay = document.getElementById('settingsOverlay');
+            overlay.classList.toggle('bg-slate-950/70', !mapMode);
+            overlay.classList.toggle('backdrop-blur-sm', !mapMode);
+            overlay.classList.toggle('bg-slate-950/20', mapMode);
+            if (open) { if (mapMode) window.FlySkyMap.renderDrawer(); else renderSettingsDrawer(); }
             drawer.classList.toggle('-translate-x-full', !open);
             drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
             document.getElementById('settingsOverlay').classList.toggle('hidden', !open);
@@ -3543,7 +3559,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=1';
+        const MAP_JS = 'map.js?v=2';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
@@ -3580,6 +3596,7 @@
         }
 
         function setView(view) {
+            if (!document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) setSettingsDrawer(false);
             currentView = view === 'map' ? 'map' : 'forecast';
             saveToStorage(VIEW_KEY, currentView);
             const isMap = currentView === 'map';

@@ -47,7 +47,8 @@
         // are accumulated orbits updated every 1 h 40 min – 3 h, not suited
         // to a 6–12 h animation.
         // Background / boundary layers are never products.
-        excludeNamespaces: ['eps', 'mumi', 'backgrounds', 'osmgray'],
+        // Copernicus Sentinel-3 layers are polar passes (a few a day).
+        excludeNamespaces: ['eps', 'mumi', 'backgrounds', 'osmgray', 'copernicus'],
         // Boundary lines + coastline drawn on top of the imagery, in this
         // order of preference (white lines stay visible on every RGB).
         borders: [
@@ -71,11 +72,16 @@
             ukraine: [22, 44, 41, 53],
             europe: [-12, 34, 45, 63]
         },
-        // Key-free basemaps only (CARTO's tiles now need an API key).
+        // Key-free basemaps only (CARTO's tiles now need an API key; the
+        // EUMETView "osmgray" maps are mid-grey with country names only).
+        // "Dark" is the OSM map darkened in the browser (CSS filter).
         basemaps: {
-            osm: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19,
+            osmDark: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, className: 'fs-tiles-dark', background: '#1b2433',
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' },
+            osm: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, background: '#aad3df',
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors' }
         },
+        openMeteo: 'https://api.open-meteo.com/v1/forecast',
         eumetsatAttribution: '&copy; <a href="https://www.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a>'
     };
 
@@ -86,10 +92,22 @@
         // (EUMETSAT quick guide: "also sometimes referred to as the Fog RGB").
         { id: 'fog', role: 'night', icon: 'fa-smog', prefer: ['msg_fes:rgb_fog'],
           test: s => /rgb_fog|\bfog\b|night.?micro/i.test(s) && !/day.?micro/i.test(s) },
+        // True colour by day; at night low cloud blue, high cloud white.
+        { id: 'geocolour', role: 'any', icon: 'fa-globe',
+          test: s => /geo.?colou?r/i.test(s) },
         { id: 'dayMicro', role: 'day', icon: 'fa-sun', prefer: ['msg_fes:rgb_microphysics'],
           test: s => /micro/i.test(s) && !/night|24/i.test(s) },
+        // Low / mid / high cloud, and supercooled water (icing).
+        { id: 'cloudType', role: 'day', icon: 'fa-layer-group',
+          test: s => /cloud.?type/i.test(s) },
+        // Water vs ice cloud and droplet size.
+        { id: 'cloudPhase', role: 'day', icon: 'fa-droplet',
+          test: s => /cloud.?phase/i.test(s) },
         { id: 'natural', role: 'day', icon: 'fa-earth-europe',
           test: s => /natural.?colou?r|rgb_natural/i.test(s) },
+        // Cloud / clear land / clear sea, day and night (exact classes).
+        { id: 'clm', role: 'any', icon: 'fa-cloud', prefer: ['msg_fes:clm'],
+          test: s => /(^|:)clm\b|cloud.?mask/i.test(s) },
         // MSG measures at 10.8 µm, MTG's FCI at 10.5 µm.
         { id: 'ir108', role: 'any', icon: 'fa-temperature-half',
           test: s => /ir[_\s-]?10[._]?[58]|10[.,][58]\s*[µμ]?m/i.test(s) },
@@ -105,16 +123,136 @@
         dayMicro: { guide: GUIDE + 'day-microphysics-rgb-quick-guide',
             colors: ['#b4d878', '#8665ac', '#54a28c', '#e6661b', '#a34448', '#ce4698', '#5d9eba', '#064ab5'] },
         natural: { guide: GUIDE + 'natural-colour-rgb-quick-guide',
-            colors: ['#f2f2f2', '#dae3f4', '#6bd4c6', '#57f6da', '#7b8745', '#b99774', '#156c7d', '#131d29'] }
+            colors: ['#f2f2f2', '#dae3f4', '#6bd4c6', '#57f6da', '#7b8745', '#b99774', '#156c7d', '#131d29'] },
+        // Described by EUMETSAT (no colour chart): illustrative swatches, so
+        // the readout shows the pixel colour without matching it.
+        geocolour: { guide: GUIDE + 'limitations-of-mtg-geo-colour-rgb-for-low-clouds-over-western-cape', noMatch: true,
+            colors: ['#7fa6d6', '#dde1e7', '#141a26', '#f2c46b', '#f2f2f2', '#5d6b34', '#14233d'] },
+        cloudType: { guide: GUIDE + 'cloud-type-rgb-quick-guide',
+            colors: ['#8ffdec', '#45ad70', '#fefffe', '#cc3f8b', '#c50c00', '#ffff3e', '#5eff10', '#443799'] },
+        cloudPhase: { guide: GUIDE + 'cloud-phase-rgb-quick-guide',
+            colors: ['#ffeabf', '#feadcd', '#8d46a2', '#786547', '#7a9272', '#73e1fa', '#496ae4', '#592a23', '#000000', '#ffe429', '#3232a1'] },
+        // Exact class colours of the service's Cloud Mask style.
+        clm: { guide: 'https://user.eumetsat.int/data/map/EO:EUM:DAT:MSG:CLM', exact: true,
+            colors: ['#ffffff', '#01c001', '#0101ff'] }
     };
 
-    const PRECIP = { id: 'precip', prefer: ['mtg_fd:h40b', 'msg_fes:h60b'], test: s => /precip|rain.?rate/i.test(s) };
+    // Overlays drawn above the product, each with its own time steps:
+    //  - precipitation: the image nearest to the product's time;
+    //  - lightning: every image of the 30 min up to the product's time;
+    //  - fires: every image from the start of the window ("risk areas").
+    const OVERLAYS = [
+        { id: 'precip', icon: 'fa-cloud-showers-heavy', prefer: ['mtg_fd:h40b', 'msg_fes:h60b'], show: 'nearest',
+          test: s => /precip|rain.?rate/i.test(s) },
+        { id: 'lightning', icon: 'fa-bolt', prefer: ['mtg_fd:li_afa'], show: 30,
+          test: s => /li_afa|lightning|flash.?area/i.test(s) },
+        { id: 'fire', icon: 'fa-fire', prefer: ['mtg_fd:frp', 'msg_fes:fire'], show: 'window',
+          test: s => /(^|:)(frp|fire)$|fire.?radiative|active.?fire/i.test(s) && !/rgb/i.test(s) }
+    ];
+    const PRECIP = OVERLAYS[0];
+    // Readout: nearest lightning / fire within this distance.
+    const SCAN_KM = 50;
+
+    // Place names drawn above the imagery (no tile service needed):
+    // [lat, lon, rank, en, uk, pt]; rank 1 from zoom 4, 2 from 6, 3 from 7.
+    const PLACES = [
+        [50.45, 30.52, 1, 'Kyiv', 'Київ', 'Kiev'], [49.84, 24.03, 2, 'Lviv', 'Львів'], [49.99, 36.23, 2, 'Kharkiv', 'Харків', 'Carcóvia'],
+        [46.48, 30.72, 2, 'Odesa', 'Одеса', 'Odessa'], [48.46, 35.05, 2, 'Dnipro', 'Дніпро'], [47.84, 35.14, 2, 'Zaporizhzhia', 'Запоріжжя'],
+        [48.0, 37.8, 2, 'Donetsk', 'Донецьк'], [48.57, 39.31, 2, 'Luhansk', 'Луганськ'], [46.97, 32.0, 2, 'Mykolaiv', 'Миколаїв'],
+        [46.64, 32.61, 2, 'Kherson', 'Херсон'], [44.95, 34.1, 2, 'Simferopol', 'Сімферополь'], [44.62, 33.52, 3, 'Sevastopol', 'Севастополь'],
+        [49.59, 34.55, 2, 'Poltava', 'Полтава'], [50.91, 34.8, 2, 'Sumy', 'Суми'], [51.49, 31.29, 2, 'Chernihiv', 'Чернігів'],
+        [50.25, 28.66, 2, 'Zhytomyr', 'Житомир'], [49.23, 28.47, 2, 'Vinnytsia', 'Вінниця'], [49.42, 27.0, 2, 'Khmelnytskyi', 'Хмельницький'],
+        [49.55, 25.59, 2, 'Ternopil', 'Тернопіль'], [48.92, 24.71, 2, 'Ivano-Frankivsk', 'Івано-Франківськ'], [48.62, 22.29, 2, 'Uzhhorod', 'Ужгород'],
+        [48.29, 25.94, 2, 'Chernivtsi', 'Чернівці'], [50.75, 25.33, 2, 'Lutsk', 'Луцьк'], [50.62, 26.25, 2, 'Rivne', 'Рівне'],
+        [49.44, 32.06, 2, 'Cherkasy', 'Черкаси'], [48.51, 32.26, 2, 'Kropyvnytskyi', 'Кропивницький'], [47.91, 33.39, 3, 'Kryvyi Rih', 'Кривий Ріг'],
+        [47.1, 37.55, 3, 'Mariupol', 'Маріуполь'], [49.8, 30.11, 3, 'Bila Tserkva', 'Біла Церква'], [48.74, 37.58, 3, 'Kramatorsk', 'Краматорськ'],
+        [52.23, 21.01, 1, 'Warsaw', 'Варшава', 'Varsóvia'], [53.9, 27.56, 1, 'Minsk', 'Мінськ'], [47.01, 28.86, 1, 'Chișinău', 'Кишинів', 'Chisinau'],
+        [44.43, 26.1, 1, 'Bucharest', 'Бухарест', 'Bucareste'], [47.5, 19.04, 1, 'Budapest', 'Будапешт', 'Budapeste'], [48.15, 17.11, 1, 'Bratislava', 'Братислава'],
+        [54.69, 25.28, 1, 'Vilnius', 'Вільнюс'], [55.76, 37.62, 1, 'Moscow', 'Москва', 'Moscou'], [51.25, 22.57, 3, 'Lublin', 'Люблін'],
+        [50.04, 22.0, 3, 'Rzeszów', 'Жешув'], [50.06, 19.94, 2, 'Kraków', 'Краків', 'Cracóvia'], [52.1, 23.69, 3, 'Brest', 'Брест'],
+        [52.44, 30.98, 2, 'Homel', 'Гомель'], [50.6, 36.59, 2, 'Belgorod', 'Бєлгород'], [53.24, 34.36, 3, 'Bryansk', 'Брянськ'],
+        [51.73, 36.19, 3, 'Kursk', 'Курськ'], [47.23, 39.72, 2, 'Rostov-on-Don', 'Ростов-на-Дону', 'Rostov do Don'], [47.16, 27.59, 2, 'Iași', 'Ясси', 'Iasi']
+    ];
     const BORDERS = { id: 'borders', test: s => /boundar|border|coastline/i.test(s) };
 
     // ================= Translations =================
     const MAP_I18N = {
         en: {
             mapProductTitle: 'Satellite product',
+            mapSettingsTitle: 'Map settings',
+            mapProduct_geocolour: 'GeoColour (day & night)',
+            mapProduct_cloudType: 'Cloud Type RGB',
+            mapProduct_cloudPhase: 'Cloud Phase RGB',
+            mapProduct_clm: 'Cloud Mask',
+            mapKey_geocolour: [
+                'Night: low cloud / fog (blue)',
+                'Night: high cloud (white / grey)',
+                'Night: clear ground (dark)',
+                'Night: city lights',
+                'Day: cloud (white)',
+                'Day: land (green / brown)',
+                'Day: sea and lakes (dark blue)'
+            ],
+            mapKey_geocolour_note: 'True colour by day, infrared at night. It can miss some low cloud at night — check the Fog / Low Clouds RGB.',
+            mapKey_cloudType: [
+                'Low / mid-level water cloud (incl. fog)',
+                'Mixed-phase cloud, low / mid level',
+                'Supercooled water cloud — icing risk',
+                'High, thin water cloud (more orange with ice)',
+                'Thin cirrus',
+                'Thick ice cloud (multi-layer, ice on top)',
+                'Snow and ice on the ground',
+                'Land'
+            ],
+            mapKey_cloudType_note: 'Daytime only. Snow can look like low / mid ice cloud; colours vary with moisture.',
+            mapKey_cloudPhase: [
+                'Thick water cloud, small droplets (fog, stratus)',
+                'Thick water cloud, larger droplets',
+                'Thick water cloud, very large droplets or mixed phase',
+                'Thin water cloud over sea',
+                'Thin ice cloud',
+                'Thick ice cloud, small particles',
+                'Thick ice cloud, large particles',
+                'Vegetated land',
+                'Sea',
+                'Desert',
+                'Snow on the ground or sea ice'
+            ],
+            mapKey_cloudPhase_note: 'Daytime only. Thin clouds take on the colour of the surface below.',
+            mapKey_clm: ['Cloud (any height)', 'Clear — land', 'Clear — sea'],
+            mapKey_clm_note: 'Cloud of any height: use Fog / Low Clouds or Cloud Type to tell low cloud.',
+            mapSourceTitle: 'Source',
+            mapSat_msg_fes: 'Meteosat MSG · 0°',
+            mapSat_mtg_fd: 'Meteosat MTG · 0°',
+            mapSat_msg_rss: 'MSG Rapid Scan · Europe',
+            mapSat_msg_iodc: 'MSG · Indian Ocean',
+            mapEvery: 'every {n} min',
+            mapEnhanced: 'enhanced',
+            mapOverlaysTitle: 'Overlays',
+            mapOv_precip: 'Precipitation',
+            mapOv_lightning: 'Lightning',
+            mapOv_fire: 'Fires',
+            mapOvKind_lightning: 'Flashes seen by MTG’s Lightning Imager during the 30 min up to each image.',
+            mapOvKind_fire: 'Fires and hot spots detected by satellite, from the start of the animation window up to each image — shows active risk areas. Smoke can lower visibility.',
+            mapOvNone: 'Not offered by the service.',
+            mapOvImages: '{n} images · {from} – {to}',
+            mapOv_wind: 'Forecast wind',
+            mapWindLevel_10m: '10 m',
+            mapWindLevel_925: '~800 m (925 hPa)',
+            mapWindKind: 'Model forecast (Open-Meteo) for the hour of the image. Arrows point where the wind blows; colour follows your flight thresholds.',
+            mapWindAt: 'Wind for {time}',
+            mapWindErr: 'Wind forecast unavailable ({msg})',
+            mapBase_osmDark: 'Dark',
+            mapLabels: 'Place names on top',
+            mapProbeLightning: 'Lightning',
+            mapProbeFire: 'Fires',
+            mapProbeNearest: '{d} km {dir} · {time}',
+            mapProbeNoneWithin: 'none within {r} km',
+            mapProbeWind: 'Wind (model)',
+            mapProbeWindValue: 'from {dir} · {w} {u}, gusts {g} {u}',
+            mapProbeClass: '{label} · exact',
+            mapProbePixel: 'pixel colour — see the colour key',
+            mapCompass: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
             mapKeyTitle: 'Colour key',
             mapKeySource: 'EUMETSAT quick guide',
             mapKeyAngle: 'Colours also vary with viewing angle, season and latitude.',
@@ -251,6 +389,80 @@
         },
         uk: {
             mapProductTitle: 'Супутниковий продукт',
+            mapSettingsTitle: 'Налаштування карти',
+            mapProduct_geocolour: 'GeoColour (день і ніч)',
+            mapProduct_cloudType: 'Тип хмар RGB',
+            mapProduct_cloudPhase: 'Фаза хмар RGB',
+            mapProduct_clm: 'Маска хмарності',
+            mapKey_geocolour: [
+                'Ніч: низька хмарність / туман (синій)',
+                'Ніч: висока хмарність (білий / сірий)',
+                'Ніч: безхмарна поверхня (темна)',
+                'Ніч: вогні міст',
+                'День: хмари (білі)',
+                'День: суходіл (зелений / коричневий)',
+                'День: море та озера (темно-сині)'
+            ],
+            mapKey_geocolour_note: 'Удень — природні кольори, вночі — інфрачервоний. Вночі може пропускати частину низької хмарності — перевіряйте на «Туман / низька хмарність».',
+            mapKey_cloudType: [
+                'Водяна хмарність нижнього / середнього ярусу (зокрема туман)',
+                'Змішана хмарність нижнього / середнього ярусу',
+                'Переохолоджена водяна хмарність — ризик обмерзання',
+                'Висока тонка водяна хмарність (оранжевіша з льодом)',
+                'Тонкі перисті хмари',
+                'Щільна льодяна хмарність (багатошарова, лід угорі)',
+                'Сніг і лід на поверхні',
+                'Суходіл'
+            ],
+            mapKey_cloudType_note: 'Лише вдень. Сніг схожий на льодяну хмарність нижнього / середнього ярусу; кольори залежать від вологості.',
+            mapKey_cloudPhase: [
+                'Щільна водяна хмарність, дрібні краплі (туман, шаруваті)',
+                'Щільна водяна хмарність, більші краплі',
+                'Щільна водяна хмарність, дуже великі краплі або змішана фаза',
+                'Тонка водяна хмарність над морем',
+                'Тонка льодяна хмарність',
+                'Щільна льодяна хмарність, дрібні частинки',
+                'Щільна льодяна хмарність, великі частинки',
+                'Суходіл із рослинністю',
+                'Море',
+                'Пустеля',
+                'Сніг на поверхні або морський лід'
+            ],
+            mapKey_cloudPhase_note: 'Лише вдень. Тонкі хмари набувають кольору поверхні під ними.',
+            mapKey_clm: ['Хмарність (будь-якої висоти)', 'Ясно — суходіл', 'Ясно — море'],
+            mapKey_clm_note: 'Хмарність будь-якої висоти: низьку визначайте за «Туман / низька хмарність» або «Тип хмар».',
+            mapSourceTitle: 'Джерело',
+            mapSat_msg_fes: 'Meteosat MSG · 0°',
+            mapSat_mtg_fd: 'Meteosat MTG · 0°',
+            mapSat_msg_rss: 'MSG швидке сканування · Європа',
+            mapSat_msg_iodc: 'MSG · Індійський океан',
+            mapEvery: 'кожні {n} хв',
+            mapEnhanced: 'посилений',
+            mapOverlaysTitle: 'Накладання',
+            mapOv_precip: 'Опади',
+            mapOv_lightning: 'Блискавки',
+            mapOv_fire: 'Пожежі',
+            mapOvKind_lightning: 'Спалахи, зафіксовані блискавковим сенсором MTG за 30 хв до кожного знімка.',
+            mapOvKind_fire: 'Пожежі та гарячі точки, виявлені супутником, від початку вікна анімації до кожного знімка — показує активні зони ризику. Дим може погіршувати видимість.',
+            mapOvNone: 'Сервіс не надає.',
+            mapOvImages: '{n} знімків · {from} – {to}',
+            mapOv_wind: 'Прогноз вітру',
+            mapWindLevel_10m: '10 м',
+            mapWindLevel_925: '~800 м (925 гПа)',
+            mapWindKind: 'Прогноз моделі (Open-Meteo) на годину знімка. Стрілки показують, куди дме вітер; колір — за вашими порогами польоту.',
+            mapWindAt: 'Вітер на {time}',
+            mapWindErr: 'Прогноз вітру недоступний ({msg})',
+            mapBase_osmDark: 'Темна',
+            mapLabels: 'Назви місць зверху',
+            mapProbeLightning: 'Блискавки',
+            mapProbeFire: 'Пожежі',
+            mapProbeNearest: '{d} км {dir} · {time}',
+            mapProbeNoneWithin: 'немає в межах {r} км',
+            mapProbeWind: 'Вітер (модель)',
+            mapProbeWindValue: 'з {dir} · {w} {u}, пориви {g} {u}',
+            mapProbeClass: '{label} · точно',
+            mapProbePixel: 'колір пікселя — див. пояснення кольорів',
+            mapCompass: ['Пн', 'ПнСх', 'Сх', 'ПдСх', 'Пд', 'ПдЗх', 'Зх', 'ПнЗх'],
             mapKeyTitle: 'Пояснення кольорів',
             mapKeySource: 'Довідник EUMETSAT',
             mapKeyAngle: 'Кольори також залежать від кута огляду, сезону та широти.',
@@ -387,6 +599,80 @@
         },
         'pt-BR': {
             mapProductTitle: 'Produto de satélite',
+            mapSettingsTitle: 'Ajustes do mapa',
+            mapProduct_geocolour: 'GeoColour (dia e noite)',
+            mapProduct_cloudType: 'Tipo de nuvem RGB',
+            mapProduct_cloudPhase: 'Fase da nuvem RGB',
+            mapProduct_clm: 'Máscara de nuvens',
+            mapKey_geocolour: [
+                'Noite: nuvem baixa / nevoeiro (azul)',
+                'Noite: nuvem alta (branco / cinza)',
+                'Noite: solo sem nuvens (escuro)',
+                'Noite: luzes das cidades',
+                'Dia: nuvens (brancas)',
+                'Dia: terra (verde / marrom)',
+                'Dia: mar e lagos (azul-escuro)'
+            ],
+            mapKey_geocolour_note: 'Cor verdadeira de dia, infravermelho à noite. À noite pode perder parte das nuvens baixas — confira no Nevoeiro / Nuvens baixas RGB.',
+            mapKey_cloudType: [
+                'Nuvem de água baixa / média (inclui nevoeiro)',
+                'Nuvem de fase mista, baixa / média',
+                'Nuvem de água super-resfriada — risco de gelo',
+                'Nuvem de água alta e fina (mais laranja com gelo)',
+                'Cirrus fino',
+                'Nuvem de gelo espessa (várias camadas, gelo no topo)',
+                'Neve e gelo no solo',
+                'Terra'
+            ],
+            mapKey_cloudType_note: 'Só de dia. A neve pode parecer nuvem de gelo baixa / média; as cores variam com a umidade.',
+            mapKey_cloudPhase: [
+                'Nuvem de água espessa, gotas pequenas (nevoeiro, estrato)',
+                'Nuvem de água espessa, gotas maiores',
+                'Nuvem de água espessa, gotas muito grandes ou fase mista',
+                'Nuvem de água fina sobre o mar',
+                'Nuvem de gelo fina',
+                'Nuvem de gelo espessa, partículas pequenas',
+                'Nuvem de gelo espessa, partículas grandes',
+                'Terra com vegetação',
+                'Mar',
+                'Deserto',
+                'Neve no solo ou gelo marinho'
+            ],
+            mapKey_cloudPhase_note: 'Só de dia. Nuvens finas assumem a cor da superfície abaixo.',
+            mapKey_clm: ['Nuvem (qualquer altura)', 'Céu limpo — terra', 'Céu limpo — mar'],
+            mapKey_clm_note: 'Nuvem de qualquer altura: use Nevoeiro / Nuvens baixas ou Tipo de nuvem para ver as baixas.',
+            mapSourceTitle: 'Fonte',
+            mapSat_msg_fes: 'Meteosat MSG · 0°',
+            mapSat_mtg_fd: 'Meteosat MTG · 0°',
+            mapSat_msg_rss: 'MSG Varredura rápida · Europa',
+            mapSat_msg_iodc: 'MSG · Oceano Índico',
+            mapEvery: 'a cada {n} min',
+            mapEnhanced: 'realçado',
+            mapOverlaysTitle: 'Sobreposições',
+            mapOv_precip: 'Precipitação',
+            mapOv_lightning: 'Raios',
+            mapOv_fire: 'Incêndios',
+            mapOvKind_lightning: 'Descargas vistas pelo Lightning Imager do MTG nos 30 min até cada imagem.',
+            mapOvKind_fire: 'Incêndios e pontos quentes detectados por satélite, do início da janela de animação até cada imagem — mostra áreas de risco ativas. A fumaça pode reduzir a visibilidade.',
+            mapOvNone: 'Não oferecido pelo serviço.',
+            mapOvImages: '{n} imagens · {from} – {to}',
+            mapOv_wind: 'Vento previsto',
+            mapWindLevel_10m: '10 m',
+            mapWindLevel_925: '~800 m (925 hPa)',
+            mapWindKind: 'Previsão de modelo (Open-Meteo) para a hora da imagem. As setas apontam para onde o vento sopra; a cor segue seus limites de voo.',
+            mapWindAt: 'Vento para {time}',
+            mapWindErr: 'Previsão de vento indisponível ({msg})',
+            mapBase_osmDark: 'Escuro',
+            mapLabels: 'Nomes de lugares por cima',
+            mapProbeLightning: 'Raios',
+            mapProbeFire: 'Incêndios',
+            mapProbeNearest: '{d} km {dir} · {time}',
+            mapProbeNoneWithin: 'nenhum a até {r} km',
+            mapProbeWind: 'Vento (modelo)',
+            mapProbeWindValue: 'de {dir} · {w} {u}, rajadas {g} {u}',
+            mapProbeClass: '{label} · exato',
+            mapProbePixel: 'cor do pixel — veja a legenda de cores',
+            mapCompass: ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'],
             mapKeyTitle: 'Legenda de cores',
             mapKeySource: 'Guia rápido da EUMETSAT',
             mapKeyAngle: 'As cores também variam com o ângulo de visada, a estação e a latitude.',
@@ -526,6 +812,25 @@
         if (translations[lang]) Object.assign(translations[lang], MAP_I18N[lang]);
     });
 
+    // Map-only styles (dark tiles, place names, wind arrows, switches).
+    (() => {
+        const st = document.createElement('style');
+        st.textContent = `
+            .fs-tiles-dark img.leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.5); }
+            .fs-place { display: flex; align-items: center; gap: 4px; white-space: nowrap; pointer-events: none; }
+            .fs-place-dot { width: 5px; height: 5px; border-radius: 9999px; background: #f8fafc; box-shadow: 0 0 0 1.5px #020617; flex-shrink: 0; }
+            .fs-place-name { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #f1f5f9; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }
+            .fs-place-major { font-size: 12.5px; letter-spacing: 0.01em; }
+            .fs-wind { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+            .fs-wind span { font: 700 10px/1 Inter, system-ui, sans-serif; color: #f8fafc; text-shadow: 0 0 3px #020617, 0 0 2px #020617; margin-top: 1px; }
+            .fs-switch { position: relative; width: 34px; height: 20px; border-radius: 9999px; background: #334155; transition: background 0.15s; flex-shrink: 0; }
+            .fs-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 9999px; background: #e2e8f0; transition: transform 0.15s; }
+            input:checked + .fs-switch { background: #06b6d4; }
+            input:checked + .fs-switch::after { transform: translateX(14px); background: #fff; }
+            input:focus-visible + .fs-switch { outline: 2px solid #22d3ee; outline-offset: 2px; }`;
+        document.head.appendChild(st);
+    })();
+
     // ================= Small helpers =================
     const $ = id => document.getElementById(id);
     const h = escapeHtml;
@@ -663,20 +968,34 @@
     }
 
     // ================= Persistent settings =================
+    // Lightning and fire marks are small, so they start fully visible; the
+    // imagery and precipitation start at 40%.
+    const OV_DEFAULT_OPACITY = { precip: 0.4, lightning: 0.9, fire: 0.9 };
     const defaults = {
-        product: null, productAt: 0, sources: {}, opacity: 0.4, precipOn: false, precipOpacity: 0.4,
-        basemap: 'osm', borders: true, windowH: 6, utc: true, speed: 1,
-        view: null, region: 'ukraine', panelOpen: null, diagOpen: false, keyOpen: true, probe: true, probeOpen: true
+        product: null, productAt: 0, sources: {}, opacity: 0.4,
+        overlays: { precip: { on: false, opacity: 0.4 }, lightning: { on: false, opacity: 0.9 }, fire: { on: false, opacity: 0.9 } },
+        wind: { on: false, level: '10m' },
+        basemap: 'osmDark', labels: true, borders: true, windowH: 6, utc: true, speed: 1,
+        view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true
     };
-    const S = Object.assign({}, defaults, loadFromStorage(MAP_CONFIG.settingsKey, {}) || {});
-    // Opacity defaults to 40%; only a value the user actually set is kept
-    // (earlier versions stored the old 100% / 85% defaults unasked).
+    const stored = loadFromStorage(MAP_CONFIG.settingsKey, {}) || {};
+    const S = Object.assign({}, defaults, stored);
+    S.overlays = {};
+    OVERLAYS.forEach(o => { S.overlays[o.id] = Object.assign({}, defaults.overlays[o.id], (stored.overlays || {})[o.id]); });
+    S.wind = Object.assign({}, defaults.wind, stored.wind);
+    // Earlier versions kept precipitation settings at the top level.
+    if (stored.precipOn !== undefined) S.overlays.precip.on = !!stored.precipOn;
+    if (stored.precipOpacitySet) { S.overlays.precip.opacity = stored.precipOpacity; S.overlays.precip.opacitySet = true; }
+    ['precipOn', 'precipOpacity', 'precipOpacitySet', 'panelOpen'].forEach(k => delete S[k]);
+    // Defaults only apply until the user changes a value (earlier versions
+    // stored their defaults unasked).
     if (!S.opacitySet) S.opacity = defaults.opacity;
-    if (!S.precipOpacitySet) S.precipOpacity = defaults.precipOpacity;
+    OVERLAYS.forEach(o => { if (!S.overlays[o.id].opacitySet) S.overlays[o.id].opacity = OV_DEFAULT_OPACITY[o.id]; });
+    if (!S.basemapSet) S.basemap = defaults.basemap;
     if (!MAP_CONFIG.windows.includes(S.windowH)) S.windowH = 6;
     if (!MAP_CONFIG.speeds.includes(S.speed)) S.speed = 1;
-    if (!['osm', 'none'].includes(S.basemap)) S.basemap = 'osm';
-    delete S.labels;
+    if (!MAP_CONFIG.basemaps[S.basemap] && S.basemap !== 'none') S.basemap = defaults.basemap;
+    if (!['10m', '925'].includes(S.wind.level)) S.wind.level = '10m';
     let savedRegions = loadFromStorage(MAP_CONFIG.regionsKey, []);
     if (!Array.isArray(savedRegions)) savedRegions = [];
     const save = () => saveToStorage(MAP_CONFIG.settingsKey, S);
@@ -689,12 +1008,15 @@
         catalogError: '',
         resolved: {},             // productId -> [layer, ...] ordered
         precipLayers: [], borderLayers: [],
+        ovLayers: {},             // overlayId -> [layer, ...] ordered
+        ovFrames: {},             // overlayId -> [{ t, key, url }]
+        ovShown: {},              // overlayId -> Map(frameKey -> L.imageOverlay)
+        ovWant: {},               // overlayId -> Set(frameKey) for the shown time
         times: {},                // layerName -> { at, list:[ms], ok, error }
         frames: [],               // [{ t, key }]
-        precipFrames: [],
         index: -1, playing: false, playTimer: null,
         extent: null,             // { key, bounds, bbox3857, w, h }
-        overlay: null, precipOverlay: null, bordersLayer: null, baseLayer: null, locMarker: null,
+        overlay: null, bordersLayer: null, baseLayer: null, locMarker: null, labelsLayer: null,
         lastOk: null, lastError: null, requestMode: 'fetch', fetchWorked: false,
         refreshTimer: null, moveTimer: null, drawing: null, gen: 0
     };
@@ -762,7 +1084,7 @@
 
     function evict() {
         if (cache.size <= MAP_CONFIG.cacheLimit) return;
-        const inUse = new Set(R.frames.map(f => f.key).concat(R.precipFrames.map(f => f.key)));
+        const inUse = new Set(R.frames.map(f => f.key).concat(...Object.values(R.ovFrames).map(l => l.map(f => f.key))));
         for (const [key, e] of cache) {
             if (cache.size <= MAP_CONFIG.cacheLimit) break;
             if (inUse.has(key) || e.status === 'loading' || e.status === 'queued') continue;
@@ -890,8 +1212,19 @@
         return MAP_CONFIG.excludeNamespaces.includes(String(name).split(':')[0].toLowerCase());
     }
 
+    // Update interval in minutes, from "start/end/PT10M" or a value list.
+    function stepMinutes(values) {
+        const m = /\/(P[^,\/\s]*)\s*$/.exec(String(values || '').trim());
+        if (m) return Math.round(isoDurationMs(m[1]) / 60000) || null;
+        const list = parseTimeDimension(values).slice(-6);
+        if (list.length < 2) return null;
+        const diffs = list.slice(1).map((v, i) => v - list[i]).sort((a, b) => a - b);
+        return Math.round(diffs[Math.floor(diffs.length / 2)] / 60000) || null;
+    }
+
     function slimLayer(l) {
-        return { name: l.name, title: l.title, abstract: l.abstract, bbox: l.bbox, styles: l.styles, crs3857: l.crs3857, hasTime: !!l.time };
+        return { name: l.name, title: l.title, abstract: l.abstract, bbox: l.bbox, styles: l.styles, crs3857: l.crs3857, hasTime: !!l.time,
+            step: l.time ? stepMinutes(l.time.values) : null };
     }
 
     function matchCatalog(layers) {
@@ -901,7 +1234,8 @@
             const s = `${l.name} ${l.title}`;
             if (BORDERS.test(s) && !l.time) { add(l); return; }
             if (excluded(l.name)) return;
-            if (PRODUCTS.some(p => (p.prefer || []).includes(l.name) || p.test(s)) || PRECIP.test(s) || BORDERS.test(s)) add(l);
+            const hit = x => (x.prefer || []).includes(l.name) || x.test(s);
+            if (PRODUCTS.some(hit) || OVERLAYS.some(hit) || BORDERS.test(s)) add(l);
         });
         return [...keep.values()];
     }
@@ -983,8 +1317,11 @@
             list.sort((a, b) => sourceRank(a, p, region) - sourceRank(b, p, region) || a.name.localeCompare(b.name));
             R.resolved[p.id] = list;
         });
-        R.precipLayers = layers.filter(l => PRECIP.test(`${l.name} ${l.title}`) && l.hasTime)
-            .sort((a, b) => sourceRank(a, PRECIP, region) - sourceRank(b, PRECIP, region) || a.name.localeCompare(b.name));
+        OVERLAYS.forEach(o => {
+            R.ovLayers[o.id] = layers.filter(l => l.hasTime && ((o.prefer || []).includes(l.name) || o.test(`${l.name} ${l.title}`)))
+                .sort((a, b) => sourceRank(a, o, region) - sourceRank(b, o, region) || a.name.localeCompare(b.name));
+        });
+        R.precipLayers = R.ovLayers.precip;
         // Preferred boundary/coastline layers with their white-line style;
         // otherwise any boundary layer the service offers, default style.
         const byName = new Map(all.map(l => [l.name, l]));
@@ -1007,8 +1344,22 @@
         return list.find(l => l.name === S.sources[S.product]) || list[0] || null;
     }
 
-    function activePrecipLayer() {
-        return S.precipOn ? (R.precipLayers.find(l => l.name === S.sources.precip) || R.precipLayers[0] || null) : null;
+    function overlayLayer(id) {
+        const list = R.ovLayers[id] || [];
+        return list.find(l => l.name === S.sources[id]) || list[0] || null;
+    }
+
+    function activeOverlay(id) {
+        return S.overlays[id] && S.overlays[id].on ? overlayLayer(id) : null;
+    }
+
+    function activeOverlays() {
+        return OVERLAYS.filter(o => activeOverlay(o.id));
+    }
+
+    // Without a product, the first enabled overlay drives the timeline.
+    function drivingOverlay() {
+        return activeLayer() ? null : activeOverlays()[0] || null;
     }
 
     // ================= Day / night =================
@@ -1021,7 +1372,7 @@
     function suggestedProduct() {
         const has = id => (R.resolved[id] || []).length > 0;
         const sun = sunState();
-        const order = sun === 'day' ? ['dayMicro', 'natural', 'fog', 'ir108'] : sun === 'night' ? ['fog', 'ir108', 'dayMicro'] : ['fog', 'dayMicro', 'ir108'];
+        const order = sun === 'day' ? ['dayMicro', 'geocolour', 'natural', 'fog', 'ir108'] : sun === 'night' ? ['fog', 'geocolour', 'ir108', 'dayMicro'] : ['geocolour', 'fog', 'dayMicro', 'ir108'];
         return order.find(has) || PRODUCTS.map(p => p.id).find(has) || 'fog';
     }
 
@@ -1062,32 +1413,38 @@
         const ext = R.extent;
         if (!ext) return;
         const layer = activeLayer();
-        const precip = activePrecipLayer();
+        const overlays = activeOverlays().map(o => ({ o, layer: activeOverlay(o.id) }));
         const winMs = S.windowH * 3600e3;
 
-        const [satTimes, precipTimes] = await Promise.all([
+        const [satTimes, ...ovTimes] = await Promise.all([
             layer ? refreshTimes(layer.name, opts.forceTimes) : null,
-            precip ? refreshTimes(precip.name, opts.forceTimes) : null
+            ...overlays.map(x => refreshTimes(x.layer.name, opts.forceTimes))
         ]);
         if (gen !== R.gen) return;
 
-        const pick = info => {
+        const pick = (info, fromMs) => {
             if (!info || !info.list.length) return info && (info.noTime || !info.ok) ? [null] : [];
             const latest = info.list[info.list.length - 1];
-            return info.list.filter(v => v >= latest - winMs);
+            return info.list.filter(v => v >= (fromMs ?? latest - winMs));
         };
         const satList = layer ? pick(satTimes) : [];
-        const precipList = precip ? pick(precipTimes) : [];
+        const prevT = timelineFrames()[R.index] ? timelineFrames()[R.index].t : undefined;
+        const wasLatest = R.index === timelineFrames().length - 1;
+
         const satStyle = layer ? styleOf(layer) : '';
-        const precipStyle = precip ? styleOf(precip) : '';
-        const prevT = R.frames[R.index] ? R.frames[R.index].t : undefined;
-        const wasLatest = R.index === R.frames.length - 1;
+        R.frames = satList.map(tm => ({ t: tm, key: frameKey(layer.name, satStyle, tm, ext, MAP_CONFIG.format), url: getMapUrl(layer.name, satStyle, tm, ext, MAP_CONFIG.format) }));
+        // Overlay steps cover the product's window, plus 30 min before it
+        // for lightning (each image shows the previous 30 min).
+        const windowStart = satList.length && satList[0] !== null ? satList[0] : null;
+        R.ovFrames = {};
+        overlays.forEach((x, i) => {
+            const extra = typeof x.o.show === 'number' ? x.o.show * 60e3 : x.o.show === 'nearest' ? 30 * 60e3 : 0;
+            const list = pick(ovTimes[i], windowStart === null ? undefined : windowStart - extra);
+            const style = styleOf(x.layer);
+            R.ovFrames[x.o.id] = list.map(tm => ({ t: tm, key: frameKey(x.layer.name, style, tm, ext, MAP_CONFIG.overlayFormat), url: getMapUrl(x.layer.name, style, tm, ext, MAP_CONFIG.overlayFormat) }));
+        });
 
-        const satFmt = MAP_CONFIG.format, precipFmt = MAP_CONFIG.overlayFormat;
-        R.frames = satList.map(tm => ({ t: tm, key: frameKey(layer.name, satStyle, tm, ext, satFmt), url: getMapUrl(layer.name, satStyle, tm, ext, satFmt) }));
-        R.precipFrames = precipList.map(tm => ({ t: tm, key: frameKey(precip.name, precipStyle, tm, ext, precipFmt), url: getMapUrl(precip.name, precipStyle, tm, ext, precipFmt) }));
-
-        const wanted = new Set(R.frames.map(f => f.key).concat(R.precipFrames.map(f => f.key)));
+        const wanted = new Set(R.frames.map(f => f.key).concat(...Object.values(R.ovFrames).map(l => l.map(f => f.key))));
         cancelExcept(wanted);
         // Opens on the latest image; only it is loaded until another time
         // is picked (showFrame() then loads from there forward).
@@ -1100,15 +1457,15 @@
     }
 
     // Frames needed once frame `from` is selected: that frame, then every
-    // later one up to the latest (with their precipitation frames).
+    // later one up to the latest (with the overlay images each one shows).
     function framesFrom(from) {
         const tl = timelineFrames();
-        const withPrecip = !!(activeLayer() && activePrecipLayer());
+        const ovs = activeOverlays();
         const out = [], seen = new Set();
         const add = f => { if (f && !seen.has(f.key)) { seen.add(f.key); out.push(f); } };
         for (let i = Math.max(0, from); i < tl.length; i++) {
             add(tl[i]);
-            if (withPrecip) add(precipFrameFor(tl[i].t));
+            ovs.forEach(o => overlayFramesFor(o, tl[i].t).forEach(add));
         }
         return out;
     }
@@ -1136,25 +1493,33 @@
         return '';   // server default
     }
 
-    // The timeline follows the satellite product, or the precipitation
-    // layer when no product is selected.
+    // The timeline follows the satellite product, or the first enabled
+    // overlay when no product is selected.
     function timelineFrames() {
-        return activeLayer() ? R.frames : R.precipFrames;
+        if (activeLayer()) return R.frames;
+        const d = drivingOverlay();
+        return d ? R.ovFrames[d.id] || [] : [];
     }
 
-    function precipFrameFor(tm) {
-        if (!R.precipFrames.length || tm === null || tm === undefined) return R.precipFrames[R.precipFrames.length - 1] || null;
-        let best = null;
-        R.precipFrames.forEach(f => {
-            if (f.t === null) return;
-            if (f.t <= tm + 5 * 60e3 && tm - f.t <= 30 * 60e3 && (!best || Math.abs(f.t - tm) < Math.abs(best.t - tm))) best = f;
-        });
-        return best;
+    // Overlay images shown with a product image taken at `tm`.
+    function overlayFramesFor(o, tm) {
+        const list = R.ovFrames[o.id] || [];
+        if (!list.length) return [];
+        if (tm === null || tm === undefined) tm = list[list.length - 1].t;
+        if (tm === null) return [list[list.length - 1]];
+        const upTo = f => f.t !== null && f.t <= tm + 5 * 60e3;
+        if (o.show === 'nearest') {
+            let best = null;
+            list.forEach(f => { if (upTo(f) && tm - f.t <= 30 * 60e3 && (!best || Math.abs(f.t - tm) < Math.abs(best.t - tm))) best = f; });
+            return best ? [best] : [];
+        }
+        if (o.show === 'window') return list.filter(upTo);
+        return list.filter(f => upTo(f) && f.t > tm - o.show * 60e3);
     }
 
     async function showFrame(i) {
         const tl = timelineFrames();
-        if (!tl.length || i < 0) { setOverlay('overlay', null); setOverlay('precipOverlay', null); renderTimeLabel(); return; }
+        if (!tl.length || i < 0) { setOverlay('overlay', null); OVERLAYS.forEach(o => showOverlayFrames(o, [])); renderTimeLabel(); return; }
         R.index = Math.max(0, Math.min(i, tl.length - 1));
         loadFrom(R.index);
         renderSlider();
@@ -1163,31 +1528,56 @@
         const f = tl[R.index];
         const gen = R.gen;
         const satFrame = activeLayer() ? f : null;
-        const precipFrame = activeLayer() ? (activePrecipLayer() ? precipFrameFor(f.t) : null) : f;
         const satEntry = satFrame ? cache.get(satFrame.key) || ensureFrame(satFrame, true) : null;
-        const precipEntry = precipFrame ? cache.get(precipFrame.key) || ensureFrame(precipFrame, true) : null;
         if (satEntry) whenReady(satEntry).then(e => { if (gen === R.gen && timelineFrames()[R.index] === f && e.status === 'ok') setOverlay('overlay', e.url); });
         else setOverlay('overlay', null);
-        if (precipEntry) whenReady(precipEntry).then(e => { if (gen === R.gen && timelineFrames()[R.index] === f && e.status === 'ok') setOverlay('precipOverlay', e.url); });
-        else setOverlay('precipOverlay', null);
-        renderPrecipInfo(precipFrame);
+        OVERLAYS.forEach(o => showOverlayFrames(o, activeOverlay(o.id) ? overlayFramesFor(o, f.t) : []));
+        renderOverlayInfo();
+        if (S.wind.on && windHour() !== W.hour) updateWind();
         if (!R.playing) scheduleProbe();
     }
 
     function setOverlay(which, url) {
         const ov = R[which];
         if (!url) { if (ov) ov.setUrl(transparentPixel); return; }
-        const opacity = which === 'overlay' ? S.opacity : S.precipOpacity;
         if (!ov) {
             R[which] = L.imageOverlay(url, R.extent.bounds, {
-                pane: which === 'overlay' ? 'sat' : 'precip', opacity, interactive: false,
+                pane: 'sat', opacity: S.opacity, interactive: false,
                 attribution: MAP_CONFIG.eumetsatAttribution
             }).addTo(R.map);
             return;
         }
         ov.setUrl(url);
         ov.setBounds(R.extent.bounds);
-        ov.setOpacity(opacity);
+        ov.setOpacity(S.opacity);
+    }
+
+    // Shows exactly `frames` for an overlay (one image, or several stacked
+    // for lightning / fires). Images already on the map stay put, so
+    // stepping through time only adds or removes the difference.
+    function showOverlayFrames(o, frames) {
+        const shown = R.ovShown[o.id] || (R.ovShown[o.id] = new Map());
+        const want = new Set(frames.map(f => f.key));
+        R.ovWant[o.id] = want;
+        const gen = R.gen;
+        const opacity = S.overlays[o.id].opacity;
+        // A single image (precipitation) is swapped only once the new one is
+        // ready, so the overlay never blinks off between steps.
+        const single = o.show === 'nearest';
+        if (!single) shown.forEach((ov, key) => { if (!want.has(key)) { R.map.removeLayer(ov); shown.delete(key); } });
+        if (!frames.length && single) { shown.forEach(ov => R.map.removeLayer(ov)); shown.clear(); }
+        frames.forEach(f => {
+            if (shown.has(f.key)) return;
+            const entry = cache.get(f.key) || ensureFrame(f, true);
+            whenReady(entry).then(e => {
+                if (gen !== R.gen || e.status !== 'ok' || !R.ovWant[o.id] || !R.ovWant[o.id].has(f.key) || shown.has(f.key)) return;
+                const ov = L.imageOverlay(e.url, R.extent.bounds, { pane: 'ov_' + o.id, opacity, interactive: false, attribution: MAP_CONFIG.eumetsatAttribution }).addTo(R.map);
+                shown.set(f.key, ov);
+                // The readout's nearest lightning / fire uses these images.
+                if (!single && !R.playing) scheduleProbe(700);
+                if (single) shown.forEach((old, key) => { if (key !== f.key) { R.map.removeLayer(old); shown.delete(key); } });
+            });
+        });
     }
     const transparentPixel = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
@@ -1248,10 +1638,9 @@
         root.innerHTML = `
             <div id="satMap" class="absolute inset-0 z-0 bg-slate-950"></div>
             <div id="mapDrawHint" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-[500] px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 text-xs font-semibold shadow-lg"></div>
-            <button type="button" id="mapPanelBtn" class="absolute top-3 left-3 z-[500] flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-slate-200 shadow-xl backdrop-blur-md hover:border-cyan-600 transition">
-                <i class="fa-solid fa-layer-group text-cyan-400"></i><span id="mapPanelBtnLabel" class="max-w-[11rem] truncate"></span><i id="mapPanelChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform"></i>
+            <button type="button" id="mapPanelBtn" class="absolute top-3 left-3 z-[500] flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-slate-200 shadow-xl backdrop-blur-md hover:border-cyan-600 transition max-w-[calc(100vw-5.5rem)]">
+                <i class="fa-solid fa-layer-group text-cyan-400"></i><span id="mapPanelBtnLabel" class="truncate"></span><span id="mapPanelBtnBadges" class="flex items-center gap-1 text-[10px]"></span><i class="fa-solid fa-sliders text-[11px] text-slate-500"></i>
             </button>
-            <div id="mapPanel" class="hidden absolute top-14 left-3 z-[500] w-[min(22rem,calc(100vw-1.5rem))] max-h-[calc(100%-12rem)] overflow-y-auto p-3 space-y-4 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-md text-xs text-slate-300"></div>
             <div id="mapCrosshair" class="hidden absolute left-1/2 top-1/2 z-[420] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                 <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
                     <g stroke="#020617" stroke-width="4" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
@@ -1271,7 +1660,7 @@
         R.map = map;
         L.control.zoom({ position: 'topright' }).addTo(map);
         map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
-        [['sat', 410], ['precip', 420], ['borders', 600], ['loc', 650]].forEach(([name, z]) => {
+        [['sat', 410], ['ov_precip', 420], ['ov_fire', 430], ['ov_lightning', 440], ['borders', 600], ['wind', 620], ['labels', 640], ['loc', 650]].forEach(([name, z]) => {
             const pane = map.createPane(name);
             pane.style.zIndex = z;
             if (name !== 'loc') pane.style.pointerEvents = 'none';
@@ -1284,6 +1673,8 @@
         else fitRegion(MAP_CONFIG.regions.ukraine, false);
         setBasemap(S.basemap, true);
         updateLocationMarker();
+        updatePlaces();
+        map.on('zoomend', updatePlaces);
 
         map.on('movestart', () => clearTimeout(R.moveTimer));
         map.on('move', renderProbeHeader);
@@ -1298,10 +1689,11 @@
             // Moved away from the forecast location: follow the crosshair.
             if (R.anchor && !anchorCentred()) R.anchor = null;
             scheduleProbe();
+            updatePlaces();
+            if (S.wind.on) { clearTimeout(W.timer); W.timer = setTimeout(updateWind, 400); }
         });
         setupDrawing();
         setupUiEvents();
-        if (S.panelOpen === null) S.panelOpen = window.innerWidth >= 768;
         R.built = true;
     }
 
@@ -1311,11 +1703,120 @@
 
     function setBasemap(id, init) {
         S.basemap = id;
+        if (!init) S.basemapSet = true;
         if (R.baseLayer) { R.map.removeLayer(R.baseLayer); R.baseLayer = null; }
         const cfg = MAP_CONFIG.basemaps[id];
-        if (cfg) R.baseLayer = L.tileLayer(cfg.url, { subdomains: cfg.subdomains || 'abc', maxZoom: cfg.maxZoom, attribution: cfg.attribution, detectRetina: false }).addTo(R.map);
-        $('satMap').style.background = id === 'osm' ? '#aad3df' : '#020617';
+        if (cfg) R.baseLayer = L.tileLayer(cfg.url, { subdomains: cfg.subdomains || 'abc', maxZoom: cfg.maxZoom, attribution: cfg.attribution, className: cfg.className || '', detectRetina: false }).addTo(R.map);
+        $('satMap').style.background = cfg ? cfg.background : '#020617';
         if (!init) { save(); renderPanel(); }
+    }
+
+    // ---- Place names (built-in list, current language)
+    function placeName(p) {
+        return currentLang === 'uk' ? p[4] : currentLang === 'pt-BR' ? (p[5] || p[3]) : p[3];
+    }
+
+    function updatePlaces() {
+        if (!R.map) return;
+        if (!R.labelsLayer) R.labelsLayer = L.layerGroup().addTo(R.map);
+        R.labelsLayer.clearLayers();
+        if (!S.labels) return;
+        const z = R.map.getZoom();
+        const maxRank = z >= 7 ? 3 : z >= 6 ? 2 : z >= 4 ? 1 : 0;
+        const b = R.map.getBounds().pad(0.1);
+        PLACES.forEach(p => {
+            if (p[2] > maxRank || !b.contains([p[0], p[1]])) return;
+            L.marker([p[0], p[1]], {
+                pane: 'labels', interactive: false, keyboard: false,
+                icon: L.divIcon({ className: 'fs-place', html: `<span class="fs-place-dot"></span><span class="fs-place-name${p[2] === 1 ? ' fs-place-major' : ''}">${h(placeName(p))}</span>`, iconSize: null, iconAnchor: [3, 3] })
+            }).addTo(R.labelsLayer);
+        });
+    }
+
+    // ---- Forecast wind arrows (Open-Meteo, one request for the grid)
+    const W = { cache: new Map(), group: null, seq: 0, hour: null, error: '', loading: false, timer: null };
+
+    function windHour() {
+        const f = timelineFrames()[R.index];
+        const tm = f && f.t !== null && f.t !== undefined ? f.t : Date.now();
+        return Math.round(tm / 3600e3) * 3600e3;
+    }
+
+    function windGrid() {
+        const z = R.map.getZoom();
+        const degPerPx = 360 / (256 * 2 ** z);
+        const spacing = window.innerWidth < 640 ? 80 : 100;
+        const step = [0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 10].find(v => v / degPerPx >= spacing) || 10;
+        const b = R.map.getBounds();
+        const pts = [];
+        for (let la = Math.ceil(b.getSouth() / step) * step; la <= b.getNorth() && pts.length < 220; la += step) {
+            if (Math.abs(la) > 80) continue;
+            for (let lo = Math.ceil(b.getWest() / step) * step; lo <= b.getEast() && pts.length < 220; lo += step) {
+                const lat = Math.round(la * 100) / 100, lon = Math.round(lo * 100) / 100;
+                pts.push({ lat, lon, key: `${lat},${lon}` });
+            }
+        }
+        return pts;
+    }
+
+    async function fetchWind(pts) {
+        for (let i = 0; i < pts.length; i += 100) {
+            const chunk = pts.slice(i, i + 100);
+            const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
+                latitude: chunk.map(p => p.lat).join(','), longitude: chunk.map(p => p.lon).join(','),
+                hourly: 'wind_speed_10m,wind_direction_10m,wind_speed_925hPa,wind_direction_925hPa',
+                past_days: 1, forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
+            }, []);
+            const res = await fetch(url);
+            const body = await res.json();
+            if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
+            const list = Array.isArray(body) ? body : [body];
+            chunk.forEach((p, k) => { if (list[k] && list[k].hourly) W.cache.set(p.key, { at: Date.now(), hourly: list[k].hourly }); });
+        }
+    }
+
+    async function updateWind() {
+        if (!R.map) return;
+        if (!W.group) W.group = L.layerGroup().addTo(R.map);
+        const id = ++W.seq;
+        if (!S.wind.on) { W.group.clearLayers(); W.hour = null; renderWindInfo(); return; }
+        const hour = windHour();
+        const pts = windGrid();
+        const missing = pts.filter(p => { const c = W.cache.get(p.key); return !c || Date.now() - c.at > 30 * 60e3; });
+        W.error = '';
+        if (missing.length) {
+            W.loading = true; renderWindInfo();
+            try { await fetchWind(missing); } catch (err) { W.error = err instanceof TypeError ? t('mapErrNetwork') : err.message; }
+            W.loading = false;
+        }
+        if (id !== W.seq) return;
+        W.hour = hour;
+        W.group.clearLayers();
+        const key = new Date(hour).toISOString().slice(0, 13);
+        const lvl = S.wind.level === '925' ? '925hPa' : '10m';
+        const R_ = state.flightRules || {};
+        const toUnit = WIND_TO_MS[state.windUnit] || 1;
+        pts.forEach(p => {
+            const c = W.cache.get(p.key);
+            if (!c) return;
+            const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
+            const ms = i < 0 ? null : c.hourly[`wind_speed_${lvl}`][i], dir = i < 0 ? null : c.hourly[`wind_direction_${lvl}`][i];
+            if (!Number.isFinite(ms) || !Number.isFinite(dir)) return;
+            const color = ms >= R_.windBad ? FLIGHT_STATUS.bad.color : ms >= R_.windGood ? FLIGHT_STATUS.marginal.color : FLIGHT_STATUS.good.color;
+            const shown = ms / toUnit;
+            const html = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${(dir + 180) % 360}deg)"><path d="M12 2 L17.5 11 H13.6 V22 H10.4 V11 H6.5 Z" fill="${color}" stroke="#020617" stroke-width="1.2" stroke-linejoin="round"/></svg><span>${shown < 10 ? shown.toFixed(1) : Math.round(shown)}</span>`;
+            L.marker([p.lat, p.lon], { pane: 'wind', interactive: false, keyboard: false, icon: L.divIcon({ className: 'fs-wind', html, iconSize: [40, 36], iconAnchor: [20, 12] }) }).addTo(W.group);
+        });
+        renderWindInfo();
+    }
+
+    function renderWindInfo() {
+        const el = $('mapWindInfo');
+        if (!el) return;
+        if (!S.wind.on) { el.textContent = ''; return; }
+        el.innerHTML = W.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('mapProbeLoading'))}`
+            : W.error ? `<span class="text-rose-300">${h(t('mapWindErr', { msg: W.error }))}</span>`
+            : W.hour ? h(`${t('mapWindAt', { time: fmtTime(W.hour) })} · ${UNIT_LABELS.wind[state.windUnit]}`) : '';
     }
 
     // Boundary lines from the same service, drawn as transparent WMS tiles
@@ -1407,7 +1908,7 @@
         const hint = $('mapDrawHint');
         hint.textContent = t('mapDrawHint');
         hint.classList.remove('hidden');
-        if (window.innerWidth < 768) setPanel(false);
+        if (typeof setSettingsDrawer === 'function') setSettingsDrawer(false);
     }
 
     function stopDrawing() {
@@ -1417,61 +1918,111 @@
         $('mapDrawHint').classList.add('hidden');
     }
 
-    function setPanel(open) {
-        S.panelOpen = open;
-        save();
-        $('mapPanel').classList.toggle('hidden', !open);
-        $('mapPanelChevron').style.transform = open ? 'rotate(180deg)' : '';
-    }
-
     const seg = (name, items, current) => `<div class="seg" role="group">${items.map(([v, label]) =>
         `<button type="button" data-map-${name}="${v}" class="${String(v) === String(current) ? 'active' : ''}">${label}</button>`).join('')}</div>`;
     const sectionTitle = (icon, key) => `<h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2"><i class="fa-solid ${icon} mr-1.5"></i>${h(t(key))}</h3>`;
 
+    // Satellite name + interval for a source layer (polished picker).
+    function sourceLabel(l) {
+        const ns = l.name.split(':')[0];
+        const base = translations.en['mapSat_' + ns] ? t('mapSat_' + ns) : ns;
+        return /enh/i.test(l.name) ? `${base} · ${t('mapEnhanced')}` : base;
+    }
+
+    function sourceSub(l) {
+        const step = l.step || (R.times[l.name] && R.times[l.name].list.length > 1 ? Math.round((R.times[l.name].list.at(-1) - R.times[l.name].list.at(-2)) / 60000) : null);
+        return [step ? t('mapEvery', { n: step }) : '', l.title || l.name].filter(Boolean).join(' · ');
+    }
+
+    function sourcePicker(group, list, current) {
+        if (list.length < 2) return '';
+        return `<div class="mt-2.5">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">${h(t('mapSourceTitle'))}</div>
+            <div class="space-y-1" role="radiogroup">${list.map(l => {
+                const on = current && l.name === current.name;
+                return `<button type="button" role="radio" aria-checked="${on}" data-map-src="${h(group)}" data-value="${h(l.name)}" title="${h(l.name)}"
+                    class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border text-left transition ${on ? 'border-cyan-500/70 bg-cyan-950/40' : 'border-slate-800 bg-slate-950/40 hover:border-slate-600'}">
+                    <span class="w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${on ? 'border-cyan-400' : 'border-slate-600'}">${on ? '<span class="w-2 h-2 rounded-full bg-cyan-400"></span>' : ''}</span>
+                    <span class="flex-1 min-w-0"><span class="block text-[11.5px] ${on ? 'text-white' : 'text-slate-200'}">${h(sourceLabel(l))}</span><span class="block text-[10px] text-slate-500 truncate">${h(sourceSub(l))}</span></span>
+                </button>`;
+            }).join('')}</div></div>`;
+    }
+
+    const switchRow = (attr, on, icon, label, extra = '') => `<label class="flex items-center gap-2.5 cursor-pointer select-none">
+        <input type="checkbox" class="sr-only" ${attr} ${on ? 'checked' : ''}><span class="fs-switch" aria-hidden="true"></span>
+        ${icon ? `<i class="fa-solid ${icon} w-4 text-center ${on ? 'text-cyan-400' : 'text-slate-500'}"></i>` : ''}<span class="flex-1 text-[12px] text-slate-200">${h(label)}</span>${extra}</label>`;
+
     function renderPanel() {
-        if (!R.built) return;
+        const root = $('drawerMap');
+        if (!R.built || !root) return;
         const layer = activeLayer();
         const productRows = PRODUCTS.map(p => {
             const list = R.resolved[p.id] || [];
             const available = list.length > 0;
             const active = S.product === p.id;
-            return `<button type="button" data-map-product="${p.id}" ${available ? '' : 'disabled'} class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left border transition ${active ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${available ? '' : 'opacity-40 cursor-not-allowed'}">
+            return `<button type="button" data-map-product="${p.id}" ${available ? '' : 'disabled'} class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left border transition ${active ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${available ? '' : 'opacity-40 cursor-not-allowed'}">
                 <i class="fa-solid ${p.icon} w-4 text-center ${active ? 'text-cyan-400' : 'text-slate-500'}"></i>
-                <span class="flex-1 min-w-0"><span class="block truncate">${h(t('mapProduct_' + p.id))}</span>${available ? '' : `<span class="block text-[10px] text-slate-500">${h(t('mapNotFound'))}</span>`}</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">${h(t('mapRole_' + p.role))}</span>
+                <span class="flex-1 min-w-0"><span class="block truncate text-[12px]">${h(t('mapProduct_' + p.id))}</span>${available ? '' : `<span class="block text-[10px] text-slate-500">${h(t('mapNotFound'))}</span>`}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">${h(t('mapRole_' + p.role))}</span>
             </button>`;
-        }).join('') + `<button type="button" data-map-product="none" class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left border transition ${S.product === 'none' ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'}">
-                <i class="fa-solid fa-ban w-4 text-center text-slate-500"></i><span class="flex-1">${h(t('mapProduct_none'))}</span></button>`;
+        }).join('') + `<button type="button" data-map-product="none" class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left border transition ${S.product === 'none' ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'}">
+                <i class="fa-solid fa-ban w-4 text-center text-slate-500"></i><span class="flex-1 text-[12px]">${h(t('mapProduct_none'))}</span></button>`;
         const sources = S.product !== 'none' ? (R.resolved[S.product] || []) : [];
-        const sourceSelect = sources.length > 1 ? `<label class="block mt-2"><span class="block text-[10px] text-slate-500 mb-1">${h(t('mapSource'))}</span>
-            <select data-map-source="${S.product}" class="unit-select w-full">${sources.map(l => `<option value="${h(l.name)}" ${layer && l.name === layer.name ? 'selected' : ''}>${h(l.title || l.name)} · ${h(l.name)}</option>`).join('')}</select></label>` : '';
         const styleSelect = layer && (layer.styles || []).length > 1 ? `<label class="block mt-2"><span class="block text-[10px] text-slate-500 mb-1">Style</span>
-            <select data-map-style="${h(layer.name)}" class="unit-select w-full"><option value="">default</option>${layer.styles.map(s => `<option value="${h(s.name)}" ${styleOf(layer) === s.name ? 'selected' : ''}>${h(s.title || s.name)}</option>`).join('')}</select></label>` : '';
-        const opacity = (key, value) => `<label class="flex items-center gap-2 mt-2"><span class="text-[10px] text-slate-500 w-20 shrink-0">${h(t('mapOpacity'))}</span>
+            <select data-map-style="${h(layer.name)}" class="unit-select w-full"><option value="">default</option>${layer.styles.map(st => `<option value="${h(st.name)}" ${styleOf(layer) === st.name ? 'selected' : ''}>${h(st.title || st.name)}</option>`).join('')}</select></label>` : '';
+        const opacity = (key, value) => `<label class="flex items-center gap-2 mt-2.5"><span class="text-[10px] text-slate-500 w-20 shrink-0">${h(t('mapOpacity'))}</span>
             <input type="range" min="0.1" max="1" step="0.05" value="${value}" data-map-opacity="${key}" class="flex-1 accent-cyan-500"></label>`;
 
-        const precip = R.precipLayers;
-        const precipLayer = R.precipLayers.find(l => l.name === S.sources.precip) || R.precipLayers[0];
-        const legend = precipLayer ? legendUrl(precipLayer) : '';
-        const precipBlock = precip.length ? `
-            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" data-map-precip ${S.precipOn ? 'checked' : ''} class="accent-cyan-500 w-4 h-4"> <span>${h(t('mapPrecipShow'))}</span></label>
-            <p class="text-[10px] text-slate-500 mt-1">${h(t('mapPrecipKind'))}</p>
-            ${precip.length > 1 ? `<select data-map-source="precip" class="unit-select w-full mt-2">${precip.map(l => `<option value="${h(l.name)}" ${l.name === precipLayer.name ? 'selected' : ''}>${h(l.title || l.name)}</option>`).join('')}</select>` : ''}
-            ${S.precipOn ? opacity('precip', S.precipOpacity) : ''}
-            ${S.precipOn && precipLayer && !covers(precipLayer.bbox, regionBbox()) ? `<p class="text-[10px] text-amber-300 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${h(t('mapPrecipPartial'))}</p>` : ''}
-            <p id="mapPrecipInfo" class="text-[10px] text-slate-400 mt-1"></p>
-            ${S.precipOn && legend ? `<img src="${h(legend)}" alt="" class="mt-2 max-w-full rounded bg-white/90 p-1" loading="lazy" onerror="this.remove()">` : ''}`
-            : `<p class="text-[11px] text-slate-500">${h(R.catalogStatus === 'loading' ? t('mapLoadingCatalog') : t('mapPrecipNone'))}</p>`;
+        const overlayBlocks = OVERLAYS.map(o => {
+            const list = R.ovLayers[o.id] || [];
+            const cfg = S.overlays[o.id];
+            const lay = overlayLayer(o.id);
+            if (!list.length) {
+                return `<div class="flex items-center gap-2.5 opacity-50"><span class="fs-switch" aria-hidden="true"></span><i class="fa-solid ${o.icon} w-4 text-center text-slate-500"></i>
+                    <span class="flex-1 text-[12px] text-slate-300">${h(t('mapOv_' + o.id))}</span><span class="text-[10px] text-slate-500">${h(R.catalogStatus === 'loading' ? t('mapProbeLoading') : t('mapOvNone'))}</span></div>`;
+            }
+            const kind = o.id === 'precip' ? t('mapPrecipKind') : t('mapOvKind_' + o.id);
+            const legend = lay ? legendUrl(lay) : '';
+            return `<div>
+                ${switchRow(`data-map-ov="${o.id}"`, cfg.on, o.icon, t('mapOv_' + o.id))}
+                ${cfg.on ? `<div class="pl-[3.6rem] mt-1.5">
+                    <p class="text-[10.5px] leading-snug text-slate-500">${h(kind)}</p>
+                    ${sourcePicker(o.id, list, lay)}
+                    ${opacity(o.id, cfg.opacity)}
+                    ${lay && !covers(lay.bbox, regionBbox()) ? `<p class="text-[10px] text-amber-300 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${h(t('mapPrecipPartial'))}</p>` : ''}
+                    <p id="mapOvInfo_${o.id}" class="text-[10.5px] text-slate-400 mt-1.5"></p>
+                    ${legend ? `<img src="${h(legend)}" alt="" class="mt-2 max-w-full rounded bg-white/90 p-1" loading="lazy" onerror="this.remove()">` : ''}
+                </div>` : ''}
+            </div>`;
+        }).join('');
+        const windBlock = `<div>
+            ${switchRow('data-map-wind', S.wind.on, 'fa-wind', t('mapOv_wind'))}
+            ${S.wind.on ? `<div class="pl-[3.6rem] mt-1.5 space-y-1.5">
+                ${seg('windlevel', [['10m', h(t('mapWindLevel_10m'))], ['925', h(t('mapWindLevel_925'))]], S.wind.level)}
+                <p class="text-[10.5px] leading-snug text-slate-500">${h(t('mapWindKind'))}</p>
+                <p id="mapWindInfo" class="text-[10.5px] text-slate-400"></p>
+            </div>` : ''}
+        </div>`;
 
         const regions = regionOptions();
-        $('mapPanel').innerHTML = `
+        root.innerHTML = `
             <section>${sectionTitle('fa-satellite', 'mapProductTitle')}
-                <div class="space-y-1">${productRows}</div>${sourceSelect}${styleSelect}
+                <div class="space-y-1">${productRows}</div>
+                ${sourcePicker(S.product, sources, layer)}${styleSelect}
                 ${layer ? opacity('sat', S.opacity) : ''}
                 ${layer ? colourKeyHtml(layer) : ''}
                 <p class="text-[10px] text-slate-500 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>${h(t('mapDisclaimer'))}</p>
             </section>
-            <section>${sectionTitle('fa-cloud-showers-heavy', 'mapPrecipTitle')}${precipBlock}</section>
+            <section>${sectionTitle('fa-layer-group', 'mapOverlaysTitle')}
+                <div class="space-y-3">${overlayBlocks}${windBlock}</div>
+            </section>
+            <section>${sectionTitle('fa-map', 'mapBaseTitle')}
+                ${seg('basemap', [['osmDark', h(t('mapBase_osmDark'))], ['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
+                <div class="space-y-2.5 mt-3">
+                    ${switchRow('data-map-labels', S.labels, 'fa-font', t('mapLabels'))}
+                    ${R.borderLayers.length ? switchRow('data-map-borders', S.borders, 'fa-draw-polygon', t('mapBorders')) : ''}
+                </div>
+            </section>
             <section>${sectionTitle('fa-crop-simple', 'mapRegionTitle')}
                 <select data-map-region class="unit-select w-full">${regions.map(r => `<option value="${h(r.id)}" ${r.id === S.region ? 'selected' : ''}>${h(r.label)}</option>`).join('')}</select>
                 <div class="flex flex-wrap gap-1.5 mt-2">
@@ -1480,10 +2031,6 @@
                     ${S.region.startsWith('saved:') ? `<button type="button" data-map-delregion class="chip py-1" title="${h(t('mapDeleteRegion'))}" aria-label="${h(t('mapDeleteRegion'))}"><i class="fa-regular fa-trash-can"></i></button>` : ''}
                 </div>
                 <form data-map-saveform class="hidden mt-2 flex gap-1.5"><input name="name" maxlength="40" placeholder="${h(t('mapSaveName'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"><button class="chip py-1"><i class="fa-solid fa-check"></i></button></form>
-            </section>
-            <section>${sectionTitle('fa-map', 'mapBaseTitle')}
-                ${seg('basemap', [['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
-                ${R.borderLayers.length ? `<label class="flex items-center gap-2 mt-1.5 cursor-pointer"><input type="checkbox" data-map-borders ${S.borders ? 'checked' : ''} class="accent-cyan-500 w-4 h-4"> ${h(t('mapBorders'))}</label>` : ''}
             </section>
             <section>${sectionTitle('fa-film', 'mapTimeTitle')}
                 <div class="flex flex-wrap gap-2">
@@ -1499,7 +2046,8 @@
             </section>
             <p class="text-[10px] text-slate-500">${h(t('mapAttrNote'))}</p>`;
         renderDiagnostics();
-        renderPrecipInfo();
+        renderOverlayInfo();
+        renderWindInfo();
     }
 
     // Colour key of the active product: EUMETSAT's interpretation for the
@@ -1539,16 +2087,19 @@
         return buildWmsUrl(MAP_CONFIG.wmsBase, { SERVICE: 'WMS', VERSION: MAP_CONFIG.version, REQUEST: 'GetLegendGraphic', FORMAT: 'image/png', LAYER: layer.name, STYLE: style, SLD_VERSION: '1.1.0' }, []);
     }
 
-    function renderPrecipInfo(frame) {
-        const el = $('mapPrecipInfo');
-        if (!el) return;
-        if (!activePrecipLayer()) { el.textContent = ''; return; }
-        if (frame === undefined) {
-            const tl = timelineFrames();
-            const f = tl[R.index];
-            frame = f ? (activeLayer() ? precipFrameFor(f.t) : f) : null;
-        }
-        el.textContent = frame ? t('mapPrecipAt', { time: fmtTime(frame.t) }) : (R.precipFrames.length ? t('mapPrecipNoFrame') : '');
+    // "Image: 21:30" for precipitation; "6 images · 21:00 – 21:30" for
+    // stacked overlays.
+    function renderOverlayInfo() {
+        const f = timelineFrames()[R.index];
+        OVERLAYS.forEach(o => {
+            const el = $('mapOvInfo_' + o.id);
+            if (!el) return;
+            if (!activeOverlay(o.id)) { el.textContent = ''; return; }
+            const frames = overlayFramesFor(o, f ? f.t : null);
+            if (!frames.length) { el.textContent = (R.ovFrames[o.id] || []).length ? t('mapPrecipNoFrame') : ''; return; }
+            el.textContent = frames.length === 1 ? t('mapPrecipAt', { time: fmtTime(frames[0].t) })
+                : t('mapOvImages', { n: frames.length, from: fmtTime(frames[0].t), to: fmtTime(frames[frames.length - 1].t) });
+        });
     }
 
     function renderDiagnostics() {
@@ -1610,7 +2161,8 @@
         const tl = timelineFrames();
         const f = tl[R.index];
         if (!f) { el.textContent = R.catalogStatus === 'loading' ? t('mapLoadingCatalog') : t('mapDiagNone'); return; }
-        const name = activeLayer() ? t('mapProduct_' + S.product) : t('mapPrecipTitle');
+        const d = drivingOverlay();
+        const name = activeLayer() ? t('mapProduct_' + S.product) : d ? t('mapOv_' + d.id) : '';
         el.textContent = `${f.t === null ? t('mapNow') : fmtTime(f.t)} · ${name}`;
         el.title = `${t('mapFrameOf', { i: R.index + 1, n: tl.length })}`;
     }
@@ -1664,14 +2216,17 @@
                 if (age > 90 * 60e3) notes.push(pill('bg-amber-950/90 border border-amber-800/60 text-amber-200', 'fa-clock-rotate-left', t('mapStale', { age: fmtAge(age) })));
             }
             if (!covers(layer.bbox, regionBbox())) notes.push(pill('bg-amber-950/90 border border-amber-800/60 text-amber-200', 'fa-crop', t('mapPartial')));
+            // Only when the product doesn't suit the time of day (a daytime
+            // RGB at night or the night RGB by day); day & night products never.
             const sun = sunState();
-            const recommended = sun === 'night' ? ['fog'] : sun === 'day' ? ['dayMicro', 'natural'] : null;
-            if (recommended && !recommended.includes(S.product)) {
+            const role = (PRODUCTS.find(p => p.id === S.product) || {}).role;
+            const recommended = sun === 'night' && role === 'day' ? ['fog'] : sun === 'day' && role === 'night' ? ['dayMicro', 'natural'] : null;
+            if (recommended) {
                 const target = recommended.find(id => (R.resolved[id] || []).length);
                 if (target) notes.push(pill('bg-indigo-950/90 border border-indigo-800/60 text-indigo-100', sun === 'night' ? 'fa-moon' : 'fa-sun',
                     t(sun === 'night' ? 'mapNight' : 'mapDay'),
                     `<button type="button" data-map-product="${target}" class="px-2 py-0.5 rounded-md bg-indigo-500/30 hover:bg-indigo-500/50 font-semibold">${h(t('mapUse'))}</button>`));
-            } else if (sun === 'twilight' && S.product !== 'ir108') {
+            } else if (sun === 'twilight' && (role === 'day' || role === 'night')) {
                 notes.push(pill('bg-slate-900/90 border border-slate-700 text-slate-300', 'fa-circle-half-stroke', t('mapTwilight')));
             }
         }
@@ -1680,9 +2235,9 @@
 
     function renderAllMapUi() {
         if (!R.built) return;
-        $('mapPanelBtnLabel').textContent = S.product === 'none' ? t('mapPrecipTitle') : t('mapProduct_' + S.product);
-        $('mapPanelBtn').title = t('mapPanelToggle');
-        setPanel(!!S.panelOpen);
+        $('mapPanelBtnLabel').textContent = S.product === 'none' ? t('mapProduct_none') : t('mapProduct_' + S.product);
+        $('mapPanelBtnBadges').innerHTML = activeOverlays().map(o => `<i class="fa-solid ${o.icon} text-cyan-300"></i>`).join('') + (S.wind.on ? '<i class="fa-solid fa-wind text-cyan-300"></i>' : '');
+        $('mapPanelBtn').title = t('mapSettingsTitle');
         renderPanel();
         renderControls();
         renderStatus();
@@ -1690,16 +2245,35 @@
     }
 
     function setupUiEvents() {
-        $('mapPanelBtn').addEventListener('click', () => setPanel(!S.panelOpen));
+        $('mapPanelBtn').addEventListener('click', () => { if (typeof setSettingsDrawer === 'function') setSettingsDrawer(true); });
         $('mapProbeBtn').addEventListener('click', () => { S.probe = !S.probe; save(); renderProbe(); scheduleProbe(0); });
         $('mapCenterBtn').addEventListener('click', () => centerOnLocation(true));
         const view = $('mapView');
+        // Map controls live both on the map and in the side menu.
+        [view, $('drawerMap')].filter(Boolean).forEach(root => bindUi(root));
+        document.addEventListener('keydown', e => {
+            if (!R.visible || e.target.closest('input, select, textarea, button, a')) return;
+            if (!$('settingsDrawer').classList.contains('-translate-x-full')) return;
+            if (e.key === 'Escape' && R.drawing) stopDrawing();
+            else if (e.key === ' ') { e.preventDefault(); play(!R.playing); }
+            else if (e.key === 'ArrowLeft') step(-1);
+            else if (e.key === 'ArrowRight') step(1);
+        });
+        window.addEventListener('online', () => { renderStatus(); reloadFrames(); });
+        window.addEventListener('offline', renderStatus);
+    }
+
+    function bindUi(view) {
         view.addEventListener('click', e => {
             const q = sel => e.target.closest(sel);
             let el;
             if ((el = q('[data-map-product]')) && !el.disabled) {
                 S.product = el.dataset.mapProduct; S.productAt = Date.now(); save();
                 play(false); renderAllMapUi(); reloadFrames();
+            } else if ((el = q('[data-map-src]'))) {
+                S.sources[el.dataset.mapSrc] = el.dataset.value; save(); renderAllMapUi(); reloadFrames();
+            } else if ((el = q('[data-map-windlevel]'))) {
+                S.wind.level = el.dataset.mapWindlevel; save(); renderPanel(); W.hour = null; updateWind();
             } else if ((el = q('[data-map-basemap]'))) setBasemap(el.dataset.mapBasemap);
             else if ((el = q('[data-map-window]'))) { S.windowH = Number(el.dataset.mapWindow); save(); renderPanel(); reloadFrames(); }
             else if ((el = q('[data-map-utc]'))) { S.utc = el.dataset.mapUtc === '1'; save(); renderPanel(); renderTimeLabel(); renderProgress(); }
@@ -1708,7 +2282,7 @@
             else if (q('[data-map-next]')) step(1);
             else if (q('[data-map-latest]')) { play(false); showFrame(timelineFrames().length - 1); }
             else if (q('[data-map-draw]')) startDrawing();
-            else if (q('[data-map-saveview]')) { const f = view.querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
+            else if (q('[data-map-saveview]')) { const f = $('drawerMap').querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
             else if (q('[data-map-delregion]')) {
                 const i = Number(S.region.slice(6));
                 savedRegions.splice(i, 1);
@@ -1726,11 +2300,14 @@
                 S.sources[el.dataset.mapSource] = el.value; save(); renderAllMapUi(); reloadFrames();
             } else if (el.matches('[data-map-style]')) {
                 S.sources[`${el.dataset.mapStyle}#style`] = el.value; save(); reloadFrames();
-            } else if (el.matches('[data-map-precip]')) {
-                S.precipOn = el.checked; save(); renderAllMapUi(); reloadFrames();
-
+            } else if (el.matches('[data-map-ov]')) {
+                S.overlays[el.dataset.mapOv].on = el.checked; save(); renderAllMapUi(); reloadFrames();
+            } else if (el.matches('[data-map-wind]')) {
+                S.wind.on = el.checked; save(); renderAllMapUi(); updateWind();
+            } else if (el.matches('[data-map-labels]')) {
+                S.labels = el.checked; save(); renderPanel(); updatePlaces();
             } else if (el.matches('[data-map-borders]')) {
-                S.borders = el.checked; save(); updateBorders();
+                S.borders = el.checked; save(); renderPanel(); updateBorders();
             } else if (el.matches('[data-map-region]')) {
                 selectRegion(el.value);
             } else if (el.matches('[data-map-speed]')) {
@@ -1742,8 +2319,9 @@
             if (el.id === 'mapSlider') { play(false); showFrame(Number(el.value)); }
             else if (el.matches('[data-map-opacity]')) {
                 const v = Number(el.value);
-                if (el.dataset.mapOpacity === 'sat') { S.opacity = v; S.opacitySet = true; if (R.overlay) R.overlay.setOpacity(v); }
-                else { S.precipOpacity = v; S.precipOpacitySet = true; if (R.precipOverlay) R.precipOverlay.setOpacity(v); }
+                const id = el.dataset.mapOpacity;
+                if (id === 'sat') { S.opacity = v; S.opacitySet = true; if (R.overlay) R.overlay.setOpacity(v); }
+                else { S.overlays[id].opacity = v; S.overlays[id].opacitySet = true; (R.ovShown[id] || new Map()).forEach(ov => ov.setOpacity(v)); }
                 save();
             }
         });
@@ -1759,15 +2337,6 @@
             S.region = `saved:${savedRegions.length - 1}`; save();
             renderPanel();
         });
-        document.addEventListener('keydown', e => {
-            if (!R.visible || e.target.closest('input, select, textarea, button, a')) return;
-            if (e.key === 'Escape' && R.drawing) stopDrawing();
-            else if (e.key === ' ') { e.preventDefault(); play(!R.playing); }
-            else if (e.key === 'ArrowLeft') step(-1);
-            else if (e.key === 'ArrowRight') step(1);
-        });
-        window.addEventListener('online', () => { renderStatus(); reloadFrames(); });
-        window.addEventListener('offline', renderStatus);
     }
 
     // ================= Point readout (crosshair) =================
@@ -1823,7 +2392,7 @@
     // Nearest colour-key entries for a pixel, best first: [{ i, d }].
     function matchKey(productId, rgb) {
         const key = RGB_KEYS[productId];
-        if (!key) return null;
+        if (!key || key.noMatch) return null;
         const lab = toLab(rgb);
         const dist = hex => Math.hypot(...toLab(hexRgb(hex)).map((v, k) => v - lab[k]));
         return key.colors.map((c, i) => {
@@ -1860,12 +2429,13 @@
 
     // Open-Meteo best-match forecast at a point (hourly, UTC), cached 15 min.
     async function modelAt(ll, signal) {
-        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit}`;
+        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit},${state.windUnit}`;
         const hit = P.model.get(key);
         if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
-        const url = buildWmsUrl('https://api.open-meteo.com/v1/forecast', {
-            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: 'cloud_cover_low,visibility,precipitation',
-            past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined
+        const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
+            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: 'cloud_cover_low,visibility,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+            past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined,
+            wind_speed_unit: state.windUnit && state.windUnit !== 'ms' ? state.windUnit : undefined
         }, []);
         const res = await fetch(url, { signal });
         const body = await res.json();
@@ -1881,6 +2451,55 @@
         let best = null;
         info.list.forEach(v => { if (v <= tm + 5 * 60e3 && tm - v <= 30 * 60e3 && (best === null || Math.abs(v - tm) < Math.abs(best - tm))) best = v; });
         return best;
+    }
+
+    // Nearest lightning / fire mark within SCAN_KM of a point, read from the
+    // overlay images already on the map (no extra requests). Needs readable
+    // pixels, i.e. images fetched with CORS (the normal case).
+    const imgCache = new WeakMap();
+    function pixelsOf(entry) {
+        if (imgCache.has(entry)) return imgCache.get(entry);
+        const p = new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = entry.url; });
+        imgCache.set(entry, p);
+        return p;
+    }
+
+    async function scanNearest(o, ll) {
+        const want = R.ovWant[o.id];
+        const ext = R.extent;
+        if (!want || !want.size || !ext) return null;
+        if (R.requestMode !== 'fetch') throw new Error(t('mapErrNetwork'));
+        const frames = (R.ovFrames[o.id] || []).filter(f => want.has(f.key));
+        const pt = L.CRS.EPSG3857.project(ll);
+        const [x0, y0, x1, y1] = ext.bbox3857;
+        const px = (pt.x - x0) / (x1 - x0) * ext.w, py = (y1 - pt.y) / (y1 - y0) * ext.h;
+        const kmPerPx = (x1 - x0) / ext.w * Math.cos(ll.lat * Math.PI / 180) / 1000;
+        const r = Math.ceil(SCAN_KM / kmPerPx);
+        const sx0 = Math.max(0, Math.floor(px - r)), sy0 = Math.max(0, Math.floor(py - r));
+        const sw = Math.min(ext.w, Math.ceil(px + r)) - sx0, sh = Math.min(ext.h, Math.ceil(py + r)) - sy0;
+        if (sw <= 0 || sh <= 0) return { none: true };
+        const canvas = document.createElement('canvas');
+        canvas.width = sw; canvas.height = sh;
+        const g = canvas.getContext('2d', { willReadFrequently: true });
+        let best = null;
+        for (const f of frames) {
+            const e = cache.get(f.key);
+            if (!e || e.status !== 'ok') continue;
+            const img = await pixelsOf(e);
+            const kx = img.naturalWidth / ext.w, ky = img.naturalHeight / ext.h;
+            g.clearRect(0, 0, sw, sh);
+            g.drawImage(img, sx0 * kx, sy0 * ky, sw * kx, sh * ky, 0, 0, sw, sh);
+            const d = g.getImageData(0, 0, sw, sh).data;
+            for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+                if (d[(y * sw + x) * 4 + 3] < 80) continue;
+                const dx = sx0 + x + 0.5 - px, dy = sy0 + y + 0.5 - py;
+                const km = Math.hypot(dx, dy) * kmPerPx;
+                if (km <= SCAN_KM && (!best || km < best.km - 0.5 || (Math.abs(km - best.km) <= 0.5 && f.t > best.t))) best = { km, dx, dy, t: f.t };
+            }
+        }
+        if (!best) return { none: true };
+        const deg = (Math.atan2(best.dx, -best.dy) * 180 / Math.PI + 360) % 360;
+        return { ...best, dir: Math.round(deg / 45) % 8 };
     }
 
     function scheduleProbe(delay = 350) {
@@ -1909,10 +2528,11 @@
             return pt === null ? null : featureInfo(rainLayer.name, pt, ll, controller.signal).then(props => ({ props, t: pt }));
         }) : Promise.resolve(undefined);
         const model = navigator.onLine ? modelAt(ll, controller.signal) : Promise.reject(new Error(t('mapOffline')));
-        const [s, r, m] = await Promise.allSettled([sat, rain, model]);
+        const scans = ['lightning', 'fire'].map(id => (activeOverlay(id) ? scanNearest(OVERLAYS.find(o => o.id === id), ll) : Promise.resolve(undefined)));
+        const [s, r, m, lt, fi] = await Promise.allSettled([sat, rain, model, ...scans]);
         if (id !== P.seq) return;
         P.loading = false;
-        P.result = { ll, tm, layer, rainLayer, sat: s, rain: r, model: m };
+        P.result = { ll, tm, layer, rainLayer, sat: s, rain: r, model: m, lightning: lt, fire: fi };
         renderProbe();
     }
 
@@ -1953,9 +2573,14 @@
                     const rgb = ['RED_BAND', 'GREEN_BAND', 'BLUE_BAND'].map(k => p[k]);
                     if (rgb.every(Number.isFinite)) {
                         const sw = `<span class="inline-block w-3.5 h-3 rounded-sm align-[-2px] mr-1 border border-white/20" style="background: rgb(${rgb.join(',')})"></span>`;
+                        const key = RGB_KEYS[S.product];
                         const m = matchKey(S.product, rgb);
                         const texts = t('mapKey_' + S.product);
-                        if (!m) html = sw + h(t('mapProbeNoKey'));
+                        if (key && key.noMatch) html = sw + h(t('mapProbePixel'));
+                        else if (key && key.exact) {
+                            const i = key.colors.findIndex(c => hexRgb(c).every((v, k) => Math.abs(v - rgb[k]) <= 12));
+                            html = sw + (i >= 0 ? `<span class="text-slate-100">${h(t('mapProbeClass', { label: texts[i] }))}</span>` : h(t('mapProbeNoData')));
+                        } else if (!m) html = sw + h(t('mapProbeNoKey'));
                         else if (m[0].d > MATCH_APPROX) html = sw + h(t('mapProbeUnclear', { label: texts[m[0].i] }));
                         else {
                             const second = m[1] && m[1].d - m[0].d < MATCH_TIE && m[1].d <= MATCH_APPROX ? ` <span class="text-slate-400">${h(t('mapProbeOr'))} ${h(texts[m[1].i])}</span>` : '';
@@ -1984,7 +2609,19 @@
                 }
                 rows += row('fa-cloud-rain', t('mapProbeRain'), html);
             }
+            // Nearest lightning / fire (from the overlay images)
+            [['lightning', 'fa-bolt', 'mapProbeLightning'], ['fire', 'fa-fire', 'mapProbeFire']].forEach(([id, icon, label]) => {
+                const v = res[id];
+                if (!v || (v.status === 'fulfilled' && v.value === undefined)) return;
+                let html;
+                if (v.status === 'rejected') html = errText(v.reason);
+                else if (!v.value) html = h(t('mapProbeLoading'));
+                else if (v.value.none) html = h(t('mapProbeNoneWithin', { r: SCAN_KM }));
+                else html = `<span class="font-semibold ${id === 'fire' ? 'text-orange-300' : 'text-yellow-200'}">${h(t('mapProbeNearest', { d: Math.max(1, Math.round(v.value.km)), dir: t('mapCompass')[v.value.dir], time: fmtTime(v.value.t) }))}</span>`;
+                rows += row(icon, t(label), html);
+            });
             // Model forecast for the same hour
+            let windHtml = '';
             {
                 let html;
                 if (res.model.status === 'rejected') html = errText(res.model.reason);
@@ -1999,9 +2636,15 @@
                             c: num(hr.cloud_cover_low[i], 0), v: num(hr.visibility[i] / 1000, 1),
                             p: num(hr.precipitation[i], state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
                         }))}</span> <span class="text-slate-500">· ${h(fmtTime(Date.parse(hr.time[i] + 'Z')))}</span>`;
+                        if (hr.wind_speed_10m && Number.isFinite(hr.wind_speed_10m[i])) {
+                            const d = Math.round(hr.wind_direction_10m[i] / 45) % 8;
+                            const digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
+                            windHtml = `<span class="text-slate-100">${h(t('mapProbeWindValue', { dir: t('mapCompass')[d], w: num(hr.wind_speed_10m[i], digits), g: num(hr.wind_gusts_10m[i], digits), u: UNIT_LABELS.wind[state.windUnit] }))}</span>`;
+                        }
                     }
                 }
                 rows += row('fa-chart-area', t('mapProbeModel'), html);
+                if (windHtml) rows += row('fa-wind', t('mapProbeWind'), windHtml);
             }
         }
         card.innerHTML = `
@@ -2061,7 +2704,9 @@
     }
 
     function onLangChange() {
-        if (R.built) renderAllMapUi();
+        if (!R.built) return;
+        renderAllMapUi();
+        updatePlaces();
     }
 
     function onLocationChange() {
@@ -2075,7 +2720,7 @@
         if (document.visibilityState === 'visible' && R.visible) reloadFrames({ forceTimes: false });
     });
 
-    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange,
+    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, renderDrawer: () => renderPanel(),
         // exposed for tests / diagnostics
         _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, cache } };
 })();
