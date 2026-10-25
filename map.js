@@ -406,7 +406,17 @@
             mapHazardAlerts: 'Nearby hazard alerts',
             mapHazardKind: 'Lightning and rain within {r} km of the forecast location, from the latest satellite images (checked every 5 min while the app is open).',
             mapWindForecast: 'Forecast wind for {time} · latest satellite image',
-            mapWindForecastClear: 'Back to the image time'
+            mapWindForecastClear: 'Back to the image time',
+            mapProbeModelsN: 'Models (median of {n})',
+            mapVsRain: 'Rain: sat vs models',
+            mapVsCloud: 'Low cloud: sat vs models',
+            mapVsRainWet: 'satellite: rain within 10 km',
+            mapVsRainDry: 'satellite: no rain within 15 km',
+            mapVsLow: 'satellite: likely fog / low cloud',
+            mapVsClear: 'satellite: no low cloud',
+            mapVsAll: 'all {n} models agree',
+            mapVsDry: 'dry',
+            mapVsLowPct: 'low clouds {v}%'
         },
         uk: {
             mapProductTitle: 'Супутниковий продукт',
@@ -627,7 +637,17 @@
             mapHazardAlerts: 'Попередження про небезпеку поруч',
             mapHazardKind: 'Блискавки та опади в межах {r} км від локації прогнозу за останніми супутниковими знімками (перевірка кожні 5 хв, поки застосунок відкритий).',
             mapWindForecast: 'Прогноз вітру на {time} · останній супутниковий знімок',
-            mapWindForecastClear: 'Повернутися до часу знімка'
+            mapWindForecastClear: 'Повернутися до часу знімка',
+            mapProbeModelsN: 'Моделі (медіана з {n})',
+            mapVsRain: 'Опади: супутник і моделі',
+            mapVsCloud: 'Низька хмарність: супутник і моделі',
+            mapVsRainWet: 'супутник: опади в межах 10 км',
+            mapVsRainDry: 'супутник: опадів у межах 15 км немає',
+            mapVsLow: 'супутник: ймовірно туман / низька хмарність',
+            mapVsClear: 'супутник: низької хмарності немає',
+            mapVsAll: 'усі {n} моделей згодні',
+            mapVsDry: 'сухо',
+            mapVsLowPct: 'низька хмарність {v}%'
         },
         'pt-BR': {
             mapProductTitle: 'Produto de satélite',
@@ -848,7 +868,17 @@
             mapHazardAlerts: 'Alertas de perigo próximo',
             mapHazardKind: 'Raios e chuva a até {r} km do local da previsão, pelas imagens de satélite mais recentes (verificado a cada 5 min com o app aberto).',
             mapWindForecast: 'Vento previsto para {time} · imagem de satélite mais recente',
-            mapWindForecastClear: 'Voltar ao horário da imagem'
+            mapWindForecastClear: 'Voltar ao horário da imagem',
+            mapProbeModelsN: 'Modelos (mediana de {n})',
+            mapVsRain: 'Chuva: satélite x modelos',
+            mapVsCloud: 'Nuvem baixa: satélite x modelos',
+            mapVsRainWet: 'satélite: chuva a até 10 km',
+            mapVsRainDry: 'satélite: sem chuva a até 15 km',
+            mapVsLow: 'satélite: provável nevoeiro / nuvem baixa',
+            mapVsClear: 'satélite: sem nuvem baixa',
+            mapVsAll: 'todos os {n} modelos concordam',
+            mapVsDry: 'seco',
+            mapVsLowPct: 'nuvens baixas {v}%'
         }
     };
     Object.keys(MAP_I18N).forEach(lang => {
@@ -2614,7 +2644,7 @@
     //    EUMETSAT's colour key (CIE Lab distance) and shown as "likely";
     //  - MTG precipitation (h40b) returns the actual rain rate + quality;
     //  - plus the Open-Meteo model forecast at the same point and hour.
-    const P = { timer: null, seq: 0, controller: null, gfi: new Map(), model: new Map(), result: null, loading: false };
+    const P = { timer: null, seq: 0, controller: null, gfi: new Map(), model: new Map(), area: new Map(), result: null, loading: false };
     const MATCH_CLOSE = 15, MATCH_APPROX = 30, MATCH_TIE = 6;   // ΔE thresholds, tuned on live imagery
 
     function locKey() {
@@ -2695,21 +2725,187 @@
         return props;
     }
 
-    // Open-Meteo best-match forecast at a point (hourly, UTC), cached 15 min.
+    // The models of the forecast's Models mode at a point (hourly, UTC), in
+    // one request, cached 15 min: { ids, per: { id: hourly }, merged } where
+    // `merged` holds the median across the models (wind direction: the
+    // average direction).
+    const MODEL_VARS = ['cloud_cover_low', 'visibility', 'precipitation', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
+    function readoutModels() {
+        return ((state.modelsByMode && state.modelsByMode.deterministic) || []).slice();
+    }
+
+    function readoutModelName(id) {
+        const m = (MODES.deterministic.models || []).find(x => x.id === id);
+        return m ? m.name : id;
+    }
+
     async function modelAt(ll, signal) {
-        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit},${state.windUnit}`;
+        const ids = readoutModels();
+        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit},${state.windUnit},${ids.join('+')}`;
         const hit = P.model.get(key);
         if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
         const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
-            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: 'cloud_cover_low,visibility,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: MODEL_VARS.join(','), models: ids.length ? ids.join(',') : undefined,
             past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined,
             wind_speed_unit: state.windUnit && state.windUnit !== 'ms' ? state.windUnit : undefined
         }, []);
         const res = await fetch(url, { signal });
         const body = await res.json();
         if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
-        P.model.set(key, { at: Date.now(), data: body.hourly });
-        return body.hourly;
+        const data = splitModels(body.hourly, ids);
+        P.model.set(key, { at: Date.now(), data });
+        return data;
+    }
+
+    // One response with several models has one column per variable and
+    // model ("precipitation_icon_seamless"); one model has plain names.
+    function splitModels(hourly, ids) {
+        const per = {};
+        if (ids.length <= 1) per[ids[0] || 'best_match'] = hourly;
+        else {
+            const vars = MODEL_VARS.slice().sort((a, b) => b.length - a.length);
+            Object.keys(hourly).forEach(k => {
+                const v = vars.find(x => k.startsWith(x + '_'));
+                if (!v) return;
+                const sfx = k.slice(v.length + 1);
+                const id = ids.find(m => m === sfx) || ids.find(m => m.startsWith(sfx + '_') || sfx.startsWith(m + '_'));
+                if (!id) return;
+                (per[id] || (per[id] = { time: hourly.time }))[v] = hourly[k];
+            });
+        }
+        const list = Object.values(per);
+        const merged = { time: hourly.time };
+        const med = vals => { const v = vals.filter(Number.isFinite).sort((a, b) => a - b); return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
+        MODEL_VARS.forEach(v => {
+            merged[v] = hourly.time.map((_, i) => {
+                const vals = list.map(hr => (hr[v] ? hr[v][i] : null));
+                if (v !== 'wind_direction_10m') return med(vals);
+                const ok = vals.filter(Number.isFinite);
+                if (!ok.length) return null;
+                const x = ok.reduce((s, d) => s + Math.sin(d * Math.PI / 180), 0), y = ok.reduce((s, d) => s + Math.cos(d * Math.PI / 180), 0);
+                return (Math.atan2(x, y) * 180 / Math.PI + 360) % 360;
+            });
+        });
+        return { ids: Object.keys(per), per, merged };
+    }
+
+    // Rain around a point in a small precipitation image (34 × 34 px, about
+    // 1 km per pixel): distance of the nearest rain within 17 km, or null.
+    async function rainAround(name, tm, ll, signal) {
+        const key = `${name}|${tm}|${ll.lat.toFixed(3)},${ll.lng.toFixed(3)}`;
+        if (P.area.has(key)) return P.area.get(key);
+        const n = 34;
+        const p = L.CRS.EPSG3857.project(ll), half = 17000 / Math.cos(ll.lat * Math.PI / 180);
+        const url = buildWmsUrl(MAP_CONFIG.wmsBase, {
+            SERVICE: 'WMS', VERSION: MAP_CONFIG.version, REQUEST: 'GetMap', LAYERS: name, STYLES: '', CRS: MAP_CONFIG.crs,
+            BBOX: [p.x - half, p.y - half, p.x + half, p.y + half].map(Math.round).join(','), WIDTH: n, HEIGHT: n,
+            FORMAT: MAP_CONFIG.overlayFormat, TRANSPARENT: 'TRUE', EXCEPTIONS: 'XML', TIME: new Date(tm).toISOString().replace('.000Z', 'Z')
+        });
+        const res = await fetch(url, { signal, credentials: 'omit' });
+        if (!res.ok || !(res.headers.get('content-type') || '').startsWith('image/')) throw new Error(`HTTP ${res.status}`);
+        const img = await createImageBitmap(await res.blob());
+        const c = document.createElement('canvas');
+        c.width = n; c.height = n;
+        const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(img, 0, 0, n, n);
+        const d = g.getImageData(0, 0, n, n).data;
+        let nearest = null;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+            if (d[(y * n + x) * 4 + 3] < 80) continue;
+            const km = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) * (2 * 17 / n);
+            if (km <= 17 && (nearest === null || km < nearest)) nearest = km;
+        }
+        const out = { nearest };
+        if (P.area.size > 200) P.area.clear();
+        P.area.set(key, out);
+        return out;
+    }
+
+    // ---- Satellite vs models
+    // Colour-key entries that mean fog / low cloud, or no cloud (land, sea),
+    // per product; only close colour matches count. Cloud Mask is exact.
+    const LOW_CLOUD_KEYS = { fog: [1, 2], dayMicro: [0, 1], natural: [0], cloudType: [0], cloudPhase: [0, 1] };
+    const CLEAR_KEYS = { fog: [0], dayMicro: [6, 7], natural: [4, 5, 7], cloudType: [7], cloudPhase: [7, 8, 9], clm: [1, 2] };
+
+    // 'low' | 'clear' | null from the satellite pixel under the crosshair.
+    function satCloudState(res) {
+        const p = res.sat && res.sat.status === 'fulfilled' ? res.sat.value : null;
+        if (!p || !res.product) return null;
+        const rgb = ['RED_BAND', 'GREEN_BAND', 'BLUE_BAND'].map(k => p[k]);
+        if (!rgb.every(Number.isFinite)) return null;
+        const key = RGB_KEYS[res.product];
+        if (!key || key.noMatch) return null;
+        // Night-only / day-only RGBs say nothing at the wrong time of day.
+        const role = (PRODUCTS.find(x => x.id === res.product) || {}).role;
+        const alt = sunAltitudeDeg(res.tm ?? Date.now(), res.ll.lat, res.ll.lng);
+        if ((role === 'night' && alt > -3) || (role === 'day' && alt < 6)) return null;
+        let i;
+        if (key.exact) i = key.colors.findIndex(c => hexRgb(c).every((v, k) => Math.abs(v - rgb[k]) <= 12));
+        else {
+            const m = matchKey(res.product, rgb);
+            if (!m || m[0].d > MATCH_CLOSE) return null;
+            i = m[0].i;
+        }
+        if ((LOW_CLOUD_KEYS[res.product] || []).includes(i)) return 'low';
+        if ((CLEAR_KEYS[res.product] || []).includes(i)) return 'clear';
+        return null;
+    }
+
+    // 'wet' (rain within 10 km, or a rain rate at the point) | 'dry' (none
+    // within 15 km) | null.
+    function satRainState(res) {
+        const r = res.rain && res.rain.status === 'fulfilled' && res.rain.value && res.rain.value.props;
+        const rate = r ? (r.Instantaneous_rain_rate ?? r.instantaneous_rain_rate ?? r.rain_rate) : null;
+        if (Number.isFinite(rate) && rate > 0) return 'wet';
+        const a = res.area && res.area.status === 'fulfilled' ? res.area.value : null;
+        if (!a) return null;
+        if (a.nearest !== null && a.nearest <= 10) return 'wet';
+        if (a.nearest === null || a.nearest > 15) return 'dry';
+        return null;
+    }
+
+    // Each model against the satellite, an hour either side of the image:
+    // [{ check, sat, agree: [names], disagree: [{ name, note }] }].
+    function compareModels(res) {
+        const m = res.model && res.model.status === 'fulfilled' ? res.model.value : null;
+        if (!m || !m.ids.length) return [];
+        const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
+        const inch = state.precipUnit === 'inch';
+        const mm = v => (inch ? v * 25.4 : v);
+        const fmtP = v => `${v.toLocaleString(currentLang, { maximumFractionDigits: inch ? 2 : 1, minimumFractionDigits: inch ? 2 : 1 })} ${inch ? 'in' : 'mm'}`;
+        const out = [];
+        const around = (hr, v) => {
+            const i = hr.time.findIndex(x => x.slice(0, 13) === target);
+            if (i < 0 || !hr[v]) return null;
+            const vals = [hr[v][i - 1], hr[v][i], hr[v][i + 1]].filter(Number.isFinite);
+            return vals.length ? { now: hr[v][i], min: Math.min(...vals), max: Math.max(...vals) } : null;
+        };
+        const run = (check, sat, judge) => {
+            if (!sat) return;
+            const row = { check, sat, agree: [], disagree: [] };
+            m.ids.forEach(id => {
+                const verdict = judge(m.per[id]);
+                if (!verdict) return;
+                if (verdict.ok) row.agree.push(readoutModelName(id));
+                else row.disagree.push({ name: readoutModelName(id), note: verdict.note });
+            });
+            if (row.agree.length || row.disagree.length) out.push(row);
+        };
+        run('rain', satRainState(res), hr => {
+            const p = around(hr, 'precipitation');
+            if (!p) return null;
+            if (satRainState(res) === 'wet') return mm(p.max) >= 0.1 ? { ok: true } : { ok: false, note: t('mapVsDry') };
+            if (mm(p.max) < 0.1) return { ok: true };
+            return Number.isFinite(p.now) && mm(p.now) >= 1 ? { ok: false, note: fmtP(p.now) } : null;
+        });
+        run('cloud', satCloudState(res), hr => {
+            const c = around(hr, 'cloud_cover_low');
+            if (!c) return null;
+            const note = t('mapVsLowPct', { v: Math.round(c.now ?? c.max) });
+            if (satCloudState(res) === 'low') return c.max >= 60 ? { ok: true } : c.max < 30 ? { ok: false, note } : null;
+            return c.min <= 30 ? { ok: true } : c.min >= 70 ? { ok: false, note } : null;
+        });
+        return out;
     }
 
     function precipTimeFor(name, tm) {
@@ -2797,11 +2993,16 @@
             return pt === null ? null : featureInfo(rainLayer.name, pt, ll, controller.signal).then(props => ({ props, t: pt }));
         }) : Promise.resolve(undefined);
         const model = navigator.onLine ? modelAt(ll, controller.signal) : Promise.reject(new Error(t('mapOffline')));
+        // Rain around the point, for the satellite-vs-models check.
+        const area = rainLayer && R.requestMode === 'fetch' ? refreshTimes(rainLayer.name).then(() => {
+            const pt = precipTimeFor(rainLayer.name, tm);
+            return pt === null ? null : rainAround(rainLayer.name, pt, ll, controller.signal);
+        }) : Promise.resolve(null);
         const scans = ['lightning', 'fire'].map(id => (activeOverlay(id) ? scanNearest(OVERLAYS.find(o => o.id === id), ll) : Promise.resolve(undefined)));
-        const [s, r, m, lt, fi] = await Promise.allSettled([sat, rain, model, ...scans]);
+        const [s, r, m, lt, fi, ar] = await Promise.allSettled([sat, rain, model, ...scans, area]);
         if (id !== P.seq) return;
         P.loading = false;
-        P.result = { ll, tm, layer, product, rainLayer, sat: s, rain: r, model: m, lightning: lt, fire: fi };
+        P.result = { ll, tm, layer, product, rainLayer, sat: s, rain: r, model: m, lightning: lt, fire: fi, area: ar };
         renderProbe();
     }
 
@@ -2899,7 +3100,7 @@
                 let html;
                 if (res.model.status === 'rejected') html = errText(res.model.reason);
                 else {
-                    const hr = res.model.value;
+                    const hr = res.model.value.merged;
                     const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
                     const i = hr.time.findIndex(x => x.slice(0, 13) === target);
                     if (i < 0) html = h(t('mapProbeNoData'));
@@ -2916,8 +3117,17 @@
                         }
                     }
                 }
-                rows += row('fa-chart-area', t('mapProbeModel'), html);
+                const nModels = res.model.status === 'fulfilled' ? res.model.value.ids.length : 0;
+                rows += row('fa-chart-area', nModels > 1 ? t('mapProbeModelsN', { n: nModels }) : t('mapProbeModel'), html);
                 if (windHtml) rows += row('fa-wind', t('mapProbeWind'), windHtml);
+                // Satellite vs each model: shown where a check could be made.
+                compareModels(res).forEach(c => {
+                    const satText = t(c.check === 'rain' ? (c.sat === 'wet' ? 'mapVsRainWet' : 'mapVsRainDry') : (c.sat === 'low' ? 'mapVsLow' : 'mapVsClear'));
+                    const agree = c.agree.length ? `<span class="text-emerald-300"><i class="fa-solid fa-check mr-0.5"></i>${h(c.disagree.length ? c.agree.join(', ') : t('mapVsAll', { n: c.agree.length }))}</span>` : '';
+                    const dis = c.disagree.length ? `<span class="text-amber-300 font-semibold"><i class="fa-solid fa-xmark mr-0.5"></i>${h(c.disagree.map(d => `${d.name} (${d.note})`).join(', '))}</span>` : '';
+                    rows += row(c.check === 'rain' ? 'fa-scale-balanced' : 'fa-scale-balanced', t(c.check === 'rain' ? 'mapVsRain' : 'mapVsCloud'),
+                        `<span class="text-slate-300">${h(satText)}</span> <span class="text-slate-500">·</span> ${[agree, dis].filter(Boolean).join(' <span class="text-slate-500">·</span> ')}`);
+                });
             }
         }
         card.innerHTML = `

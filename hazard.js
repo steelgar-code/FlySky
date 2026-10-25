@@ -330,6 +330,55 @@
         H.locKey = key;
         H.obs = { lightning: [], rain: [] };
         H.status = null;
+        H.now = null;
+    }
+
+    // ---- Satellite "now" at the location (for the flight card's check of
+    // the current forecast hour): Cloud Mask (exact classes) and, at night,
+    // the Fog / Low Clouds RGB colour. Point readings (GetFeatureInfo, a
+    // few hundred bytes each) of the latest image.
+    const NOW_LAYERS = { clm: 'msg_fes:clm', fog: 'msg_fes:rgb_fog' };
+    // Fog RGB colour key (EUMETSAT quick guide): 0 clear, 1–2 fog / low
+    // cloud, the rest other cloud. Close matches only (CIE Lab ΔE ≤ 15).
+    const FOG_KEY = [['#785af0', '#b06fd9'], '#9cd0d9', '#aad7b0', '#a6797b', '#820a14', '#a02700', '#1b009c', '#7800c8', '#c80078'];
+    const hexRgb = hx => [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+    function toLab([r, g, b]) {
+        const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+        const [R_, G_, B_] = [lin(r), lin(g), lin(b)];
+        const f = v => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+        const x = f((R_ * 0.4124 + G_ * 0.3576 + B_ * 0.1805) / 0.95047), y = f(R_ * 0.2126 + G_ * 0.7152 + B_ * 0.0722), z = f((R_ * 0.0193 + G_ * 0.1192 + B_ * 0.9505) / 1.08883);
+        return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+    }
+
+    async function pointRgb(name, loc) {
+        const p = project(loc.latitude, loc.longitude), d = 500;
+        const params = new URLSearchParams({
+            SERVICE: 'WMS', VERSION: '1.3.0', REQUEST: 'GetFeatureInfo', LAYERS: name, QUERY_LAYERS: name, STYLES: '', CRS: 'EPSG:3857',
+            BBOX: [p.x - d, p.y - d, p.x + d, p.y + d].map(Math.round).join(','), WIDTH: 3, HEIGHT: 3, I: 1, J: 1, INFO_FORMAT: 'application/json', FEATURE_COUNT: 1
+        });
+        const res = await fetchWithTimeout(`${HZ.wms}?${params}`, 30000);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const pr = data.features && data.features[0] ? data.features[0].properties : null;
+        const rgb = pr ? ['RED_BAND', 'GREEN_BAND', 'BLUE_BAND'].map(k => pr[k]) : null;
+        return rgb && rgb.every(Number.isFinite) ? rgb : null;
+    }
+
+    // 'low' (likely fog / low cloud) | 'clear' (no cloud) | null.
+    async function cloudNow(loc) {
+        const night = sunAltitudeDeg(Date.now(), loc.latitude, loc.longitude) < -3;
+        const [clm, fog] = await Promise.all([
+            pointRgb(NOW_LAYERS.clm, loc).catch(() => null),
+            night ? pointRgb(NOW_LAYERS.fog, loc).catch(() => null) : null
+        ]);
+        if (fog) {
+            const lab = toLab(fog);
+            const best = FOG_KEY.map((c, i) => ({ i, d: Math.min(...(Array.isArray(c) ? c : [c]).map(hx => Math.hypot(...toLab(hexRgb(hx)).map((v, k) => v - lab[k])))) }))
+                .sort((a, b) => a.d - b.d)[0];
+            if (best.d <= 15 && (best.i === 1 || best.i === 2)) return 'low';
+        }
+        if (clm && (Math.abs(clm[0] - 1) + Math.abs(clm[1] - 192) + Math.abs(clm[2] - 1) <= 24 || Math.abs(clm[0] - 1) + Math.abs(clm[1] - 1) + Math.abs(clm[2] - 255) <= 24)) return 'clear';
+        return null;
     }
 
     // ================= Polling =================
@@ -341,7 +390,9 @@
         H.polling = true;
         H.lastPoll = Date.now();
         const errors = [];
-        await Promise.all(KINDS.map(async kind => {
+        const nowLoc = state.location;
+        const cloud = cloudNow(nowLoc).then(c => { if (key === locKey()) H.now = { at: Date.now(), cloud: c }; }).catch(() => {});
+        await Promise.all([cloud, ...KINDS.map(async kind => {
             try {
                 const { name, t: tm } = await latestOf(kind);
                 if (H.obs[kind.id].some(o => o.t === tm && o.layer === name)) return;
@@ -354,7 +405,7 @@
             } catch (err) {
                 errors.push(`${t(kind.id === 'rain' ? 'hzRain' : 'hzLightning')}: ${err.message}`);
             }
-        }));
+        })]);
         H.polling = false;
         if (key !== locKey()) { poll(); return; }
         H.status = { at: Date.now(), error: errors.join('; ') };
@@ -523,8 +574,20 @@
         if (st) st.textContent = H.on ? statusText() : '';
     }
 
+    // Satellite now at the location: { rain: 'wet' | 'dry' | null,
+    // cloud: 'low' | 'clear' | null }, or null when there is nothing recent.
+    function nowState() {
+        if (!H.on || !state.location) return null;
+        const list = H.obs.rain.filter(o => o.layer === H.layer.rain);
+        const last = list[list.length - 1];
+        const rain = !last || Date.now() - last.t > HZ.maxAgeMs ? null : last.km !== null && last.km < 3 ? 'wet' : last.km === null || last.km > 15 ? 'dry' : null;
+        const cloud = H.now && Date.now() - H.now.at < 30 * 60e3 ? H.now.cloud : null;
+        return rain || cloud ? { rain, cloud } : null;
+    }
+
     function emit() {
         render();
+        if (typeof renderNowCheck === 'function') renderNowCheck();
         if (window.FlySkyMap && window.FlySkyMap.onHazardChange) window.FlySkyMap.onHazardChange();
     }
 
@@ -569,6 +632,7 @@
         },
         chipsHtml,
         statusText,
+        nowState,
         // The map shows an image taken at `tm` (ms).
         track,
         alertKm: HZ.alertKm,

@@ -309,19 +309,30 @@
 
             <!-- Flight conditions timeline -->
             <section id="flightCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
-                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-plane-departure text-emerald-400"></i>
-                    <span data-i18n="flightTitle">Flight Conditions</span>
-                </h3>
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-plane-departure text-emerald-400"></i>
+                        <span data-i18n="flightTitle">Flight Conditions</span>
+                    </h3>
+                    <!-- Main bar: one verdict per hour, or split by the share of members / models -->
+                    <button type="button" id="btnFlightSplit" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition" aria-pressed="false" data-i18n-title="flightSplitTitle" title="Split each hour by the share of members / models per verdict">
+                        <i class="fa-solid fa-chart-simple"></i><span data-i18n="flightSplitToggle">Split by share</span>
+                    </button>
+                </div>
                 <!-- Nearby lightning / rain (hazard.js) -->
                 <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
+                <!-- Satellite now vs this hour's forecast (only when they disagree) -->
+                <div id="nowCheck" class="hidden"></div>
                 <div id="flightMain">
                     <div class="relative">
                         <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                         <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                     </div>
+                    <!-- Forecast confidence (members / models agreeing) -->
+                    <div id="flightConf" class="flex h-1.5 mt-1 rounded-full overflow-hidden bg-slate-950 cursor-crosshair"></div>
                     <div data-daynight class="h-1.5 mt-1 rounded-full"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                    <p id="flightConfLegend" class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-slate-500"></p>
                 </div>
                 <p id="flightSun" class="text-[11px] text-slate-400 flex items-center gap-x-3 whitespace-nowrap overflow-hidden"></p>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
@@ -756,6 +767,32 @@
                 flightNoData: "No data",
                 flightHours: "{n} h {label}",
                 flightNextGood: "next suitable: {when}",
+                flightSplitToggle: "Split by share",
+                nowRainWet: "Satellite now: raining at your location — forecast for this hour: {p} rain chance.",
+                nowRainDry: "Satellite now: no rain within 15 km — forecast for this hour: {p} rain chance.",
+                nowCloudLow: "Satellite now: likely fog / low cloud at your location — forecast for this hour: low clouds {v}%.",
+                nowCloudClear: "Satellite now: no cloud at your location — forecast for this hour: low clouds {v}%.",
+                nowCaution: "The forecast is off right now — treat the next hours with caution.",
+                flightSplitTitle: "Split each hour by the share of members / models per verdict",
+                confLegend: "Forecast confidence ({what} agreeing):",
+                confWhatMembers: "members",
+                confWhatModels: "models",
+                confLevel_high: "high",
+                confLevel_medium: "medium",
+                confLevel_low: "low",
+                conf_high: "high confidence",
+                conf_medium: "medium confidence",
+                conf_low: "low confidence",
+                confHour: "confidence {level} ({pct})",
+                confSplit: "suitable {good} · uncertain {marginal} · not suitable {bad}",
+                confByModel: "by model",
+                confMembersN: "{n} members",
+                confCause: "{conf} — {cause} uncertain",
+                confCause_rain: "rain",
+                confCause_wind: "wind",
+                confCause_gust: "gusts",
+                confCause_cloud: "low clouds",
+                confCause_vis: "visibility",
                 flightNoGood: "no suitable hours in this window",
                 settingsTitle: "Settings",
                 factorDetailHint: "Hover or tap a bar above to see that hour's values (tap to pin).",
@@ -802,7 +839,7 @@
                 toastSettingsReset: "Settings reset to defaults",
                 hazardSettingsTitle: "Nearby hazards",
                 hazardSettingLabel: "Lightning & rain alerts",
-                hazardSettingDesc: "A chip on the flight card (and on the map) when satellite data shows lightning or rain within 50 km of the forecast location, with direction and, once a few images have been seen, how fast it is coming. Only the latest small EUMETSAT image is checked, every 5 min while the app is open.",
+                hazardSettingDesc: "A chip on the flight card (and on the map) when satellite data shows lightning or rain within 50 km of the forecast location, with direction and, once a few images have been seen, how fast it is coming. It also warns when the satellite disagrees with this hour's forecast (rain, fog / low cloud, clear sky). Only the latest small EUMETSAT images are checked, every 5 min while the app is open.",
                 flightOnMap: "Map",
                 fullscreenOn: "Full screen",
                 fullscreenOff: "Exit full screen",
@@ -942,6 +979,32 @@
                 flightNoData: "Немає даних",
                 flightHours: "{n} год — {label}",
                 flightNextGood: "наступне придатне: {when}",
+                flightSplitToggle: "Частки",
+                nowRainWet: "Супутник зараз: над вашою локацією опади — прогноз на цю годину: ймовірність опадів {p}.",
+                nowRainDry: "Супутник зараз: опадів у межах 15 км немає — прогноз на цю годину: ймовірність опадів {p}.",
+                nowCloudLow: "Супутник зараз: ймовірно туман / низька хмарність над локацією — прогноз на цю годину: низька хмарність {v}%.",
+                nowCloudClear: "Супутник зараз: над локацією хмар немає — прогноз на цю годину: низька хмарність {v}%.",
+                nowCaution: "Прогноз зараз не збігається з дійсністю — до найближчих годин ставтеся обережно.",
+                flightSplitTitle: "Розділити кожну годину за часткою членів ансамблю / моделей для кожного висновку",
+                confLegend: "Впевненість прогнозу (згода {what}):",
+                confWhatMembers: "членів ансамблю",
+                confWhatModels: "моделей",
+                confLevel_high: "висока",
+                confLevel_medium: "середня",
+                confLevel_low: "низька",
+                conf_high: "висока впевненість",
+                conf_medium: "середня впевненість",
+                conf_low: "низька впевненість",
+                confHour: "впевненість {level} ({pct})",
+                confSplit: "придатно {good} · невизначено {marginal} · непридатно {bad}",
+                confByModel: "за моделями",
+                confMembersN: "{n} членів",
+                confCause: "{conf} — невизначеність: {cause}",
+                confCause_rain: "опади",
+                confCause_wind: "вітер",
+                confCause_gust: "пориви",
+                confCause_cloud: "низька хмарність",
+                confCause_vis: "видимість",
                 flightNoGood: "немає придатних годин у цьому періоді",
                 settingsTitle: "Налаштування",
                 factorDetailHint: "Наведіть або торкніться смуги вище, щоб побачити значення за цю годину (дотик закріплює).",
@@ -988,7 +1051,7 @@
                 toastSettingsReset: "Налаштування скинуто до типових",
                 hazardSettingsTitle: "Небезпека поруч",
                 hazardSettingLabel: "Попередження про блискавки й опади",
-                hazardSettingDesc: "Позначка на картці польоту (і на карті), коли супутникові дані показують блискавки чи опади в межах 50 км від локації прогнозу — з напрямком і, після кількох знімків, швидкістю наближення. Перевіряється лише останній невеликий знімок EUMETSAT, кожні 5 хв, поки застосунок відкритий.",
+                hazardSettingDesc: "Позначка на картці польоту (і на карті), коли супутникові дані показують блискавки чи опади в межах 50 км від локації прогнозу — з напрямком і, після кількох знімків, швидкістю наближення. Також попереджає, коли супутник не збігається з прогнозом на цю годину (опади, туман / низька хмарність, ясно). Перевіряються лише останні невеликі знімки EUMETSAT, кожні 5 хв, поки застосунок відкритий.",
                 flightOnMap: "Карта",
                 fullscreenOn: "Повний екран",
                 fullscreenOff: "Вийти з повного екрана",
@@ -1128,6 +1191,32 @@
                 flightNoData: "Sem dados",
                 flightHours: "{n} h {label}",
                 flightNextGood: "próximo adequado: {when}",
+                flightSplitToggle: "Dividir por fração",
+                nowRainWet: "Satélite agora: chovendo no seu local — previsão para esta hora: {p} de chance de chuva.",
+                nowRainDry: "Satélite agora: sem chuva a até 15 km — previsão para esta hora: {p} de chance de chuva.",
+                nowCloudLow: "Satélite agora: provável nevoeiro / nuvem baixa no seu local — previsão para esta hora: nuvens baixas {v}%.",
+                nowCloudClear: "Satélite agora: sem nuvens no seu local — previsão para esta hora: nuvens baixas {v}%.",
+                nowCaution: "A previsão não confere com o momento — trate as próximas horas com cautela.",
+                flightSplitTitle: "Dividir cada hora pela fração de membros / modelos em cada avaliação",
+                confLegend: "Confiança da previsão ({what} de acordo):",
+                confWhatMembers: "membros",
+                confWhatModels: "modelos",
+                confLevel_high: "alta",
+                confLevel_medium: "média",
+                confLevel_low: "baixa",
+                conf_high: "confiança alta",
+                conf_medium: "confiança média",
+                conf_low: "confiança baixa",
+                confHour: "confiança {level} ({pct})",
+                confSplit: "adequado {good} · incerto {marginal} · inadequado {bad}",
+                confByModel: "por modelo",
+                confMembersN: "{n} membros",
+                confCause: "{conf} — incerteza: {cause}",
+                confCause_rain: "chuva",
+                confCause_wind: "vento",
+                confCause_gust: "rajadas",
+                confCause_cloud: "nuvens baixas",
+                confCause_vis: "visibilidade",
                 flightNoGood: "nenhuma hora adequada neste período",
                 settingsTitle: "Configurações",
                 factorDetailHint: "Passe o mouse ou toque em uma barra acima para ver os valores daquela hora (toque para fixar).",
@@ -1174,7 +1263,7 @@
                 toastSettingsReset: "Configurações restauradas",
                 hazardSettingsTitle: "Perigos próximos",
                 hazardSettingLabel: "Alertas de raios e chuva",
-                hazardSettingDesc: "Um aviso no cartão de voo (e no mapa) quando os dados de satélite mostram raios ou chuva a até 50 km do local da previsão, com a direção e, depois de algumas imagens, a velocidade de aproximação. Só a imagem pequena mais recente da EUMETSAT é verificada, a cada 5 min com o app aberto.",
+                hazardSettingDesc: "Um aviso no cartão de voo (e no mapa) quando os dados de satélite mostram raios ou chuva a até 50 km do local da previsão, com a direção e, depois de algumas imagens, a velocidade de aproximação. Também avisa quando o satélite não confere com a previsão desta hora (chuva, nevoeiro / nuvem baixa, céu limpo). Só as imagens pequenas mais recentes da EUMETSAT são verificadas, a cada 5 min com o app aberto.",
                 flightOnMap: "Mapa",
                 fullscreenOn: "Tela cheia",
                 fullscreenOff: "Sair da tela cheia",
@@ -1356,6 +1445,8 @@
             flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
             statsCollapsed: loadFromStorage('flysky_stats_collapsed', false) === true,
             plannerOpen: loadFromStorage('flysky_planner_open', true) !== false,
+            // Main flight bar split by the share of members / models per verdict.
+            flightSplit: loadFromStorage('flysky_flight_split', false) === true,
             flightRules: sanitizeFlightRules(loadFromStorage('flysky_flight_rules', null)),
             minSlotHours: loadFromStorage('flysky_min_slot_hours', DEFAULT_MIN_SLOT),
             // Which wind the flight rules judge: 'surface' = 10 m wind + gusts,
@@ -1876,6 +1967,78 @@
                 const reasons = Object.keys(checks).filter(k => checks[k] && checks[k] === status && status !== 'good');
                 return { time, status, values, checks, reasons };
             });
+
+            // ---- Forecast confidence: how much the members (Ensemble) or
+            // models (Models) agree with each other. Each member / model gets
+            // its own verdict from its own values (rain: wet or dry in that
+            // hour); the shares are averaged per model so every model counts
+            // the same, whatever its number of members. Confidence is the
+            // share of the largest group.
+            const series = {};   // member id -> { model, rain, wind, gust, cloud, vis }
+            const pick = (fn, a, b) => (!known(a) ? b : !known(b) ? a : fn(a, b));
+            const take = (key, check, fn) => {
+                const p = result.params[key];
+                if (!p) return;
+                p.members.forEach(m => {
+                    // "_member07" (or "" for a control run / single model) names
+                    // the member across variables; wind aloft pools two levels,
+                    // which take the stronger value.
+                    const id = `${m.model}|${m.key.slice(m.variable.length)}`;
+                    const ser = series[id] || (series[id] = { model: m.model });
+                    ser[check] = ser[check] ? ser[check].map((v, i) => pick(fn, v, m.values[i])) : m.values.slice();
+                });
+            };
+            take('precipitation', 'rain', Math.max);
+            take(aloft ? 'wind_aloft' : 'wind_speed_10m', 'wind', Math.max);
+            if (!aloft) take('wind_gusts_10m', 'gust', Math.max);
+            take('cloud_cover_low', 'cloud', Math.max);
+            take('visibility', 'vis', Math.min);
+            const wet = state.precipUnit === 'inch' ? WET_HOUR_MM / 25.4 : WET_HOUR_MM;
+            const CHECKS = ['rain', 'wind', 'gust', 'cloud', 'vis'];
+            const memberChecks = (ser, i) => ({
+                rain: ser.rain && known(ser.rain[i]) ? rainLevel(ser.rain[i] >= wet - 1e-9 ? 100 : 0) : null,
+                wind: ser.wind && known(ser.wind[i]) ? level(ser.wind[i] * toMs, R.windGood, R.windBad) : null,
+                gust: ser.gust && known(ser.gust[i]) ? level(ser.gust[i] * toMs, R.windGood, R.windBad) : null,
+                cloud: ser.cloud ? level(ser.cloud[i], R.cloudGood, R.cloudBad) : null,
+                vis: ser.vis ? visLevel(ser.vis[i]) : null
+            });
+            const STATUSES = ['good', 'marginal', 'bad'];
+            const sharesOf = counts => {
+                const models = Object.values(counts).filter(c => c.n);
+                const out = { good: 0, marginal: 0, bad: 0 };
+                models.forEach(c => STATUSES.forEach(st => { out[st] += c[st] / c.n / models.length; }));
+                return models.length ? out : null;
+            };
+            const topOf = sh => STATUSES.reduce((a, b) => (sh[b] > sh[a] ? b : a), 'good');
+            hours.forEach((h, i) => {
+                const all = {}, byCheck = {};
+                Object.values(series).forEach(ser => {
+                    const c = memberChecks(ser, i);
+                    const v = CHECKS.map(k => c[k]).filter(Boolean);
+                    if (!v.length) return;
+                    const st = v.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good');
+                    const m = all[ser.model] || (all[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
+                    m.n++; m[st]++;
+                    CHECKS.forEach(k => {
+                        if (!c[k]) return;
+                        const bm = (byCheck[k] || (byCheck[k] = {}));
+                        const x = bm[ser.model] || (bm[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
+                        x.n++; x[c[k]]++;
+                    });
+                });
+                const shares = sharesOf(all);
+                if (!shares) { h.agree = null; return; }
+                const top = topOf(shares);
+                const conf = shares[top];
+                const checkConf = {};
+                Object.keys(byCheck).forEach(k => { const sh = sharesOf(byCheck[k]); if (sh) checkConf[k] = sh[topOf(sh)]; });
+                h.agree = {
+                    shares, top, conf, checkConf,
+                    level: conf >= 0.8 ? 'high' : conf >= 0.6 ? 'medium' : 'low',
+                    members: Object.values(all).reduce((s, c) => s + c.n, 0),
+                    models: Object.entries(all).map(([model, c]) => ({ model, n: c.n, share: c[top] / c.n }))
+                };
+            });
             return { hours, missing };
         }
 
@@ -1975,9 +2138,10 @@
                     return decisive ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
                 });
             const label = factor ? `${factorLabel(factor)}: ${t(st.labelKey)}` : t(st.labelKey);
+            const conf = !factor && h.agree ? ` <span class="text-slate-600">·</span> <span style="color: ${CONF_TEXT[h.agree.level]}">${escapeHtml(confText(h))}</span>` : '';
             return `<span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
                 <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>
-                <span class="text-slate-400">${parts.join(' · ')}</span>`;
+                <span class="text-slate-400">${parts.join(' · ')}</span>${conf}`;
         }
 
         // One cell per hour; a 2px gap wherever the status changes keeps
@@ -1990,6 +2154,63 @@
             }).join('');
         }
 
+        // ---- Forecast confidence (see computeFlight)
+        const CONF_BG = { high: '#67e8f9', medium: '#0e7490', low: 'repeating-linear-gradient(135deg, #94a3b8 0 1.5px, #1e293b 1.5px 4px)' };
+        const CONF_TEXT = { high: '#67e8f9', medium: '#22d3ee', low: '#94a3b8' };
+
+        function confText(h) {
+            const a = h.agree;
+            return a ? t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }) : '';
+        }
+
+        function confCellsHtml(hours) {
+            return hours.map((h, i) => {
+                const a = h.agree;
+                return `<div data-flight-hour="${i}" class="flex-1 min-w-0" style="background: ${a ? CONF_BG[a.level] : '#1e293b'}" title="${escapeHtml(formatDayHour(h.time) + (a ? ' · ' + confText(h) : ''))}"></div>`;
+            }).join('');
+        }
+
+        // Each hour stacked by share: suitable at the bottom, then uncertain,
+        // then not suitable.
+        function splitCellsHtml(hours) {
+            const c = st => FLIGHT_STATUS[st].color;
+            return hours.map((h, i) => {
+                const a = h.agree;
+                const g = a ? a.shares.good * 100 : 0, m = a ? g + a.shares.marginal * 100 : 0;
+                const bg = a ? `linear-gradient(to top, ${c('good')} 0 ${g}%, ${c('marginal')} ${g}% ${m}%, ${c('bad')} ${m}% 100%)` : c(h.status);
+                return `<div data-flight-hour="${i}" class="flex-1 min-w-0 hover:brightness-125 transition" style="${i ? 'margin-left: 1px;' : ''} background: ${bg}" title="${escapeHtml(formatDayHour(h.time) + (a ? ' · ' + confSplitText(a) : ''))}"></div>`;
+            }).join('');
+        }
+
+        function confSplitText(a) {
+            return t('confSplit', { good: formatPercent(a.shares.good * 100), marginal: formatPercent(a.shares.marginal * 100), bad: formatPercent(a.shares.bad * 100) });
+        }
+
+        // Pinned hour: the split and each model's share.
+        function confDetailHtml(h) {
+            const a = h.agree;
+            if (!a) return '';
+            const byModel = a.models.length > 1 ? ` <span class="text-slate-500">· ${escapeHtml(t(FLIGHT_STATUS[a.top].labelKey))} ${escapeHtml(t('confByModel'))}:</span> ${a.models.map(m =>
+                `<span class="whitespace-nowrap">${escapeHtml(modelName(m.model))} ${escapeHtml(formatPercent(m.share * 100))}</span>`).join(' · ')}` : '';
+            return `<span class="block mt-1 text-[11px] text-slate-400"><i class="fa-solid fa-signal mr-1 text-[9px]" style="color: ${CONF_TEXT[a.level]}"></i>${escapeHtml(confSplitText(a))}${byModel}</span>`;
+        }
+
+        function renderConfidence(hours) {
+            const has = hours.some(h => h.agree);
+            const strip = document.getElementById('flightConf');
+            strip.classList.toggle('hidden', !has);
+            strip.innerHTML = has ? confCellsHtml(hours) : '';
+            const sw = lvl => `<span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-1.5 rounded-full" style="background: ${CONF_BG[lvl]}"></span>${escapeHtml(t('confLevel_' + lvl))}</span>`;
+            document.getElementById('flightConfLegend').innerHTML = has
+                ? `<span>${escapeHtml(t('confLegend', { what: t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels') }))}</span>${sw('high')} <span>≥ 80%</span>${sw('medium')}${sw('low')} <span>&lt; 60%</span>`
+                : '';
+            const btn = document.getElementById('btnFlightSplit');
+            btn.classList.toggle('hidden', !has);
+            btn.setAttribute('aria-pressed', state.flightSplit ? 'true' : 'false');
+            btn.classList.toggle('!border-cyan-500', state.flightSplit);
+            btn.classList.toggle('!text-cyan-300', state.flightSplit);
+        }
+
         function flightSummaryHtml() {
             const f = processed && processed.flight;
             if (!f || !f.hours.length) return escapeHtml(state.loading ? t('loading') : t('statNoData'));
@@ -1999,7 +2220,7 @@
             return `${pill('good', count('good'))} <span class="text-slate-600 mx-1">·</span>
                 ${pill('marginal', count('marginal'))} <span class="text-slate-600 mx-1">·</span>
                 ${pill('bad', count('bad'))} <span class="text-slate-600 mx-1">·</span>
-                <span class="text-slate-400">${escapeHtml(nextGood ? t('flightNextGood', { when: formatDayHour(nextGood.time) }) : t('flightNoGood'))}</span>`;
+                <span class="text-slate-400">${escapeHtml(nextGood ? t('flightNextGood', { when: formatDayHour(nextGood.time) }) + (nextGood.agree ? ` (${t('conf_' + nextGood.agree.level)})` : '') : t('flightNoGood'))}</span>`;
         }
 
         // Hour pinned on the main bar (by its local time, so it survives the
@@ -2014,7 +2235,7 @@
             if (!shown) return flightSummaryHtml();
             if (shown !== pinned) return flightHourText(shown);
             return `${flightHourText(shown)} <button type="button" data-flight-map="${escapeHtml(shown.time)}" title="${escapeHtml(t('flightOnMapTitle'))}"
-                class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold align-middle transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>`;
+                class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold align-middle transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>${confDetailHtml(shown)}`;
         }
 
         function markMainPin() {
@@ -2030,13 +2251,37 @@
             loadMapAssets().then(() => { if (window.FlySkyMap) window.FlySkyMap.showHour(ms); }).catch(() => {});
         }
 
+        // Satellite now at the location (hazard.js) against the current
+        // forecast hour; shown only when they clearly disagree.
+        function renderNowCheck() {
+            const el = document.getElementById('nowCheck');
+            const sat = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard.nowState() : null;
+            const h = processed && processed.flight ? processed.flight.hours[0] : null;
+            const notes = [];
+            if (sat && h) {
+                const chance = h.values.rain, cloud = h.values.cloud;
+                const pct = v => formatPercent(v);
+                if (sat.rain === 'wet' && Number.isFinite(chance) && chance < 20) notes.push(t('nowRainWet', { p: pct(chance) }));
+                if (sat.rain === 'dry' && Number.isFinite(chance) && chance >= 70) notes.push(t('nowRainDry', { p: pct(chance) }));
+                if (sat.cloud === 'low' && Number.isFinite(cloud) && cloud < 30) notes.push(t('nowCloudLow', { v: Math.round(cloud) }));
+                if (sat.cloud === 'clear' && Number.isFinite(cloud) && cloud >= 70) notes.push(t('nowCloudClear', { v: Math.round(cloud) }));
+            }
+            el.classList.toggle('hidden', !notes.length);
+            el.innerHTML = notes.length ? `<div class="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-950/50 border border-amber-800/50 text-xs text-amber-100">
+                <i class="fa-solid fa-satellite-dish text-amber-300 mt-0.5"></i>
+                <span class="min-w-0">${notes.map(n => `<span class="block">${escapeHtml(n)}</span>`).join('')}<span class="block text-[11px] text-amber-200/70">${escapeHtml(t('nowCaution'))}</span></span>
+            </div>` : '';
+        }
+
         function renderFlight() {
             const strip = document.getElementById('flightStrip');
             const detail = document.getElementById('flightDetail');
             const f = processed && processed.flight;
             const hours = f ? f.hours : [];
 
-            strip.innerHTML = flightCellsHtml(hours, h => h.status);
+            strip.innerHTML = state.flightSplit && hours.some(h => h.agree) ? splitCellsHtml(hours) : flightCellsHtml(hours, h => h.status);
+            renderConfidence(hours);
+            renderNowCheck();
 
             document.getElementById('flightFactorBars').innerHTML = FLIGHT_FACTORS.map(factor => {
                 const noData = hours.length && hours.every(h => factorStatus(h, factor) === 'none');
@@ -2181,6 +2426,11 @@
             detail.addEventListener('click', e => {
                 const btn = e.target.closest('[data-flight-map]');
                 if (btn) openMapAt(btn.dataset.flightMap);
+            });
+            document.getElementById('btnFlightSplit').addEventListener('click', () => {
+                state.flightSplit = !state.flightSplit;
+                saveToStorage('flysky_flight_split', state.flightSplit);
+                renderFlight();
             });
 
             // Breakdown bars: their own details block. Hover previews an hour;
@@ -2427,8 +2677,24 @@
                     });
                 }
             });
+            // Confidence of a slot: the average over its hours; the cause is
+            // the factor the members / models agree on least.
+            const confOf = sl => {
+                const hs = hours.slice(sl.start, sl.end + 1).filter(h => h.agree);
+                if (!hs.length) return null;
+                const conf = hs.reduce((s, h) => s + h.agree.conf, 0) / hs.length;
+                let cause = null, low = 0.8;
+                ['rain', 'wind', 'gust', 'cloud', 'vis'].forEach(k => {
+                    const v = hs.filter(h => k in h.agree.checkConf);
+                    if (!v.length) return;
+                    const c = v.reduce((s, h) => s + h.agree.checkConf[k], 0) / v.length;
+                    if (c < low) { low = c; cause = k; }
+                });
+                return { conf, level: conf >= 0.8 ? 'high' : conf >= 0.6 ? 'medium' : 'low', cause };
+            };
             return slots.map(sl => ({
                 ...sl,
+                confidence: confOf(sl),
                 day: hours[sl.start].time.slice(0, 10),
                 from: hours[sl.start].time,
                 to: addHoursToLocal(hours[sl.end].time, 1),
@@ -2490,6 +2756,8 @@
                     // the same window stay visually joined.
                     const newWindow = i > 0 && d.slots[i - 1].window !== sl.window;
                     const reason = sl.status === 'marginal' ? planReasonText(sl) : '';
+                    const cf = sl.confidence;
+                    const confTag = !cf ? '' : cf.level !== 'high' && cf.cause ? t('confCause', { conf: t('conf_' + cf.level), cause: t('confCause_' + cf.cause) }) : t('conf_' + cf.level);
                     return `<li class="flex items-start gap-2.5 py-1.5 ${newWindow ? 'mt-1.5 pt-2.5 border-t border-slate-800' : ''}">
                         <span class="w-1 self-stretch rounded-full shrink-0" style="background: ${st.color}"></span>
                         <i class="fa-solid ${st.icon} text-xs mt-0.5 shrink-0" style="color: ${st.color}" title="${escapeHtml(t(st.labelKey))}"></i>
@@ -2497,6 +2765,7 @@
                             <span class="font-mono text-sm text-slate-100">${escapeHtml(formatHour(sl.from))}–${escapeHtml(formatHour(sl.to))}</span>
                             <span class="text-[11px] text-slate-500 ml-1">${escapeHtml(t('windowHours', { n: sl.hours }))}</span>
                             ${reason ? `<span class="block text-[11px] text-amber-300/90">${escapeHtml(reason)}</span>` : ''}
+                            ${confTag ? `<span class="block text-[11px]" style="color: ${CONF_TEXT[cf.level]}"><i class="fa-solid fa-signal mr-1 text-[9px]"></i>${escapeHtml(confTag)}</span>` : ''}
                         </span>
                     </li>`;
                 }).join('');
@@ -3664,7 +3933,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=7';
+        const MAP_JS = 'map.js?v=8';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
@@ -3723,7 +3992,7 @@
 
         // ---- Nearby-hazard alerts (hazard.js, loaded only while switched on)
         const HAZARD_KEY = 'flysky_hazard';
-        const HAZARD_JS = 'hazard.js?v=4';
+        const HAZARD_JS = 'hazard.js?v=5';
         let hazardPromise = null;
 
         function hazardEnabled() {
