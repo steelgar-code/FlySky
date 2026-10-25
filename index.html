@@ -262,6 +262,15 @@
                 </div>
             </section>
 
+            <!-- "Can I fly now?": the current hour at a glance (renderNow) -->
+            <section id="nowCard" class="hidden px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
+                <div id="nowMain" class="space-y-3"></div>
+                <!-- Nearby lightning / rain (hazard.js) -->
+                <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
+                <!-- Satellite now vs this hour's forecast (only when they disagree) -->
+                <div id="nowCheck" class="hidden"></div>
+            </section>
+
             <!-- Forecast settings: models + units (collapsible) -->
             <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
                 <button type="button" id="btnSettingsToggle" class="w-full flex items-center justify-between gap-3 text-left" aria-expanded="true" aria-controls="settingsBody">
@@ -291,7 +300,7 @@
             </section>
 
             <!-- Summary stat cards -->
-            <section id="statsCard" class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4">
+            <section id="statsCard" class="p-3.5 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-4">
                 <button type="button" id="btnStatsToggle" class="w-full flex items-center justify-between gap-3 text-left" aria-expanded="true" aria-controls="statsGrid">
                     <span class="min-w-0">
                         <span class="font-semibold text-slate-200 text-sm flex items-center gap-2">
@@ -304,7 +313,7 @@
                         <i id="statsChevron" class="fa-solid fa-chevron-up text-xs transition-transform"></i>
                     </span>
                 </button>
-                <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3"></div>
+                <div id="statsGrid" class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-2 sm:gap-3"></div>
             </section>
 
             <!-- Flight conditions timeline -->
@@ -319,10 +328,6 @@
                         <i class="fa-solid fa-chart-simple"></i><span data-i18n="flightSplitToggle">Split by share</span>
                     </button>
                 </div>
-                <!-- Nearby lightning / rain (hazard.js) -->
-                <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
-                <!-- Satellite now vs this hour's forecast (only when they disagree) -->
-                <div id="nowCheck" class="hidden"></div>
                 <div id="flightMain">
                     <div class="relative">
                         <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
@@ -768,6 +773,21 @@
                 flightHours: "{n} h {label}",
                 flightNextGood: "next suitable: {when}",
                 flightSplitToggle: "Split by share",
+                nowTitle: "Can I fly now?",
+                nowDetails: "Details",
+                nowAllGood: "Everything is within your limits.",
+                nowLimitedBy: "Limited by",
+                nowTile_rain: "Rain",
+                nowTile_wind: "Wind",
+                nowTile_windAloft: "Aloft",
+                nowTile_gust: "Gusts",
+                nowTile_cloud: "Low cloud",
+                nowTile_vis: "Visibility",
+                nowTileRange: "80% range {range}",
+                nowTilesNote: "Strip under each tile: that factor over the next 6 hours.",
+                nowSuitableUntil: "Suitable now until {time} ({n})",
+                nowNextSuitable: "Next suitable: {when} ({n})",
+                nowNoSuitable: "No suitable window in the next {window}.",
                 nowRainWet: "Satellite now: raining at your location — forecast for this hour: {p} rain chance.",
                 nowRainDry: "Satellite now: no rain within 15 km — forecast for this hour: {p} rain chance.",
                 nowCloudLow: "Satellite now: likely fog / low cloud at your location — forecast for this hour: low clouds {v}%.",
@@ -980,6 +1000,21 @@
                 flightHours: "{n} год — {label}",
                 flightNextGood: "наступне придатне: {when}",
                 flightSplitToggle: "Частки",
+                nowTitle: "Чи можна літати зараз?",
+                nowDetails: "Деталі",
+                nowAllGood: "Усе в межах ваших порогів.",
+                nowLimitedBy: "Обмежує:",
+                nowTile_rain: "Опади",
+                nowTile_wind: "Вітер",
+                nowTile_windAloft: "На висоті",
+                nowTile_gust: "Пориви",
+                nowTile_cloud: "Низькі хмари",
+                nowTile_vis: "Видимість",
+                nowTileRange: "80% діапазон {range}",
+                nowTilesNote: "Смужка під кожною плиткою: цей чинник на найближчі 6 годин.",
+                nowSuitableUntil: "Придатно зараз до {time} ({n})",
+                nowNextSuitable: "Наступне придатне: {when} ({n})",
+                nowNoSuitable: "Немає придатного вікна в найближчі {window}.",
                 nowRainWet: "Супутник зараз: над вашою локацією опади — прогноз на цю годину: ймовірність опадів {p}.",
                 nowRainDry: "Супутник зараз: опадів у межах 15 км немає — прогноз на цю годину: ймовірність опадів {p}.",
                 nowCloudLow: "Супутник зараз: ймовірно туман / низька хмарність над локацією — прогноз на цю годину: низька хмарність {v}%.",
@@ -1192,6 +1227,21 @@
                 flightHours: "{n} h {label}",
                 flightNextGood: "próximo adequado: {when}",
                 flightSplitToggle: "Dividir por fração",
+                nowTitle: "Posso voar agora?",
+                nowDetails: "Detalhes",
+                nowAllGood: "Tudo dentro dos seus limites.",
+                nowLimitedBy: "Limitado por",
+                nowTile_rain: "Chuva",
+                nowTile_wind: "Vento",
+                nowTile_windAloft: "Em altura",
+                nowTile_gust: "Rajadas",
+                nowTile_cloud: "Nuvem baixa",
+                nowTile_vis: "Visibilidade",
+                nowTileRange: "faixa de 80% {range}",
+                nowTilesNote: "Faixa sob cada bloco: esse fator nas próximas 6 horas.",
+                nowSuitableUntil: "Adequado agora até {time} ({n})",
+                nowNextSuitable: "Próximo adequado: {when} ({n})",
+                nowNoSuitable: "Nenhuma janela adequada nas próximas {window}.",
                 nowRainWet: "Satélite agora: chovendo no seu local — previsão para esta hora: {p} de chance de chuva.",
                 nowRainDry: "Satélite agora: sem chuva a até 15 km — previsão para esta hora: {p} de chance de chuva.",
                 nowCloudLow: "Satélite agora: provável nevoeiro / nuvem baixa no seu local — previsão para esta hora: nuvens baixas {v}%.",
@@ -2221,6 +2271,7 @@
             document.getElementById('chartsContainer').classList.toggle('hidden', !hasLocation);
             document.getElementById('legendCard').classList.toggle('hidden', !hasLocation);
             document.getElementById('flightCard').classList.toggle('hidden', !hasLocation);
+            document.getElementById('nowCard').classList.toggle('hidden', !hasLocation);
             if (hasLocation) {
                 renderFlight();
                 renderStats();
@@ -2382,6 +2433,104 @@
             loadMapAssets().then(() => { if (window.FlySkyMap) window.FlySkyMap.showHour(ms); }).catch(() => {});
         }
 
+        // ---- "Can I fly now?" card: the current hour's verdict, its
+        // confidence and limiting factors, one tile per tracked factor
+        // (green / yellow / red by its own check), and the next suitable
+        // window. The hazard chips and the satellite note sit below it.
+        const NOW_TILES = [
+            { key: 'rain', icon: 'fa-cloud-rain', labelKey: 'nowTile_rain' },
+            { key: 'wind', icon: 'fa-wind', labelKey: 'nowTile_wind', aloftKey: 'nowTile_windAloft' },
+            { key: 'gust', icon: 'fa-wind', labelKey: 'nowTile_gust' },
+            { key: 'cloud', icon: 'fa-cloud', labelKey: 'nowTile_cloud' },
+            { key: 'vis', icon: 'fa-eye', labelKey: 'nowTile_vis' }
+        ];
+
+        function nowTileValue(key, v) {
+            const windParam = PARAMS.find(p => p.key === 'wind_speed_10m');
+            const visParam = PARAMS.find(p => p.key === 'visibility');
+            if (key === 'rain') return { v: formatPercent(v), u: '' };
+            if (key === 'cloud') return { v: `${Math.round(v)}%`, u: '' };
+            if (key === 'vis') return { v: formatValue(v, visParam), u: unitLabel(visParam) };
+            return { v: formatValue(v, windParam), u: unitLabel(windParam) };
+        }
+
+        // The 80% range of a factor in the current hour (tile tooltip).
+        function nowTileRange(key) {
+            const pkey = { wind: state.flightWindSource === 'aloft' ? 'wind_aloft' : 'wind_speed_10m', gust: 'wind_gusts_10m', cloud: 'cloud_cover_low', vis: 'visibility' }[key];
+            const d = pkey && processed.params[pkey];
+            if (!d || !d.members.length) return '';
+            const lo = d.stats.p10[0], hi = d.stats.p90[0];
+            if (!Number.isFinite(lo) || !Number.isFinite(hi)) return '';
+            const a = nowTileValue(key, lo), b = nowTileValue(key, hi);
+            return t('nowTileRange', { range: `${a.v}–${b.v}${a.u ? ' ' + a.u : ''}` });
+        }
+
+        function nowNextHtml(hours) {
+            const slots = computePlan(hours, state.minSlotHours);
+            const i = slots.findIndex(sl => sl.status === 'good');
+            if (i < 0) return escapeHtml(t('nowNoSuitable', { window: windowLabel(state.window) }));
+            // A suitable stretch can be split at midnight: follow it through.
+            let last = i;
+            while (slots[last + 1] && slots[last + 1].status === 'good' && slots[last + 1].start === slots[last].end + 1) last++;
+            const from = slots[i], to = slots[last];
+            const n = to.end - from.start + 1;
+            const sameDay = to.to.slice(0, 10) === from.from.slice(0, 10) || to.to.slice(11, 16) === '00:00';
+            const end = sameDay ? formatHour(to.to) : formatDayHour(to.to);
+            const conf = from.confidence ? ` <span style="color: ${CONF_TEXT[from.confidence.level]}">· ${escapeHtml(t('conf_' + from.confidence.level))}</span>` : '';
+            const text = from.start === 0
+                ? t('nowSuitableUntil', { time: end, n: windowLabel(n) })
+                : t('nowNextSuitable', { when: `${hours[from.start].time.slice(0, 10) === hours[0].time.slice(0, 10) ? formatHour(from.from) : formatDayHour(from.from)}–${end}`, n: windowLabel(n) });
+            return `<i class="fa-solid fa-calendar-check mr-1.5" style="color: ${FLIGHT_STATUS.good.color}"></i>${escapeHtml(text)}${conf}`;
+        }
+
+        function renderNow() {
+            const el = document.getElementById('nowMain');
+            const f = processed && processed.flight;
+            const h = f && f.hours[0];
+            const title = `<div class="flex items-center justify-between gap-2">
+                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2"><i class="fa-solid fa-plane-up text-emerald-400"></i>${escapeHtml(t('nowTitle'))}</h3>
+                ${h ? `<button type="button" data-now-details class="text-[11px] text-slate-400 hover:text-slate-200 transition">${escapeHtml(t('nowDetails'))} <i class="fa-solid fa-chevron-down text-[9px]"></i></button>` : ''}
+            </div>`;
+            if (!h) {
+                el.innerHTML = `${title}<p class="text-xs text-slate-500">${escapeHtml(state.loading ? t('loading') : t('statNoData'))}</p>`;
+                return;
+            }
+            const st = FLIGHT_STATUS[h.status];
+            const a = h.agree;
+            const verdict = `<div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
+                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-base font-bold border" style="color: ${st.color}; background: ${st.color}1f; border-color: ${st.color}66">
+                    <i class="fa-solid ${st.icon}"></i>${escapeHtml(t(st.labelKey))}</span>
+                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(formatHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }))}</span>` : ''}</span>
+            </div>`;
+            const limiting = h.status === 'none' ? '' : h.status === 'good'
+                ? `<p class="text-xs text-slate-300">${escapeHtml(t('nowAllGood'))}</p>`
+                : `<p class="text-xs text-slate-300">${escapeHtml(t('nowLimitedBy'))} ${h.reasons.map(k => `<span class="font-semibold" style="color: ${st.color}">${escapeHtml(flightFactorText(k, h.values[k]))}</span>`).join(', ')}</p>`;
+            const aloft = state.flightWindSource === 'aloft';
+            const tiles = NOW_TILES.filter(tile => !(aloft && tile.key === 'gust')).map(tile => {
+                const v = h.values[tile.key];
+                const known = v !== null && v !== undefined && Number.isFinite(v);
+                const c = FLIGHT_STATUS[known ? h.checks[tile.key] || 'none' : 'none'].color;
+                const label = t(aloft && tile.aloftKey ? tile.aloftKey : tile.labelKey);
+                const val = known ? nowTileValue(tile.key, v) : { v: '–', u: '' };
+                const tip = known ? [label, nowTileRange(tile.key)].filter(Boolean).join(' · ') : `${label} · ${t('flightNoData')}`;
+                // The next 6 hours of this factor, as a thin strip.
+                const next = f.hours.slice(0, 6).map(x => `<span class="flex-1" style="background: ${FLIGHT_STATUS[x.checks[tile.key] || 'none'].color}"></span>`).join('');
+                return `<div class="min-w-0 flex flex-col items-center rounded-xl border px-1 pt-1.5 pb-1 text-center" style="background: ${c}1f; border-color: ${c}66" title="${escapeHtml(tip)}">
+                    <i class="fa-solid ${tile.icon} text-[11px]" style="color: ${c}"></i>
+                    <div class="font-mono font-bold text-sm leading-tight mt-0.5 ${known ? 'text-slate-100' : 'text-slate-500'}">${escapeHtml(val.v)}</div>
+                    <div class="text-[9px] leading-none text-slate-500 h-2.5">${escapeHtml(val.u)}</div>
+                    <div lang="${escapeHtml(currentLang)}" class="text-[9.5px] leading-tight text-slate-300 mt-0.5 [hyphens:auto] [overflow-wrap:anywhere]">${escapeHtml(label)}</div>
+                    <div class="w-full mt-auto pt-1"><div class="flex gap-px h-1 rounded-full overflow-hidden">${next}</div></div>
+                </div>`;
+            });
+            el.innerHTML = `${title}${verdict}${limiting}
+                <div>
+                    <div class="grid gap-1.5" style="grid-template-columns: repeat(${tiles.length}, minmax(0, 1fr))">${tiles.join('')}</div>
+                    <p class="text-[10px] text-slate-500 mt-1">${escapeHtml(t('nowTilesNote'))}</p>
+                </div>
+                <p class="text-xs text-slate-300">${nowNextHtml(f.hours)}</p>`;
+        }
+
         // Satellite now at the location (hazard.js) against the current
         // forecast hour; shown only when they clearly disagree.
         function renderNowCheck() {
@@ -2413,6 +2562,7 @@
             strip.innerHTML = state.flightSplit && hours.some(h => h.agree) ? splitCellsHtml(hours) : flightCellsHtml(hours, h => h.status);
             renderConfidence(hours);
             renderNowCheck();
+            renderNow();
 
             document.getElementById('flightFactorBars').innerHTML = FLIGHT_FACTORS.map(factor => {
                 const noData = hours.length && hours.every(h => factorStatus(h, factor) === 'none');
@@ -2557,6 +2707,9 @@
             detail.addEventListener('click', e => {
                 const btn = e.target.closest('[data-flight-map]');
                 if (btn) openMapAt(btn.dataset.flightMap);
+            });
+            document.getElementById('nowCard').addEventListener('click', e => {
+                if (e.target.closest('[data-now-details]')) document.getElementById('flightCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
             document.getElementById('btnFlightSplit').addEventListener('click', () => {
                 state.flightSplit = !state.flightSplit;
@@ -3154,17 +3307,18 @@
         }
 
         function statCard({ title, icon, color, value, sub, extra }) {
-            return `<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 relative overflow-hidden">
-                <div class="flex justify-between items-start">
+            // Two per row on phones: smaller text, padding and icon there.
+            return `<div class="p-3 sm:p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 relative overflow-hidden">
+                <div class="flex justify-between items-start gap-2">
                     <div class="min-w-0">
-                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">${escapeHtml(title)}</p>
-                        <h3 class="text-2xl font-extrabold text-white font-mono mt-1">${escapeHtml(value)}</h3>
+                        <p class="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider leading-snug">${escapeHtml(title)}</p>
+                        <h3 class="text-base sm:text-2xl font-extrabold text-white font-mono mt-1 leading-tight whitespace-nowrap">${escapeHtml(value)}</h3>
                     </div>
-                    <div class="p-2.5 rounded-xl border shrink-0" style="color: rgb(${color}); background: rgba(${color}, 0.1); border-color: rgba(${color}, 0.3)">
-                        <i class="fa-solid ${icon} text-lg"></i>
+                    <div class="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border shrink-0" style="color: rgb(${color}); background: rgba(${color}, 0.1); border-color: rgba(${color}, 0.3)">
+                        <i class="fa-solid ${icon} text-sm sm:text-lg"></i>
                     </div>
                 </div>
-                <div class="mt-3 text-xs text-slate-400 space-y-0.5">
+                <div class="mt-2 sm:mt-3 text-[11px] sm:text-xs text-slate-400 space-y-0.5 leading-snug">
                     <p>${escapeHtml(sub)}</p>
                     ${extra ? `<p class="font-medium" style="color: rgb(${color})">${escapeHtml(extra)}</p>` : ''}
                 </div>
