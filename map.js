@@ -63,6 +63,8 @@
         autoRefreshMs: 5 * 60e3,
         concurrency: 3,
         cacheLimit: 160,
+        // …and at most this many bytes of images (RGB frames are 60–170 KB).
+        cacheBytes: 25 * 1048576,
         requestTimeoutMs: 45000,
         maxImageSide: 2048,
         windows: [6, 12],
@@ -1170,15 +1172,38 @@
         });
     }
 
+    function dropEntry(key, e) {
+        if (e.url && e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
+        cache.delete(key);
+    }
+
+    // Oldest unused images go first once the cache has too many images or
+    // too many bytes.
     function evict() {
-        if (cache.size <= MAP_CONFIG.cacheLimit) return;
+        let bytes = 0;
+        cache.forEach(e => { bytes += e.bytes || 0; });
+        const over = () => cache.size > MAP_CONFIG.cacheLimit || bytes > MAP_CONFIG.cacheBytes;
+        if (!over()) return;
         const inUse = new Set(R.frames.map(f => f.key).concat(...Object.values(R.ovFrames).map(l => l.map(f => f.key))));
         for (const [key, e] of cache) {
-            if (cache.size <= MAP_CONFIG.cacheLimit) break;
+            if (!over()) break;
             if (inUse.has(key) || e.status === 'loading' || e.status === 'queued') continue;
-            if (e.url && e.url.startsWith('blob:')) URL.revokeObjectURL(e.url);
-            cache.delete(key);
+            bytes -= e.bytes || 0;
+            dropEntry(key, e);
         }
+    }
+
+    // App in the background: keep only the images on screen, so Android is
+    // less likely to close the app for its memory. Coming back loads the
+    // latest image again (and forward from a picked one, as always).
+    function trimCache() {
+        const f = timelineFrames()[R.index];
+        const keep = new Set(f ? [f.key] : []);
+        Object.values(R.ovWant).forEach(set => set && set.forEach(k => keep.add(k)));
+        for (const [key, e] of [...cache]) {
+            if (!keep.has(key) && e.status !== 'loading' && e.status !== 'queued') dropEntry(key, e);
+        }
+        renderProgress();
     }
 
     function pump() {
@@ -1222,7 +1247,7 @@
             const url = URL.createObjectURL(blob);
             await decode(url);
             if (!cache.has(e.key)) { URL.revokeObjectURL(url); return; }
-            e.url = url; e.status = 'ok';
+            e.url = url; e.status = 'ok'; e.bytes = blob.size;
             R.lastOk = { url: e.src, at: Date.now() };
             // Lightning / precipitation images also feed the nearby-hazard
             // alert (its movement estimate), at no extra cost.
@@ -1808,14 +1833,22 @@
     }
 
     // ================= Formatting =================
+    // One formatter per language and UTC / local (building one per call was
+    // the top cost while playing).
+    const timeFormats = new Map();
     function fmtTime(ms) {
         if (ms === null || ms === undefined) return t('mapDiagNone');
-        const opts = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
-        if (S.utc) return `${new Intl.DateTimeFormat(currentLang, { ...opts, timeZone: 'UTC' }).format(ms)} UTC`;
+        const key = `${currentLang}|${S.utc}`;
+        let f = timeFormats.get(key);
+        if (!f) {
+            f = new Intl.DateTimeFormat(currentLang, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: S.utc ? 'UTC' : undefined });
+            timeFormats.set(key, f);
+        }
+        if (S.utc) return `${f.format(ms)} UTC`;
         const off = -new Date(ms).getTimezoneOffset();
         const sign = off >= 0 ? '+' : '−';
         const hm = `${Math.floor(Math.abs(off) / 60)}${Math.abs(off) % 60 ? ':' + String(Math.abs(off) % 60).padStart(2, '0') : ''}`;
-        return `${new Intl.DateTimeFormat(currentLang, opts).format(ms)} (UTC${sign}${hm})`;
+        return `${f.format(ms)} (UTC${sign}${hm})`;
     }
 
     function fmtAge(ms) {
@@ -1997,6 +2030,10 @@
         if (!windShown()) { W.group.clearLayers(); W.hour = null; renderWindInfo(); return; }
         const hour = windHour();
         const pts = windGrid();
+        // Forget points not refreshed for 30 min (they'd be fetched again
+        // anyway), and never keep more than 1500.
+        W.cache.forEach((c, k) => { if (Date.now() - c.at > 30 * 60e3) W.cache.delete(k); });
+        for (const k of W.cache.keys()) { if (W.cache.size <= 1500) break; W.cache.delete(k); }
         const missing = pts.filter(p => { const c = W.cache.get(p.key); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
         W.error = '';
         if (missing.length) {
@@ -2753,6 +2790,7 @@
         const body = await res.json();
         if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
         const data = splitModels(body.hourly, ids);
+        if (P.model.size >= 40) P.model.delete(P.model.keys().next().value);
         P.model.set(key, { at: Date.now(), data });
         return data;
     }
@@ -3276,7 +3314,12 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && R.visible) reloadFrames({ forceTimes: false });
+        if (document.visibilityState === 'visible') { if (R.visible) reloadFrames({ forceTimes: false }); return; }
+        // To the background: stop playing (no downloads while unseen) and
+        // free the images that aren't on screen.
+        if (!R.built) return;
+        if (R.playing) play(false);
+        trimCache();
     });
 
     window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, replayHazard, focusHazard, showHour, renderDrawer: () => renderPanel(),

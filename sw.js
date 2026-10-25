@@ -18,13 +18,13 @@
 // its own copy of the last forecast in localStorage for offline viewing.
 
 const CACHE_PREFIX = 'flysky-cache-';
-const CACHE_NAME = CACHE_PREFIX + 'v13';
+const CACHE_NAME = CACHE_PREFIX + 'v14';
 
 const APP_FILES = [
     './',
     './index.html',
-    './map.js?v=8',
-    './hazard.js?v=5',
+    './map.js?v=9',
+    './hazard.js?v=6',
     './manifest.json',
     './favicon.png',
     './icon-192.png',
@@ -78,12 +78,15 @@ self.addEventListener('activate', (event) => {
         // origin, and Cache Storage is per origin: only FlySky's own old caches
         // may be touched here, never the other apps' offline copies.
         const oldNames = (await caches.keys()).filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME);
-        // Carry over anything the new cache lacks (e.g. a CDN file that could
-        // not be fetched during install) before dropping the old caches.
+        // Carry over files of the current list the new cache lacks (e.g. a
+        // CDN file that could not be fetched during install) before dropping
+        // the old caches. Only those: anything else (older map.js?v=…, files
+        // no longer used) would otherwise be copied forward forever.
+        const wanted = new Set([...APP_FILES, ...CDN_NO_CORS, ...CDN_CORS].map((u) => new URL(u, self.location.href).href));
         for (const name of oldNames) {
             const old = await caches.open(name);
             for (const request of await old.keys()) {
-                if (!(await current.match(request))) {
+                if (wanted.has(request.url) && !(await current.match(request))) {
                     const response = await old.match(request);
                     if (response) await current.put(request, response).catch(() => {});
                 }

@@ -1458,7 +1458,8 @@
             // Last loaded forecast: { key, days, fetchedAt, meta, times,
             // models: { id: hourly }, errors: { id: message } }. Persisted so
             // the app still shows something useful with no network.
-            forecast: loadFromStorage('flysky_forecast_cache', null),
+            // Restored from IndexedDB at startup (restoreForecast).
+            forecast: null,
             forecastFromCache: false,
             loading: false
         };
@@ -1481,7 +1482,9 @@
         if (!Array.isArray(state.chartOrder)) state.chartOrder = [];
         if (!UNIT_LABELS.wind[state.windUnit]) state.windUnit = 'ms';
         if (!UNIT_LABELS.precip[state.precipUnit]) state.precipUnit = 'mm';
-        if (state.forecast && (!state.forecast.key || !state.forecast.models || !Array.isArray(state.forecast.times))) state.forecast = null;
+        function validForecast(fc) {
+            return !!fc && !!fc.key && !!fc.models && Array.isArray(fc.times) && !!fc.meta;
+        }
         if (state.forecast) state.forecastFromCache = true;
 
         function selectedModels() {
@@ -1512,6 +1515,95 @@
         // Processed forecast (per-parameter stats), rebuilt whenever the
         // forecast data changes.
         let processed = null;
+
+        // ================= Forecast store (IndexedDB) =================
+        // The last forecasts (up to 4: per location / mode / models / units)
+        // are kept in IndexedDB rather than localStorage: one ensemble week is
+        // ~2 MB, and localStorage's ~5 MB is shared with FlyLog, FlySend and
+        // FlyStock (same origin), whose own saves would fail once it is full.
+        // IndexedDB also saves without blocking the page. Where it can't be
+        // opened, the last forecast goes to localStorage as before.
+        const FORECAST_DB = 'flysky', FORECAST_STORE = 'forecasts', FORECAST_KEEP = 4;
+        const LEGACY_FORECAST_KEY = 'flysky_forecast_cache';
+        let forecastDbPromise = null;
+
+        function openForecastDb() {
+            if (!forecastDbPromise) {
+                forecastDbPromise = new Promise(resolve => {
+                    try {
+                        const req = indexedDB.open(FORECAST_DB, 1);
+                        req.onupgradeneeded = () => {
+                            const store = req.result.createObjectStore(FORECAST_STORE, { keyPath: 'key' });
+                            store.createIndex('fetchedAt', 'fetchedAt');
+                        };
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => resolve(null);
+                        req.onblocked = () => resolve(null);
+                    } catch (err) {
+                        resolve(null);
+                    }
+                });
+            }
+            return forecastDbPromise;
+        }
+
+        function idbDone(tx) {
+            return new Promise((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = tx.onabort = () => reject(tx.error);
+            });
+        }
+
+        async function forecastStoreGet(key) {
+            const db = await openForecastDb();
+            if (!db) {
+                const fc = loadFromStorage(LEGACY_FORECAST_KEY, null);
+                return fc && fc.key === key ? fc : null;
+            }
+            return new Promise(resolve => {
+                const req = db.transaction(FORECAST_STORE).objectStore(FORECAST_STORE).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        // Saves a forecast and drops all but the newest FORECAST_KEEP.
+        async function forecastStorePut(fc) {
+            const db = await openForecastDb();
+            if (!db) { saveToStorage(LEGACY_FORECAST_KEY, fc); return; }
+            const tx = db.transaction(FORECAST_STORE, 'readwrite');
+            const store = tx.objectStore(FORECAST_STORE);
+            store.put(fc);
+            let n = 0;
+            const cur = store.index('fetchedAt').openKeyCursor(null, 'prev');
+            cur.onsuccess = () => {
+                const c = cur.result;
+                if (!c) return;
+                if (++n > FORECAST_KEEP) store.delete(c.primaryKey);
+                c.continue();
+            };
+            await idbDone(tx);
+        }
+
+        // Startup: the saved forecast for the current settings. A forecast
+        // saved in localStorage by an earlier version moves to IndexedDB once.
+        async function restoreForecast() {
+            const db = await openForecastDb();
+            let legacy = null;
+            try { legacy = db && localStorage.getItem(LEGACY_FORECAST_KEY); } catch (err) {}
+            if (legacy) {
+                try {
+                    const fc = JSON.parse(legacy);
+                    if (validForecast(fc)) await forecastStorePut(fc);
+                    localStorage.removeItem(LEGACY_FORECAST_KEY);
+                } catch (err) {
+                    console.warn('FlySky: could not move the saved forecast to IndexedDB.', err);
+                }
+            }
+            if (!state.location) return;
+            const fc = await forecastStoreGet(forecastKey());
+            if (validForecast(fc)) state.forecast = fc;
+        }
 
         // ================= Helpers =================
         function escapeHtml(str) {
@@ -1559,8 +1651,18 @@
             return new Date(str + ':00Z');
         }
 
+        // Building an Intl.DateTimeFormat is costly (it was the top cost of a
+        // redraw), so each language + options combination is made once.
+        const dateFormats = new Map();
+        function dateFormat(opts) {
+            const key = currentLang + JSON.stringify(opts);
+            let f = dateFormats.get(key);
+            if (!f) { f = new Intl.DateTimeFormat(currentLang, opts); dateFormats.set(key, f); }
+            return f;
+        }
+
         function formatTime(str, opts) {
-            return new Intl.DateTimeFormat(currentLang, { timeZone: 'UTC', ...opts }).format(parseLocalTime(str));
+            return dateFormat({ timeZone: 'UTC', ...opts }).format(parseLocalTime(str));
         }
 
         function formatHour(str) {
@@ -1759,13 +1861,29 @@
 
         async function loadForecast({ force = false } = {}) {
             if (!state.location) return;
-            const key = forecastKey();
+            let key = forecastKey();
+            // Another location / mode / model set: show its saved forecast (if
+            // any) right away, while a fresh one loads.
+            if (!(state.forecast && state.forecast.key === key)) {
+                const stored = await forecastStoreGet(key).catch(() => null);
+                if (key !== forecastKey()) return;   // changed again meanwhile
+                if (validForecast(stored) && !(state.forecast && state.forecast.key === key)) {
+                    state.forecast = stored;
+                    processForecast();
+                    renderAll();
+                }
+            }
+            key = forecastKey();
             const days = daysNeeded();
             const fc = state.forecast;
             const fresh = fc && fc.key === key && fc.days >= days &&
                 Date.now() - fc.fetchedAt < FORECAST_MAX_AGE_MS;
             if (fresh && !force) {
+                const wasCache = state.forecastFromCache;
                 state.forecastFromCache = false;
+                // Same forecast and still the same hour: nothing to redraw
+                // (this runs on every return to the app and every 10 min).
+                if (!wasCache && processed && processed.stamp === renderStamp(fc)) return;
                 processForecast();
                 renderAll();
                 return;
@@ -1829,7 +1947,7 @@
                     errors: Object.fromEntries(failed.map(r => [r.model, r.error]))
                 };
                 state.forecastFromCache = false;
-                saveToStorage('flysky_forecast_cache', state.forecast);
+                forecastStorePut(state.forecast).catch(err => console.warn('FlySky: could not save the forecast.', err));
                 failed.filter(r => !r.network).forEach(r => {
                     const m = modeModels().find(x => x.id === r.model);
                     showToast(t('toastModelFailed', { model: m ? m.name : r.model, error: r.error }), 'warning');
@@ -1846,6 +1964,12 @@
         // responses hold a single `wind_speed_10m` series. Either way every
         // series whose key starts with the parameter name is treated as one
         // member, and all members of all selected models are pooled.
+        // What a processed forecast was made from: the data and the first hour.
+        function renderStamp(fc) {
+            const hour = new Date(Date.now() + fc.meta.utcOffsetSeconds * 1000).toISOString().slice(0, 13);
+            return `${fc.key}|${fc.fetchedAt}|${hour}|${state.window}`;
+        }
+
         function processForecast() {
             processed = null;
             const fc = state.forecast;
@@ -1908,6 +2032,7 @@
             });
 
             result.flight = computeFlight(result);
+            result.stamp = renderStamp(fc);
             processed = result;
         }
 
@@ -2075,7 +2200,13 @@
         }
 
         // ================= Rendering =================
+        // Set while the map is shown: the forecast is drawn when it is opened
+        // again (setView) instead of in the background.
+        let forecastDirty = false;
+        let chartsNeedRebuild = false;
+
         function renderAll() {
+            if (currentView === 'map') { forecastDirty = true; return; }
             renderLocation();
             renderFavorites();
             renderModeAndWindow();
@@ -3014,7 +3145,7 @@
                 el.textContent = state.loading ? t('loading') : '';
                 return;
             }
-            const time = new Intl.DateTimeFormat(currentLang, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
+            const time = dateFormat({ dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
             const models = modeModels().filter(m => fc.models[m.id]).map(m => m.name).join(', ');
             const tz = fc.meta.timezoneAbbreviation || fc.meta.timezone || 'UTC';
             el.textContent = state.loading ? t('loading') :
@@ -3251,10 +3382,13 @@
                 });
             }
             if (state.showMembers && data) {
+                // Straight segments: with hundreds of members, smoothed curves
+                // made the charts ~5× slower to draw, for no visible gain.
+                const straight = { spanGaps: true, pointRadius: 0, tension: 0 };
                 data.members.forEach(m => {
                     const level = memberLevel(param, m);
                     datasets.push({
-                        ...line, label: 'member', data: m.values, fill: false,
+                        ...straight, label: 'member', data: m.values, fill: false,
                         borderColor: level ? `rgba(${level.color}, 0.55)` : `rgba(${c}, 0.18)`, borderWidth: 1,
                         pointHoverRadius: 0, order: 3
                     });
@@ -3377,6 +3511,12 @@
         // built again from the current data.
         function rebuildAllCharts() {
             if (typeof Chart === 'undefined') return;
+            resetCharts();
+            renderCharts();
+        }
+
+        // Every chart on a brand-new canvas (drawn by the next renderCharts).
+        function resetCharts() {
             Object.keys(chartInstances).forEach(key => {
                 const chart = chartInstances[key];
                 try { chart.destroy(); } catch (err) {}
@@ -3390,11 +3530,12 @@
                     old.replaceWith(fresh);
                 }
             });
-            renderCharts();
         }
 
         let rebuildTimer = null;
         function rebuildChartsSoon() {
+            // On the map the charts are hidden: rebuild when they are shown.
+            if (currentView === 'map') { chartsNeedRebuild = true; return; }
             clearTimeout(rebuildTimer);
             rebuildTimer = setTimeout(() => requestAnimationFrame(rebuildAllCharts), 60);
         }
@@ -3548,11 +3689,12 @@
             document.getElementById('btnRefresh').disabled = loading;
             document.getElementById('refreshIcon').classList.toggle('fa-spin', loading);
             renderMeta();
-            if (state.location) {
-                renderFlight();
-                renderStats();
-                renderCharts();
-            }
+            if (!state.location) return;
+            // Behind the map: drawn when the forecast is shown again.
+            if (currentView === 'map') { forecastDirty = true; return; }
+            renderFlight();
+            renderStats();
+            renderCharts();
         }
 
         // ================= Location & Favorites =================
@@ -3911,9 +4053,16 @@
             setupViewSwitch();
             setupHazardToggle();
             setupFullscreen();
-            processForecast();
+            // The saved forecast comes from IndexedDB (a few ms); give up on it
+            // after 2 s rather than hold the app.
+            state.loading = !!state.location;
             renderAll();
-            loadForecast();
+            Promise.race([restoreForecast(), new Promise(r => setTimeout(r, 2000))]).catch(() => {}).finally(() => {
+                state.loading = false;
+                processForecast();
+                renderAll();
+                loadForecast();
+            });
             // Keep the 72-hour window sliding forward while the page stays
             // open. Not while the map is shown: the forecast catches up when
             // it is opened again (setView).
@@ -3933,7 +4082,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=8';
+        const MAP_JS = 'map.js?v=9';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
@@ -3992,7 +4141,7 @@
 
         // ---- Nearby-hazard alerts (hazard.js, loaded only while switched on)
         const HAZARD_KEY = 'flysky_hazard';
-        const HAZARD_JS = 'hazard.js?v=5';
+        const HAZARD_JS = 'hazard.js?v=6';
         let hazardPromise = null;
 
         function hazardEnabled() {
@@ -4058,8 +4207,11 @@
                     });
             } else {
                 if (window.FlySkyMap) window.FlySkyMap.hide();
-                // Redraws with the current hour if the window has moved on
-                // (or fetches, if the forecast got old) while on the map.
+                // Catch up with what changed while on the map: charts that
+                // need fresh canvases, a redraw that was put off, and the
+                // current hour (or a fetch, if the forecast got old).
+                if (chartsNeedRebuild) { chartsNeedRebuild = false; resetCharts(); forecastDirty = true; }
+                if (forecastDirty) { forecastDirty = false; renderAll(); }
                 if (fromMap) loadForecast();
                 resizeAllCharts();
             }

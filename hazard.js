@@ -2,7 +2,8 @@
 //
 // Loaded by index.html once the forecast is shown (only while the alerts are
 // switched on). Shares the page's globals: t(), translations, currentLang,
-// state, escapeHtml(), loadFromStorage(), setView(), loadMapAssets().
+// state, escapeHtml(), loadFromStorage(), setView(), loadMapAssets(),
+// dateFormat(), sunAltitudeDeg(), hazardEnabled().
 //
 // How it works
 //  - Data: EUMETSAT EUMETView WMS — MTG Lightning Imager accumulated flash
@@ -182,7 +183,7 @@
     }
 
     function clockTime(ms) {
-        return new Intl.DateTimeFormat(currentLang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
+        return dateFormat({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
     }
 
     async function fetchWithTimeout(url, timeoutMs) {
@@ -331,6 +332,8 @@
         H.obs = { lightning: [], rain: [] };
         H.status = null;
         H.now = null;
+        T.queue = [];
+        T.seen.clear();
     }
 
     // ---- Satellite "now" at the location (for the flight card's check of
@@ -460,7 +463,9 @@
     function start() {
         if (H.started) return;
         H.started = true;
-        setInterval(() => { if (due()) poll(); else emit(); }, 60e3);
+        // Every minute: a check when due, else refresh the "… min ago" texts
+        // (nothing at all while the app is in the background).
+        setInterval(() => { if (due()) poll(); else if (document.visibilityState === 'visible') emit(); }, 60e3);
         document.addEventListener('visibilitychange', () => { if (due()) poll(); });
         window.addEventListener('online', () => { if (due()) poll(); });
         window.addEventListener('offline', emit);
