@@ -1,0 +1,18 @@
+{
+  "name": "flysky-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests for FlySky (Playwright). Not part of the app.",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:live": "node run.mjs --live"
+  },
+  "devDependencies": {
+    "@fortawesome/fontawesome-free": "6.4.0",
+    "@tailwindcss/browser": "^4.1.0",
+    "chart.js": "^4.4.0",
+    "leaflet": "1.9.4",
+    "playwright": "1.56.1",
+    "pngjs": "^7.0.0"
+  }
+}

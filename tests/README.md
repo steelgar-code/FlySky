@@ -1,0 +1,48 @@
+# FlySky browser tests
+
+Playwright tests for the app in the folder above. Not part of the app (nothing here is loaded by it).
+
+```sh
+cd tests
+npm install            # Playwright + local copies of the CDN files used by the mock
+npx playwright install chromium   # unless a Chromium is already available (see CHROMIUM_PATH)
+npm test               # all offline suites
+node run.mjs map-readout forecast  # selected suites
+npm run test:live      # also live-eumetsat.mjs (real EUMETView data)
+```
+
+`run.mjs` serves the repository on a free local port, runs each suite with `BASE_URL` set,
+and prints `N passed, M failed` (exit code 1 on any failure or crash).
+
+Environment:
+- `CHROMIUM_PATH` — browser executable to use (default: Playwright's own; `/opt/pw-browsers/chromium` if present).
+- `BASE_URL` — app URL when running a suite directly (`node map-layers.mjs`), default `http://localhost:8765/`.
+
+## Mocks (`lib/mock.mjs`)
+Every external request is answered locally, so the suites run offline and are repeatable:
+- CDN files (Tailwind, Chart.js, Font Awesome, Leaflet) from `node_modules`. The mock serves Tailwind v4
+  instead of the app's v3 Play CDN, so a `tailwind is not defined` page error is expected and ignored.
+- **EUMETView WMS**: full and per-layer GetCapabilities (fog, microphysics, natural colour, GeoColour,
+  Cloud Type / Phase, Cloud Mask, IR, precipitation h40b, lightning li_afa, fires frp / fire, borders,
+  plus layers that must be ignored), GetMap PNGs (lightning NW and a fire SW of Kyiv at known times),
+  GetFeatureInfo, GetLegendGraphic, WMS exceptions. Options: `badTime`, `noCors`, `capsFail`,
+  `noLayerCaps`, `noPrecip`, `leafletFail`, `windFail`, `wmsDelay`, `gfiRgb`.
+- **Open-Meteo**: ensemble / models forecasts (members and per-model columns like the real API),
+  the map readout's point request (one column per model) and the wind-arrow grid request.
+- OSM tiles: flat dark tiles.
+
+## Suites
+| File | Covers |
+|---|---|
+| `forecast.mjs` | combined request, charts, flight bar, 72 h window, Models mode, thresholds + reset, planner, language, saved forecast |
+| `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
+| `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
+| `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |
+| `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
+| `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
+| `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
+
+Notes:
+- Results depend on the time of day (Auto product, day/night hint): suites pin a product where it matters.
+- The settings switches are visually hidden checkboxes: click their `<label>`.
+- Add `--mobile` to a suite (`node map-layers.mjs --mobile`) for a 390 × 844 phone viewport.
