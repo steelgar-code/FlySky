@@ -269,26 +269,10 @@
                 <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
                 <!-- Satellite now vs this hour's forecast (only when they disagree) -->
                 <div id="nowCheck" class="hidden"></div>
-            </section>
-
-            <!-- Forecast settings: models + units (collapsible) -->
-            <section class="p-5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
-                <button type="button" id="btnSettingsToggle" class="w-full flex items-center justify-between gap-3 text-left" aria-expanded="true" aria-controls="settingsBody">
-                    <span class="min-w-0">
-                        <span class="font-semibold text-slate-200 text-sm flex items-center gap-2">
-                            <i class="fa-solid fa-layer-group text-teal-400"></i>
-                            <span id="modelsTitle"></span>
-                            <span id="membersTotal" class="text-[11px] font-mono text-slate-500"></span>
-                        </span>
-                        <span id="settingsSummary" class="hidden block text-[11px] text-slate-500 truncate mt-0.5"></span>
-                    </span>
-                    <span class="shrink-0 w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
-                        <i id="settingsChevron" class="fa-solid fa-chevron-up text-xs transition-transform"></i>
-                    </span>
-                </button>
-                <div id="settingsBody" class="space-y-3">
-                    <div id="modelChips" class="flex flex-wrap gap-2"></div>
-                    <p id="forecastMeta" class="text-[11px] text-slate-500 font-mono"></p>
+                <!-- Data source; the model choice is in the side menu -->
+                <div class="flex items-start justify-between gap-2 pt-2 border-t border-slate-800/80">
+                    <p id="forecastMeta" class="min-w-0 text-[11px] text-slate-500 font-mono"></p>
+                    <button type="button" data-open-settings class="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition"><i class="fa-solid fa-layer-group"></i><span data-i18n="modelsButton">Models</span></button>
                 </div>
             </section>
 
@@ -430,6 +414,16 @@
         <div id="drawerMap" class="hidden flex-1 overflow-y-auto p-5 space-y-6 text-xs text-slate-300"></div>
         <div id="drawerForecast" class="flex-1 overflow-y-auto p-5 space-y-6">
             <section class="space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                        <i class="fa-solid fa-layer-group text-teal-400"></i><span id="modelsTitle"></span><span id="membersTotal" class="font-mono normal-case tracking-normal text-slate-500"></span>
+                    </h3>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="modelsDrawerDesc">For the mode chosen in the bottom bar (Ensemble or Models).</p>
+                </div>
+                <div id="modelChips" class="flex flex-wrap gap-2"></div>
+                <p id="modelCost" class="text-[11px] text-slate-500"></p>
+            </section>
+            <section class="space-y-3">
                 <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="unitsTitle">Units</h3>
                 <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
                     <span data-i18n="windUnitLabel">Wind</span>
@@ -529,7 +523,16 @@
         const WINDOWS = [3, 8, 24, 48, 72, 168];
         const DEFAULT_WINDOW = 24;
         // A forecast is re-fetched automatically once it's older than this.
-        const FORECAST_MAX_AGE_MS = 30 * 60 * 1000;
+        // How long a loaded forecast is used before asking again. Ensembles
+        // are re-run every 6–12 h and cost the most of Open-Meteo's free
+        // allowance (each member counts), so they're asked for less often;
+        // the Refresh button always asks.
+        const FORECAST_MAX_AGE_MS = { ensemble: 2 * 3600e3, deterministic: 3600e3 };
+        // Days always requested: enough for the 1-week window. Open-Meteo
+        // counts any request of up to 14 days the same, so asking for the
+        // whole week once costs no more than 2 days — and switching the
+        // window then needs no new request.
+        const FETCH_DAYS = 8;
         // An hour counts as "wet" for the chance-of-precipitation bars when a
         // member predicts at least this much (in mm, before unit conversion).
         const WET_HOUR_MM = 0.1;
@@ -931,6 +934,15 @@
                 toastFavAdded: "Added {name} to favorites",
                 toastFavRemoved: "Removed {name} from favorites",
                 toastForecastError: "Could not load forecast: {error}",
+                modelsButton: "Models",
+                modelsDrawerDesc: "For the mode chosen in the bottom bar (Ensemble or Models).",
+                modelCost: "One update ≈ {n} Open-Meteo calls of the free allowance (600 a minute, 10,000 a day); updated {every} or with Refresh.",
+                modelCostEvery2h: "every 2 h",
+                modelCostEvery1h: "every hour",
+                modelCostHigh: "Many members: fewer models keep you well under the limits.",
+                toastRateWait: "Open-Meteo's per-minute limit reached — trying again in a minute.",
+                toastRateLimited: "Open-Meteo's free limit reached for {n} model(s) ({reason}). The last forecast stays; try again later.",
+                metaFailed: "{n} model(s) missing",
                 toastSearchError: "Location search failed",
                 toastGeoError: "Could not get your location",
                 toastGeoUnsupported: "Geolocation is not supported by this browser",
@@ -1155,6 +1167,15 @@
                 toastFavAdded: "{name} додано в обране",
                 toastFavRemoved: "{name} видалено з обраного",
                 toastForecastError: "Не вдалося завантажити прогноз: {error}",
+                modelsButton: "Моделі",
+                modelsDrawerDesc: "Для режиму, вибраного в нижній панелі (Ансамбль або Моделі).",
+                modelCost: "Одне оновлення ≈ {n} запитів Open-Meteo з безплатного ліміту (600 за хвилину, 10 000 за добу); оновлюється {every} або кнопкою «Оновити».",
+                modelCostEvery2h: "кожні 2 год",
+                modelCostEvery1h: "щогодини",
+                modelCostHigh: "Багато членів ансамблю: менше моделей — далі від ліміту.",
+                toastRateWait: "Досягнуто похвилинного ліміту Open-Meteo — повтор за хвилину.",
+                toastRateLimited: "Досягнуто безплатного ліміту Open-Meteo для моделей: {n} ({reason}). Залишається останній прогноз; спробуйте пізніше.",
+                metaFailed: "бракує моделей: {n}",
                 toastSearchError: "Помилка пошуку місця",
                 toastGeoError: "Не вдалося визначити місцезнаходження",
                 toastGeoUnsupported: "Браузер не підтримує геолокацію",
@@ -1379,6 +1400,15 @@
                 toastFavAdded: "{name} adicionado aos favoritos",
                 toastFavRemoved: "{name} removido dos favoritos",
                 toastForecastError: "Não foi possível carregar a previsão: {error}",
+                modelsButton: "Modelos",
+                modelsDrawerDesc: "Para o modo escolhido na barra inferior (Conjunto ou Modelos).",
+                modelCost: "Uma atualização ≈ {n} chamadas do limite gratuito do Open-Meteo (600 por minuto, 10.000 por dia); atualizado {every} ou com Atualizar.",
+                modelCostEvery2h: "a cada 2 h",
+                modelCostEvery1h: "a cada hora",
+                modelCostHigh: "Muitos membros: menos modelos mantêm você longe dos limites.",
+                toastRateWait: "Limite por minuto do Open-Meteo atingido — tentando de novo em um minuto.",
+                toastRateLimited: "Limite gratuito do Open-Meteo atingido para {n} modelo(s) ({reason}). A última previsão continua; tente mais tarde.",
+                metaFailed: "{n} modelo(s) faltando",
                 toastSearchError: "Falha na busca de local",
                 toastGeoError: "Não foi possível obter sua localização",
                 toastGeoUnsupported: "Geolocalização não suportada por este navegador",
@@ -1481,7 +1511,6 @@
             windUnit: loadFromStorage('flysky_wind_unit', 'ms'),
             precipUnit: loadFromStorage('flysky_precip_unit', 'mm'),
             showMembers: loadFromStorage('flysky_show_members', false) === true,
-            settingsCollapsed: loadFromStorage('flysky_settings_collapsed', false) === true,
             flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
             statsCollapsed: loadFromStorage('flysky_stats_collapsed', false) === true,
             plannerOpen: loadFromStorage('flysky_planner_open', true) !== false,
@@ -1542,7 +1571,6 @@
             saveToStorage('flysky_wind_unit', state.windUnit);
             saveToStorage('flysky_precip_unit', state.precipUnit);
             saveToStorage('flysky_show_members', state.showMembers);
-            saveToStorage('flysky_settings_collapsed', state.settingsCollapsed);
             saveToStorage('flysky_flight_details_open', state.flightDetailsOpen);
             saveToStorage('flysky_stats_collapsed', state.statsCollapsed);
             saveToStorage('flysky_planner_open', state.plannerOpen);
@@ -1739,7 +1767,15 @@
         // Forecast days (counted from local midnight today) needed to cover
         // the selected window starting at the current hour.
         function daysNeeded() {
-            return Math.ceil((24 + state.window) / 24);
+            return Math.max(FETCH_DAYS, Math.ceil((24 + state.window) / 24));
+        }
+
+        // Rough Open-Meteo cost of one forecast update, in "API calls": every
+        // variable of every member (or model) counts 1/10 of a call.
+        function forecastCost(mode = state.mode, models = state.modelsByMode[mode]) {
+            const vars = apiVars(mode).filter(v => !unsupportedVars[mode].has(v)).length;
+            const series = MODES[mode].models.filter(m => models.includes(m.id)).reduce((n, m) => n + (m.members || 1), 0);
+            return Math.max(1, Math.ceil(series * vars / 10));
         }
 
         function buildForecastUrl(mode, model, vars, days) {
@@ -1758,6 +1794,7 @@
 
         const MODEL_REQUEST_GAP_MS = 200;      // spacing between per-model fallback calls
         const RATE_LIMIT_RETRY_MS = 1500;      // pause before retrying a "too many requests" reply
+        const RATE_MINUTE_WAIT_MS = 62000;     // …or until the next minute for a per-minute limit
         const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
         // One API call for one or more models. When the API rejects a variable
@@ -1772,10 +1809,19 @@
                 const body = await res.json().catch(() => null);
                 if (res.ok && body && !body.error && body.hourly) return { data: body };
                 const reason = (body && body.reason) || `HTTP ${res.status}`;
-                if ((res.status === 429 || /too many/i.test(reason)) && !rateRetried) {
-                    rateRetried = true;
-                    await sleep(RATE_LIMIT_RETRY_MS);
-                    continue;
+                if (res.status === 429 || /too many|limit exceeded/i.test(reason)) {
+                    // Free-use limits: per minute (600 calls), hour (5,000)
+                    // and day (10,000). A minute's limit clears soon: wait
+                    // once and try again; hourly / daily ones don't.
+                    const minutely = /minut/i.test(reason);
+                    if (!rateRetried && (minutely || !/hour|dai|day/i.test(reason))) {
+                        rateRetried = true;
+                        if (minutely) showToast(t('toastRateWait'), 'warning');
+                        await sleep(minutely ? RATE_MINUTE_WAIT_MS : RATE_LIMIT_RETRY_MS);
+                        if (signal && signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                        continue;
+                    }
+                    return { error: reason, rateLimited: true };
                 }
                 let bad = null;
                 if (res.status === 400) {
@@ -1872,6 +1918,8 @@
                         console.warn('FlySky: no data matched in combined response for', split.missing, '- fetching them individually.');
                         return split.results.concat(await fetchModelsOneByOne(mode, split.missing, days, signal));
                     }
+                    // Over the limit: asking model by model would only add requests.
+                    if (r.rateLimited) return models.map(model => ({ model, error: r.error, rateLimited: true }));
                     console.warn('FlySky: combined request failed, fetching models one by one.', r.error);
                 } catch (err) {
                     if (err.name === 'AbortError') throw err;
@@ -1886,9 +1934,12 @@
             const results = [];
             for (const [i, model] of models.entries()) {
                 if (i) await sleep(MODEL_REQUEST_GAP_MS);
+                // Once over the limit, the rest would fail the same way.
+                const limited = results.find(x => x.rateLimited);
+                if (limited) { results.push({ model, error: limited.error, rateLimited: true }); continue; }
                 try {
                     const r = await requestForecast(mode, [model], days, signal);
-                    results.push(r.data ? { model, data: r.data } : { model, error: r.error });
+                    results.push(r.data ? { model, data: r.data } : { model, error: r.error, rateLimited: r.rateLimited });
                 } catch (err) {
                     if (err.name === 'AbortError') throw err;
                     results.push({ model, error: err.message || String(err), network: true });
@@ -1919,7 +1970,7 @@
             const days = daysNeeded();
             const fc = state.forecast;
             const fresh = fc && fc.key === key && fc.days >= days &&
-                Date.now() - fc.fetchedAt < FORECAST_MAX_AGE_MS;
+                Date.now() - fc.fetchedAt < FORECAST_MAX_AGE_MS[state.mode];
             if (fresh && !force) {
                 const wasCache = state.forecastFromCache;
                 state.forecastFromCache = false;
@@ -1967,8 +2018,11 @@
             const failed = results.filter(r => r.error);
             if (!ok.length) {
                 console.error('FlySky: forecast request failed.', failed);
-                if (fc && fc.key === key) {
-                    state.forecastFromCache = true;
+                const limited = failed.find(r => r.rateLimited);
+                if (fc && fc.key === key) state.forecastFromCache = true;
+                if (limited) {
+                    showToast(t('toastRateLimited', { n: failed.length, reason: limited.error }), 'warning');
+                } else if (fc && fc.key === key) {
                     showToast(t('toastUsingCache'), 'warning');
                 } else {
                     showToast(t('toastForecastError', { error: failed.length ? failed[0].error : '?' }), 'warning');
@@ -1990,7 +2044,9 @@
                 };
                 state.forecastFromCache = false;
                 forecastStorePut(state.forecast).catch(err => console.warn('FlySky: could not save the forecast.', err));
-                failed.filter(r => !r.network).forEach(r => {
+                const limited = failed.find(r => r.rateLimited);
+                if (limited) showToast(t('toastRateLimited', { n: failed.filter(r => r.rateLimited).length, reason: limited.error }), 'warning');
+                failed.filter(r => !r.network && !r.rateLimited).forEach(r => {
                     const m = modeModels().find(x => x.id === r.model);
                     showToast(t('toastModelFailed', { model: m ? m.name : r.model, error: r.error }), 'warning');
                 });
@@ -2258,7 +2314,6 @@
             renderFavorites();
             renderModeAndWindow();
             renderModelChips();
-            renderSettingsPanel();
             if (!document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) renderSettingsDrawer();
             renderUnits();
             renderMeta();
@@ -3171,17 +3226,6 @@
             });
         }
 
-        function renderSettingsPanel() {
-            const collapsed = state.settingsCollapsed;
-            document.getElementById('settingsBody').classList.toggle('hidden', collapsed);
-            document.getElementById('btnSettingsToggle').setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-            document.getElementById('settingsChevron').style.transform = collapsed ? 'rotate(180deg)' : '';
-            const summary = document.getElementById('settingsSummary');
-            summary.classList.toggle('hidden', !collapsed);
-            const names = modeModels().filter(m => selectedModels().includes(m.id)).map(m => m.name).join(', ');
-            summary.textContent = names;
-        }
-
         function renderLocation() {
             const nameEl = document.getElementById('locName');
             const detailsEl = document.getElementById('locDetails');
@@ -3245,6 +3289,10 @@
                 </button>`;
             }).join('');
             const chosen = modeModels().filter(m => selected.includes(m.id));
+            // What an update costs of Open-Meteo's free allowance.
+            const cost = forecastCost();
+            const costEl = document.getElementById('modelCost');
+            costEl.innerHTML = `<i class="fa-solid fa-gauge-high mr-1 ${cost > 150 ? 'text-amber-400' : ''}"></i>${escapeHtml(t('modelCost', { n: cost, every: t(state.mode === 'ensemble' ? 'modelCostEvery2h' : 'modelCostEvery1h') }))}${cost > 150 ? ` <span class="text-amber-300">${escapeHtml(t('modelCostHigh'))}</span>` : ''}`;
             document.getElementById('membersTotal').textContent = state.mode === 'ensemble'
                 ? t('membersTotal', { count: chosen.reduce((sum, m) => sum + m.members, 0) })
                 : t('modelsCount', { count: chosen.length });
@@ -3294,9 +3342,10 @@
             const time = dateFormat({ dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
             const models = modeModels().filter(m => fc.models[m.id]).map(m => m.name).join(', ');
             const tz = fc.meta.timezoneAbbreviation || fc.meta.timezone || 'UTC';
-            el.textContent = state.loading ? t('loading') :
+            const failed = Object.keys(fc.errors || {}).length;
+            el.textContent = (state.loading ? t('loading') :
                 state.forecastFromCache ? t('forecastMetaCached', { time, models }) :
-                t('forecastMeta', { time, models, window: windowLabel(state.window), tz });
+                t('forecastMeta', { time, models, window: windowLabel(state.window), tz })) + (failed && !state.loading ? ` · ${t('metaFailed', { n: failed })}` : '');
         }
 
         function statCard({ title, icon, color, value, sub, extra }) {
@@ -4136,11 +4185,6 @@
                 saveSettings();
                 renderStatsPanel();
             });
-            document.getElementById('btnSettingsToggle').addEventListener('click', () => {
-                state.settingsCollapsed = !state.settingsCollapsed;
-                saveSettings();
-                renderSettingsPanel();
-            });
             document.getElementById('langSelect').addEventListener('change', e => setLang(e.target.value));
         }
 
@@ -4229,7 +4273,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=10';
+        const MAP_JS = 'map.js?v=11';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 

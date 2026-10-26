@@ -2002,14 +2002,15 @@
         return pts;
     }
 
-    // Two days ahead normally; up to a week for a forecast hour.
-    async function fetchWind(pts, hour) {
+    // Two days ahead normally; up to a week for a forecast hour. Only the
+    // level shown: Open-Meteo counts every variable at every point.
+    async function fetchWind(pts, hour, lvl) {
         const days = Math.min(7, Math.max(2, Math.ceil((hour - Date.now()) / 864e5) + 1));
         for (let i = 0; i < pts.length; i += 100) {
             const chunk = pts.slice(i, i + 100);
             const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
                 latitude: chunk.map(p => p.lat).join(','), longitude: chunk.map(p => p.lon).join(','),
-                hourly: 'wind_speed_10m,wind_direction_10m,wind_speed_925hPa,wind_direction_925hPa',
+                hourly: `wind_speed_${lvl},wind_direction_${lvl}`,
                 past_days: 1, forecast_days: days, timezone: 'GMT', wind_speed_unit: 'ms'
             }, []);
             const res = await fetch(url);
@@ -2018,7 +2019,7 @@
             const list = Array.isArray(body) ? body : [body];
             chunk.forEach((p, k) => {
                 const hr = list[k] && list[k].hourly;
-                if (hr) W.cache.set(p.key, { at: Date.now(), hourly: hr, until: Date.parse(hr.time[hr.time.length - 1] + 'Z') });
+                if (hr) W.cache.set(`${lvl}|${p.key}`, { at: Date.now(), hourly: hr, until: Date.parse(hr.time[hr.time.length - 1] + 'Z') });
             });
         }
     }
@@ -2034,22 +2035,22 @@
         // anyway), and never keep more than 1500.
         W.cache.forEach((c, k) => { if (Date.now() - c.at > 30 * 60e3) W.cache.delete(k); });
         for (const k of W.cache.keys()) { if (W.cache.size <= 1500) break; W.cache.delete(k); }
-        const missing = pts.filter(p => { const c = W.cache.get(p.key); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
+        const lvl = S.wind.level === '925' ? '925hPa' : '10m';
+        const missing = pts.filter(p => { const c = W.cache.get(`${lvl}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
         W.error = '';
         if (missing.length) {
             W.loading = true; renderWindInfo();
-            try { await fetchWind(missing, hour); } catch (err) { W.error = err instanceof TypeError ? t('mapErrNetwork') : err.message; }
+            try { await fetchWind(missing, hour, lvl); } catch (err) { W.error = err instanceof TypeError ? t('mapErrNetwork') : err.message; }
             W.loading = false;
         }
         if (id !== W.seq) return;
         W.hour = hour;
         W.group.clearLayers();
         const key = new Date(hour).toISOString().slice(0, 13);
-        const lvl = S.wind.level === '925' ? '925hPa' : '10m';
         const R_ = state.flightRules || {};
         const toUnit = WIND_TO_MS[state.windUnit] || 1;
         pts.forEach(p => {
-            const c = W.cache.get(p.key);
+            const c = W.cache.get(`${lvl}|${p.key}`);
             if (!c) return;
             const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
             const ms = i < 0 ? null : c.hourly[`wind_speed_${lvl}`][i], dir = i < 0 ? null : c.hourly[`wind_direction_${lvl}`][i];
