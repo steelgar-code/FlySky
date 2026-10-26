@@ -2226,9 +2226,9 @@
             // ---- Forecast confidence: how much the members (Ensemble) or
             // models (Models) agree with each other. Each member / model gets
             // its own verdict from its own values (rain: wet or dry in that
-            // hour); the shares are averaged per model so every model counts
-            // the same, whatever its number of members. Confidence is the
-            // share of the largest group.
+            // hour; a factor it lacks taken as the others see it); the shares
+            // are averaged per model so every model counts the same, whatever
+            // its number of members. Confidence is the share of the largest group.
             const series = {};   // member id -> { model, rain, wind, gust, cloud, vis }
             const pick = (fn, a, b) => (!known(a) ? b : !known(b) ? a : fn(a, b));
             const take = (key, check, fn) => {
@@ -2269,26 +2269,44 @@
             const topOf = sh => STATUSES.reduce((a, b) => (sh[b] > sh[a] ? b : a), 'good');
             hours.forEach((h, i) => {
                 const all = {}, byCheck = {};
-                Object.values(series).forEach(ser => {
-                    const c = memberChecks(ser, i);
-                    const v = CHECKS.map(k => c[k]).filter(Boolean);
-                    if (!v.length) return;
-                    const st = v.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good');
-                    const m = all[ser.model] || (all[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
-                    m.n++; m[st]++;
-                    CHECKS.forEach(k => {
-                        if (!c[k]) return;
-                        const bm = (byCheck[k] || (byCheck[k] = {}));
-                        const x = bm[ser.model] || (bm[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
-                        x.n++; x[c[k]]++;
+                const checked = Object.values(series).map(ser => ({ ser, c: memberChecks(ser, i) }));
+                // Per factor: each model's own verdicts on it.
+                checked.forEach(({ ser, c }) => CHECKS.forEach(k => {
+                    if (!c[k]) return;
+                    const bm = (byCheck[k] || (byCheck[k] = {}));
+                    const x = bm[ser.model] || (bm[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
+                    x.n++; x[c[k]]++;
+                }));
+                const checkShares = {};
+                Object.keys(byCheck).forEach(k => { checkShares[k] = sharesOf(byCheck[k]); });
+                // A member / model without a factor the others have (some
+                // models have no wind aloft, say) takes that factor as the
+                // others see it, instead of leaving it out — leaving it out
+                // made it vote "fine" on it. Its verdict (the worst factor)
+                // is then a share of each status: P(worst ≤ L) = Π P(factor ≤ L).
+                checked.forEach(({ ser, c }) => {
+                    const own = CHECKS.map(k => c[k]).filter(Boolean);
+                    if (!own.length) return;
+                    const worst = own.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'good');
+                    const atMost = STATUSES.map(st => {
+                        if (rank[worst] > rank[st]) return 0;
+                        return CHECKS.reduce((p, k) => {
+                            const sh = !c[k] && checkShares[k];
+                            return sh ? p * STATUSES.filter(x => rank[x] <= rank[st]).reduce((q, x) => q + sh[x], 0) : p;
+                        }, 1);
                     });
+                    const m = all[ser.model] || (all[ser.model] = { n: 0, good: 0, marginal: 0, bad: 0 });
+                    m.n++;
+                    m.good += atMost[0];
+                    m.marginal += atMost[1] - atMost[0];
+                    m.bad += 1 - atMost[1];
                 });
                 const shares = sharesOf(all);
                 if (!shares) { h.agree = null; return; }
                 const top = topOf(shares);
                 const conf = shares[top];
                 const checkConf = {};
-                Object.keys(byCheck).forEach(k => { const sh = sharesOf(byCheck[k]); if (sh) checkConf[k] = sh[topOf(sh)]; });
+                Object.keys(checkShares).forEach(k => { const sh = checkShares[k]; if (sh) checkConf[k] = sh[topOf(sh)]; });
                 h.agree = {
                     shares, top, conf, checkConf,
                     level: conf >= 0.8 ? 'high' : conf >= 0.6 ? 'medium' : 'low',

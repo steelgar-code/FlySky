@@ -72,5 +72,28 @@ ok('daily limit: one toast', toasts.filter(x => /limit/i.test(x)).length === 1, 
 ok('daily limit: forecast kept', await I(() => !!processed && state.forecastFromCache && document.querySelectorAll('#flightStrip [data-flight-hour]').length > 0));
 opts.forecastLimit = null;
 
+// Confidence with a factor some models lack: 8 models, wind aloft from 5 of them.
+const conf = await page.evaluate(() => {
+    const ms = Array.from({ length: 8 }, (_, k) => `m${k + 1}`);
+    const param = (variable, models, valueOf) => ({ members: models.map(m => ({ model: m, variable, key: `${variable}_${m}`, values: [valueOf(m)] })),
+        stats: { median: [models.map(valueOf).sort((x, y) => x - y)[Math.floor(models.length / 2)]] } });
+    const run = (aloft, wind = () => 5) => {
+        const save = state.windUnit; state.windUnit = 'ms';
+        const r = computeFlight({ times: ['2030-01-01T10:00'], params: { wind_speed_10m: param('wind_speed_10m', ms, wind), wind_aloft: param('wind_speed_950hPa', ms.slice(0, 5), aloft) } });
+        state.windUnit = save;
+        const a = r.hours[0].agree;
+        return { status: r.hours[0].status, top: a.top, conf: Math.round(a.conf * 1000) / 1000, level: a.level, aloft: Math.round(a.checkConf.aloft * 1000) / 1000 };
+    };
+    return {
+        allStrong: run(() => 16),                                  // the 5 agree: too strong
+        split: run(m => (['m1', 'm2', 'm3'].includes(m) ? 16 : 5)),   // 3 strong, 2 calm
+        ownBad: run(m => (['m1', 'm2', 'm3'].includes(m) ? 16 : 5), m => (m === 'm8' ? 15 : 5))
+    };
+});
+console.log('    confidence:', JSON.stringify(conf));
+ok('models without wind aloft take it as the others see it: all 5 strong → 100% high', conf.allStrong.top === 'bad' && conf.allStrong.conf === 1 && conf.allStrong.level === 'high');
+ok('split among the 5 (3 strong, 2 calm) → 60% not suitable, medium', conf.split.top === 'bad' && conf.split.conf === 0.6 && conf.split.level === 'medium' && conf.split.aloft === 0.6);
+ok('a model that is not suitable on its own stays so', conf.ownBad.conf === 0.65, conf.ownBad);
+
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await b.close();
