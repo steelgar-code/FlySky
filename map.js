@@ -2054,7 +2054,9 @@
             const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
             const ms = i < 0 ? null : c.hourly[`wind_speed_${lvl}`][i], dir = i < 0 ? null : c.hourly[`wind_direction_${lvl}`][i];
             if (!Number.isFinite(ms) || !Number.isFinite(dir)) return;
-            const color = ms >= R_.windBad ? FLIGHT_STATUS.bad.color : ms >= R_.windGood ? FLIGHT_STATUS.marginal.color : FLIGHT_STATUS.good.color;
+            // 10 m arrows by the wind limits, ~800 m ones by the wind-aloft limits.
+            const [good, bad] = lvl === '10m' ? [R_.windGood, R_.windBad] : [R_.aloftGood ?? R_.windGood, R_.aloftBad ?? R_.windBad];
+            const color = ms >= bad ? FLIGHT_STATUS.bad.color : ms >= good ? FLIGHT_STATUS.marginal.color : FLIGHT_STATUS.good.color;
             const shown = ms / toUnit;
             const html = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${(dir + 180) % 360}deg)"><path d="M12 2 L17.5 11 H13.6 V22 H10.4 V11 H6.5 Z" fill="${color}" stroke="#020617" stroke-width="1.2" stroke-linejoin="round"/></svg><span>${shown < 10 ? shown.toFixed(1) : Math.round(shown)}</span>`;
             L.marker([p.lat, p.lon], { pane: 'wind', interactive: false, keyboard: false, icon: L.divIcon({ className: 'fs-wind', html, iconSize: [40, 36], iconAnchor: [20, 12] }) }).addTo(W.group);

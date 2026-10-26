@@ -18,12 +18,12 @@
 // its own copy of the last forecast in localStorage for offline viewing.
 
 const CACHE_PREFIX = 'flysky-cache-';
-const CACHE_NAME = CACHE_PREFIX + 'v14';
+const CACHE_NAME = CACHE_PREFIX + 'v15';
 
 const APP_FILES = [
     './',
     './index.html',
-    './map.js?v=9',
+    './map.js?v=10',
     './hazard.js?v=6',
     './manifest.json',
     './favicon.png',
