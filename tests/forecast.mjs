@@ -41,7 +41,7 @@ await page.click('[data-mode="ensemble"]'); await page.waitForTimeout(2500);
 const good = () => I(() => [...document.querySelectorAll('#flightStrip [data-flight-hour]')].filter(c => c.style.background === 'rgb(12, 163, 12)').length);
 const before = await good();
 await page.click('#btnSettings'); await page.waitForTimeout(400);
-for (const [f, v] of [['windBad', '60'], ['windGood', '50'], ['rainBad', '100'], ['rainGood', '99']]) {
+for (const [f, v] of [['windBad', '60'], ['windGood', '50'], ['aloftBad', '60'], ['aloftGood', '50'], ['rainBad', '100'], ['rainGood', '99']]) {
   const input = page.locator(`[data-threshold="${f}"]`);
   await input.fill(v); await input.dispatchEvent('change'); await page.waitForTimeout(300);
 }

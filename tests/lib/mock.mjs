@@ -16,7 +16,8 @@ const iso = ms => new Date(ms).toISOString().replace('.000Z', 'Z');
 const floor = (ms, step) => Math.floor(ms / step) * step;
 
 export function makeWms(opts = {}) {
-  const now = Date.now();
+  // opts.now: pretend it is this time (ms), e.g. to get daytime images.
+  const now = opts.now ?? Date.now();
   const s15 = 15 * 60e3, s10 = 10 * 60e3;
   const fogEnd = floor(now - 20 * 60e3, s15);
   const microTimes = []; for (let k = 0; k < 60; k++) microTimes.push(iso(fogEnd - k * s15 - (k % 7 === 3 ? 5 * 60e3 : 0)));
@@ -95,6 +96,8 @@ export async function routeAll(page, opts = {}) {
     }
     if ((url.includes('ensemble-api.open-meteo.com') || url.includes('api.open-meteo.com/v1/forecast')) && url.includes('models=')) {
       // Forecast mock: every requested model / variable, ensemble members for the ensemble API.
+      // opts.forecastLimit = { n, reason }: the next n requests get Open-Meteo's 429 "limit exceeded".
+      if (opts.forecastLimit && opts.forecastLimit.n > 0) { opts.forecastLimit.n--; return route.fulfill({ status: 429, json: { error: true, reason: opts.forecastLimit.reason } }); }
       const u = new URL(url); const ens = url.includes('ensemble-api');
       const models = u.searchParams.get('models').split(','); const vars = u.searchParams.get('hourly').split(',');
       const days = +(u.searchParams.get('forecast_days') || 2); const start = Math.floor(Date.now() / 86400e3) * 86400e3;
@@ -114,7 +117,8 @@ export async function routeAll(page, opts = {}) {
               if (v === 'cloud_cover_low') return Math.round(45 + 40 * w);
               if (v === 'visibility') return Math.round(9000 + 7000 * w);
               if (/gust/.test(v)) return +(9 + 5 * w + (i % 24 > 11 && i % 24 < 17 ? 4 : 0)).toFixed(1);
-              return +(5 + 3 * w + (i % 24 > 11 && i % 24 < 17 ? 3 : 0) + (/hPa/.test(v) ? 4 : 0)).toFixed(1);
+              // Wind aloft a bit above the 10 m wind (it is a flight factor of its own).
+              return +(5 + 3 * w + (i % 24 > 11 && i % 24 < 17 ? 3 : 0) + (/hPa/.test(v) ? 2 : 0)).toFixed(1);
             });
           });
         }

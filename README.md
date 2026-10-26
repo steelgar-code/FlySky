@@ -6,6 +6,7 @@ The app has two views, switched with the buttons in the header: **Forecast** and
 
 ## Forecast
 
+- **"Can I fly now?"** — a card at the top: the current hour's verdict and its confidence, what limits it, one tile per factor (rain chance, wind, gusts, wind aloft, low cloud, visibility) coloured green / yellow / red by its own check with a strip of that factor over the next 6 hours, and the next suitable window. The nearby-hazard chips and the satellite note sit in this card; *Details* jumps to the flight bar.
 - **Two forecast modes**
   - **Ensemble**: every run (member) of each selected ensemble model, which shows how likely each outcome is.
   - **Models**: the single main (deterministic) forecast of each selected model, which shows how much the models disagree.
@@ -13,20 +14,21 @@ The app has two views, switched with the buttons in the header: **Forecast** and
 - **Per-member / per-model view** — the toggle next to the mode switch overlays every ensemble member in Ensemble mode (wind-aloft members coloured by height), and in Models mode replaces the combined range with one colored line per model.
 - **Probability ranges** — one chart per parameter with the median line plus shaded 25–75% (50% likely), 10–90% (80% likely) and min–max bands. Hover any hour for the exact numbers.
 - **Parameters** — precipitation (with an hourly chance-of-precipitation bar), wind speed and gusts at 10 m, low cloud cover (Models mode; the ensemble API doesn't provide it), visibility, and wind aloft (Ensemble: 1000 and 925 hPa pooled, roughly 110–800 m; Models: 950 hPa, roughly 500 m).
-- **Flight conditions** — a color-coded bar marking each hour as suitable (green), uncertain (yellow) or not suitable (red), from the median wind, gusts, low clouds and visibility plus the chance of precipitation:
-  - *Suitable*: no chance of precipitation, wind and gusts under 8 m/s, low clouds under 30%, visibility over 5 km.
-  - *Uncertain*: any of: precipitation chance under 40%, wind or gusts 8–14 m/s, low clouds 30–60%, visibility 3–5 km.
-  - *Not suitable*: any of: precipitation chance 40% or more, wind or gusts 14 m/s or more, low clouds 60% or more, visibility under 3 km.
-  All thresholds are adjustable in Settings, and the wind used can be the 10 m wind and gusts or the wind aloft.
-- **Forecast confidence** — every member (Ensemble) or model (Models) gets its own verdict per hour; a strip under the flight bar shows how many agree (high ≥ 80%, medium ≥ 60%, low). *Split by share* shows each hour stacked by the share of suitable / uncertain / not suitable.
-- **Breakdown by cause** — the same zones separately for precipitation, wind + gusts, low clouds and visibility, with their own details box (tap to pin an hour). A pinned hour on the flight bar offers a **Map** button that opens the satellite map at that time (later hours: the latest image with forecast wind arrows).
+- **Flight conditions** — a color-coded bar marking each hour as suitable (green), uncertain (yellow) or not suitable (red), from the median wind, gusts, wind aloft, low clouds and visibility plus the chance of precipitation:
+  - *Suitable*: no chance of precipitation, wind and gusts under 8 m/s, wind aloft under 8 m/s, low clouds under 30%, visibility over 5 km.
+  - *Uncertain*: any of: precipitation chance under 40%, wind or gusts 8–14 m/s, wind aloft 8–14 m/s, low clouds 30–60%, visibility 3–5 km.
+  - *Not suitable*: any of: precipitation chance 40% or more, wind or gusts 14 m/s or more, wind aloft 14 m/s or more, low clouds 60% or more, visibility under 3 km.
+  All thresholds are adjustable in Settings; wind aloft has limits of its own (raise them a lot to leave it out).
+- **Forecast confidence** — every member (Ensemble) or model (Models) gets its own verdict per hour, each model weighted equally; a strip under the flight bar shows how many agree (high ≥ 80%, medium 60–80%, low < 60%). *Split by share* shows each hour stacked by the share of suitable / uncertain / not suitable.
+- **Breakdown by cause** — the same zones separately for precipitation, wind + gusts, wind aloft, low clouds and visibility, with their own details box (tap to pin an hour). A pinned hour on the flight bar offers a **Map** button that opens the satellite map at that time (later hours: the latest image with forecast wind arrows).
 - **Flight Window Planner** — flyable windows day by day, with the causes and worst values for uncertain slots and the forecast's confidence; windows shorter than the minimum duration (1 h by default) are left out.
-- **Nearby hazards** — chips on the flight card when satellite data shows **lightning or rain within 50 km** of the location (distance, direction, intensity, and once several images are seen, whether it's approaching and when). A tap opens the map with that overlay on. When satellite and forecast clearly disagree at the location (rain, low cloud), a note says so. On by default; switch off in either settings menu.
+- **Nearby hazards** — chips in the "Can I fly now?" card when satellite data shows **lightning or rain within 50 km** of the location (distance, direction, intensity, and once several images are seen, whether it's approaching and when). A tap opens the map with that overlay on. When satellite and forecast clearly disagree at the location (rain, low cloud), a note says so. On by default; switch off in either settings menu.
 - **Day and night** — dotted lines mark midnight, a thin band shades daylight and night, and today's sunrise and sunset are shown under the flight bar (computed on the device).
-- **Forecast summary** — expected precipitation with its 80% range and chance of at least 1 mm, peak wind, gusts and wind aloft with a 1-in-10 worst case, low cloud cover and lowest visibility.
+- **Forecast summary** — expected precipitation with its 80% range and chance of at least 1 mm, peak wind, gusts and wind aloft with a 1-in-10 worst case, low cloud cover and lowest visibility (two cards per row on phones).
 - **Reorderable charts** — move chart panels with the arrows, or drag them by the grip on desktop.
 - **Time windows** — 3 h, 8 h, 24 h (default), 48 h, 72 h or 1 week from the current hour in the location's local time.
-- **Model picker** — defaults suit Ukraine and Eastern Europe (ensembles: DWD ICON-EU, ECMWF IFS Europe and AIFS, Google WeatherNext 2; models: DWD ICON, ECMWF IFS and AIFS, Météo-France, UK Met Office), with NOAA GFS, GEM, JMA and BOM also available. A model that fails to load is flagged and skipped.
+- **Model picker** — in the side menu (☰, or *Models* on the "Can I fly now?" card), for the current mode, with what one update costs of Open-Meteo's free allowance. Defaults suit Ukraine and Eastern Europe (ensembles: DWD ICON-EU, ECMWF IFS Europe and AIFS, Google WeatherNext 2; models: DWD ICON, ECMWF IFS and AIFS, Météo-France, UK Met Office), with NOAA GFS, GEM, JMA and BOM also available. A model that fails to load is flagged and skipped.
+- **Requests** — Open-Meteo counts every variable of every ensemble member, so an ensemble update is costly (≈ 120 calls with the 4 default ensembles, ≈ 180–210 with all 8; free use: 600 a minute, 5,000 an hour, 10,000 a day). FlySky always asks for 8 days at once (any request up to 14 days counts the same), so changing the time window needs no new request; a forecast is reused for 2 h in Ensemble mode and 1 h in Models mode (*Refresh* always asks). A per-minute limit is retried once after a minute; an hourly or daily limit stops with one note, and the last forecast stays.
 - **Locations** — search, current position, favorites (star a location); the last location, mode, models and window are remembered.
 
 ## Satellite map
@@ -44,7 +46,7 @@ Satellite RGB imagery shows *likely* fog and low cloud visually; it does not mea
 
 ## Settings, languages, offline
 
-- **Settings** (☰ menu): units (wind m/s, km/h, kn, mph; precipitation mm or inch), the wind used for flight rules, flight thresholds, planner minimum window, nearby-hazard alerts, full screen; in the map view the same menu holds the map settings.
+- **Settings** (☰ menu): models, units (wind m/s, km/h, kn, mph; precipitation mm or inch), flight thresholds (including wind aloft), planner minimum window, nearby-hazard alerts, full screen; in the map view the same menu holds the map settings.
 - **Languages**: English, Ukrainian and Portuguese (BR).
 - **Installable PWA**: works offline with the last loaded forecasts (the four most recent location / mode combinations are kept); the map needs a connection.
 

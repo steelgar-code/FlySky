@@ -26,15 +26,19 @@ Every external request is answered locally, so the suites run offline and are re
   Cloud Type / Phase, Cloud Mask, IR, precipitation h40b, lightning li_afa, fires frp / fire, borders,
   plus layers that must be ignored), GetMap PNGs (lightning NW and a fire SW of Kyiv at known times),
   GetFeatureInfo, GetLegendGraphic, WMS exceptions. Options: `badTime`, `noCors`, `capsFail`,
-  `noLayerCaps`, `noPrecip`, `leafletFail`, `windFail`, `wmsDelay`, `gfiRgb`.
+  `noLayerCaps`, `noPrecip`, `leafletFail`, `windFail`, `wmsDelay`, `gfiRgb`, `now` (pretend it is
+  this time, e.g. for daytime images).
 - **Open-Meteo**: ensemble / models forecasts (members and per-model columns like the real API),
   the map readout's point request (one column per model) and the wind-arrow grid request.
+  Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
+  forecast requests get a 429 "limit exceeded".
 - OSM tiles: flat dark tiles.
 
 ## Suites
 | File | Covers |
 |---|---|
 | `forecast.mjs` | combined request, charts, flight bar, 72 h window, Models mode, thresholds + reset, planner, language, saved forecast |
+| `forecast-now.mjs` | "Can I fly now?" card, wind aloft as a factor, models in the side menu, 8 days asked once (no request on window switch), daily limit, confidence legend |
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |

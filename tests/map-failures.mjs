@@ -81,7 +81,8 @@ async function open(opts, ctxOpts = {}, before) {
 // E. Daytime → Day Microphysics; night hint when user picks a day product at night
 {
   const noon = new Date(); noon.setUTCHours(10, 0, 0, 0);
-  const { page, st, ctx } = await open({}, {}, async p => { await p.clock.setFixedTime(noon); });
+  // Images from the same daytime as the page's clock.
+  const { page, st, ctx } = await open({ now: noon.getTime() }, {}, async p => { await p.clock.setFixedTime(noon); });
   let s = await st();
   ok('daytime: Auto shows Day Microphysics', s.product === 'auto' && s.shown === 'dayMicro', [s.product, s.shown]);
   await page.evaluate(() => document.querySelector('#drawerMap [data-map-product="fog"]').click()); await page.waitForTimeout(800);

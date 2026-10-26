@@ -102,7 +102,13 @@ ok('wind arrows drawn from one grid request', arrows > 10 && log.windReq === 1, 
 const rot10 = await I(() => document.querySelector('.fs-wind svg').style.transform);
 await page.click('#drawerMap [data-map-windlevel="925"]'); await page.waitForTimeout(800);
 const rot925 = await I(() => document.querySelector('.fs-wind svg').style.transform);
-ok('level switch: no new request, arrows turn', log.windReq === 1 && rot10 === 'rotate(45deg)' && rot925 === 'rotate(90deg)', { rot10, rot925, req: log.windReq });
+// Only the level shown is requested (Open-Meteo counts every variable):
+// the first switch asks once for the other level, later switches are cached.
+ok('level switch: one request for that level, arrows turn', log.windReq === 2 && rot10 === 'rotate(45deg)' && rot925 === 'rotate(90deg)', { rot10, rot925, req: log.windReq });
+await page.click('#drawerMap [data-map-windlevel="10m"]'); await page.waitForTimeout(600);
+const rotBack = await I(() => document.querySelector('.fs-wind svg').style.transform);
+await page.click('#drawerMap [data-map-windlevel="925"]'); await page.waitForTimeout(600);
+ok('switching back and forth: no more requests', log.windReq === 2 && rotBack === 'rotate(45deg)', { rotBack, req: log.windReq });
 const colors = await I(() => [...new Set([...document.querySelectorAll('.fs-wind path')].map(p => p.getAttribute('fill')))]);
 ok('arrow colours follow flight thresholds', colors.length >= 2, colors);
 ok('wind info line', /Wind for/.test(await page.locator('#mapWindInfo').innerText()));
