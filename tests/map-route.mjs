@@ -20,11 +20,11 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
     const d = await page.evaluate(() => { const { S, R } = FlySkyMap._internals; return { labels: S.labels, borders: S.borders, wind: S.wind.on, level: S.wind.level, utc: S.utc, max: R.map.getMaxZoom() }; });
     ok('new users: place names and borders off, wind on at 120 m, local time', !d.labels && !d.borders && d.wind && d.level === '120m' && !d.utc, d);
     ok('map zooms in to 18', d.max === 18, d.max);
-    // Deep zoom: the satellite image stays at its own resolution (zoom 11 extent).
+    // Deep zoom: the satellite image stays at its own resolution (zoom 8 image).
     await page.evaluate(() => FlySkyMap._internals.R.map.setZoom(16, { animate: false }));
     await page.waitForTimeout(1500);
     const z = await page.evaluate(() => { const { R } = FlySkyMap._internals; return { zoom: R.map.getZoom(), ext: R.extent && R.extent.zoom }; });
-    ok('zoom 16: satellite extent capped at zoom 11', z.zoom === 16 && z.ext === 11, z);
+    ok('zoom 16: satellite image drawn for zoom 8', z.zoom === 16 && z.ext === 8, z);
     await ctx.close();
 }
 

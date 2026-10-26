@@ -1256,7 +1256,8 @@
         times: {},                // layerName -> { at, list:[ms], ok, error }
         frames: [],               // [{ t, key }]
         index: -1, playing: false, playTimer: null,
-        extent: null,             // { key, bounds, bbox3857, w, h }
+        extent: null,             // { key, bounds, bbox3857, w, h, zoom }
+        extents: [],              // recently used image areas, newest first
         overlay: null, bordersLayer: null, baseLayer: null, locMarker: null, labelsLayer: null,
         lastOk: null, lastError: null, requestMode: 'fetch', fetchWorked: false,
         refreshTimer: null, moveTimer: null, drawing: null, gen: 0,
@@ -1699,10 +1700,13 @@
     }
 
     // ================= Extent =================
-    // Satellite pixels are 1–3 km: past zoom 11 a closer view only magnifies
-    // them, so the image is the zoom-11 view around the centre (and panning
-    // inside it needs no new image).
-    const SAT_MAX_ZOOM = 11;
+    // Satellite pixels here are ~1–5 km; an image drawn for zoom 8 (~400 m
+    // per pixel at 50°N) already samples them finely, so closer views only
+    // magnify it: the image is the zoom-8 view around the centre, with a
+    // wider margin (same pixel count), and zooming in or panning inside it
+    // needs no new image.
+    const SAT_MAX_ZOOM = 8;
+    const EXTENTS_KEPT = 6;
     function satZoom() {
         return Math.min(R.map.getZoom(), SAT_MAX_ZOOM);
     }
@@ -1714,7 +1718,9 @@
         const z = satZoom();
         const c = map.project(map.getCenter(), z);
         const view = L.latLngBounds(map.unproject(c.subtract(size.divideBy(2)), z), map.unproject(c.add(size.divideBy(2)), z));
-        const b = view.pad(0.1);
+        // At the cap the image covers 1.6× the (zoom-8) view: more room to
+        // pan; below it 1.2×, keeping the detail of zoomed-out views.
+        const b = view.pad(z === SAT_MAX_ZOOM ? 0.3 : 0.1);
         const sw = L.CRS.EPSG3857.project(L.latLng(Math.max(b.getSouth(), -85), b.getWest()));
         const ne = L.CRS.EPSG3857.project(L.latLng(Math.min(b.getNorth(), 85), b.getEast()));
         // Snap to 1 km so tiny pans reuse cached images.
@@ -1730,11 +1736,27 @@
         return { key: bbox3857.join(','), bbox3857, bounds, w, h: hh, zoom: z };
     }
 
-    // True when the current view still sits inside the fetched extent at the same zoom.
+    // An image area serves the view when it covers it at least as finely
+    // as needed.
+    function extentFits(ext) {
+        return !!ext && ext.zoom >= satZoom() && ext.bounds.contains(R.map.getBounds());
+    }
+
     function extentStillGood() {
-        if (!R.extent) return false;
-        if (R.extent.zoom !== satZoom()) return false;
-        return R.extent.bounds.contains(R.map.getBounds());
+        return extentFits(R.extent);
+    }
+
+    // After a move: the current area, else a recently used one (its images
+    // may still be cached — going back needs no download), else a new one.
+    function updateExtent() {
+        if (extentStillGood()) return;
+        const old = R.extents.find(extentFits);
+        if (old) { R.extent = old; rememberExtent(old); reloadFrames(); }
+        else reloadFrames({ newExtent: true });
+    }
+
+    function rememberExtent(ext) {
+        R.extents = [ext, ...R.extents.filter(e => e.key !== ext.key || e.w !== ext.w || e.h !== ext.h)].slice(0, EXTENTS_KEPT);
     }
 
     // ================= Frames =================
@@ -1742,7 +1764,7 @@
         if (!R.map || !R.visible) return;
         const gen = ++R.gen;
         if (!navigator.onLine) { renderStatus(); return; }
-        if (opts.newExtent || !R.extent) R.extent = computeExtent();
+        if (opts.newExtent || !R.extent) { R.extent = computeExtent(); if (R.extent) rememberExtent(R.extent); }
         const ext = R.extent;
         if (!ext) return;
         // Product layers in use: one, or for "Auto" the night / day /
@@ -2080,7 +2102,7 @@
             save();
             clearTimeout(R.moveTimer);
             R.moveTimer = setTimeout(() => {
-                if (!extentStillGood()) reloadFrames({ newExtent: true });
+                updateExtent();
                 renderStatus();
             }, 450);
             // Moved away from the forecast location: follow the crosshair.
