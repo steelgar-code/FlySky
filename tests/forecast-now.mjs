@@ -23,7 +23,7 @@ const I = fn => page.evaluate(fn);
 const card = await I(() => {
   const c = document.getElementById('nowCard');
   return { visible: !c.classList.contains('hidden'), aboveFlight: c.getBoundingClientRect().top < document.getElementById('flightCard').getBoundingClientRect().top,
-    tiles: document.querySelectorAll('#nowMain .grid > div').length, text: document.getElementById('nowMain').innerText };
+    tiles: document.querySelectorAll('#nowMain .grid > div').length, text: document.getElementById('nowMain').innerText + '\n' + document.getElementById('nowNext').innerText };
 });
 ok('now card above the flight card', card.visible && card.aboveFlight);
 ok('now card: verdict, 6 factor tiles, next window', /Can I fly now\?/.test(card.text) && card.tiles === 6 && /(Suitable now until|Next suitable|No suitable window)/.test(card.text), card.text.replace(/\n/g, ' | ').slice(0, 160));

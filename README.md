@@ -6,7 +6,7 @@ The app has two views, switched with the buttons in the header: **Forecast** and
 
 ## Forecast
 
-- **"Can I fly now?"** — a card at the top: the current hour's verdict and its confidence, what limits it, one tile per factor (rain chance, wind, gusts, wind aloft, low cloud, visibility) coloured green / yellow / red by its own check with a strip of that factor over the next 6 hours, and the next suitable window. The nearby-hazard chips and the satellite note sit in this card; *Details* jumps to the flight bar.
+- **"Can I fly now?"** — a card at the top: the hour's verdict and its confidence, what limits it, one tile per factor (rain chance, wind, gusts, wind aloft, low cloud, visibility) coloured green / yellow / red by its own check with a strip of that factor over the 6 hours from it, and the next suitable window. Under the tiles, an **hour scrubber** covers the whole time window, each hour stacked by the share of members / models per verdict (like *Split by share*): slide along it (mouse or finger), tap, use the ‹ › buttons or the arrow keys to check another hour — the card follows, *Now* goes back to the current hour, and *Map* opens the satellite map for that hour. The selected hour is the one pinned on the flight bar, and the other way round. The nearby-hazard chips and the satellite note (current hour only) sit in this card; *Details* jumps to the flight bar.
 - **Two forecast modes**
   - **Ensemble**: every run (member) of each selected ensemble model, which shows how likely each outcome is.
   - **Models**: the single main (deterministic) forecast of each selected model, which shows how much the models disagree.

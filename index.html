@@ -177,6 +177,11 @@
 
         /* Hour pinned on the main flight bar. */
         #flightStrip [data-pinned] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        #nowStrip { touch-action: pan-y; cursor: ew-resize; -webkit-user-select: none; user-select: none; }
+        #nowStrip:focus { outline: none; }
+        #nowStrip:focus-visible #nowMarker { border-color: #22d3ee; }
+        #nowMarker { transition: left 0.08s ease-out; }
+        #nowStrip.dragging #nowMarker { transition: none; }
     </style>
 </head>
 <body class="h-full font-sans antialiased bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
@@ -265,6 +270,9 @@
             <!-- "Can I fly now?": the current hour at a glance (renderNow) -->
             <section id="nowCard" class="hidden px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3">
                 <div id="nowMain" class="space-y-3"></div>
+                <!-- Hour scrubber: the window's hours by share (like "Split by share"), drag to check another hour -->
+                <div id="nowScrub" class="hidden"></div>
+                <p id="nowNext" class="hidden text-xs text-slate-300"></p>
                 <!-- Nearby lightning / rain (hazard.js) -->
                 <div id="hazardChips" class="hidden flex flex-wrap gap-1.5"></div>
                 <!-- Satellite now vs this hour's forecast (only when they disagree) -->
@@ -777,6 +785,13 @@
                 flightSplitToggle: "Split by share",
                 nowTitle: "Can I fly now?",
                 nowDetails: "Details",
+                nowTitleAt: "Can I fly then?",
+                nowBack: "Now",
+                nowBackTitle: "Back to the current hour",
+                nowScrubLabel: "Hour to check",
+                nowPrevHour: "Previous hour",
+                nowNextHour: "Next hour",
+                nowStart: "now",
                 nowAllGood: "Everything is within your limits.",
                 nowLimitedBy: "Limited by",
                 nowTile_rain: "Rain",
@@ -786,7 +801,7 @@
                 nowTile_cloud: "Low cloud",
                 nowTile_vis: "Visibility",
                 nowTileRange: "80% range {range}",
-                nowTilesNote: "Strip under each tile: that factor over the next 6 hours.",
+                nowTilesNote: "Strip under each tile: that factor over 6 hours from this one. Slide the bar below to check another hour.",
                 nowSuitableUntil: "Suitable now until {time} ({n})",
                 nowNextSuitable: "Next suitable: {when} ({n})",
                 nowNoSuitable: "No suitable window in the next {window}.",
@@ -1010,6 +1025,13 @@
                 flightSplitToggle: "Частки",
                 nowTitle: "Чи можна літати зараз?",
                 nowDetails: "Деталі",
+                nowTitleAt: "Чи можна літати тоді?",
+                nowBack: "Зараз",
+                nowBackTitle: "Назад до поточної години",
+                nowScrubLabel: "Година для перевірки",
+                nowPrevHour: "Попередня година",
+                nowNextHour: "Наступна година",
+                nowStart: "зараз",
                 nowAllGood: "Усе в межах ваших порогів.",
                 nowLimitedBy: "Обмежує:",
                 nowTile_rain: "Опади",
@@ -1019,7 +1041,7 @@
                 nowTile_cloud: "Низькі хмари",
                 nowTile_vis: "Видимість",
                 nowTileRange: "80% діапазон {range}",
-                nowTilesNote: "Смужка під кожною плиткою: цей чинник на найближчі 6 годин.",
+                nowTilesNote: "Смужка під кожною плиткою: цей чинник на 6 годин від цієї. Проведіть по смузі нижче, щоб перевірити іншу годину.",
                 nowSuitableUntil: "Придатно зараз до {time} ({n})",
                 nowNextSuitable: "Наступне придатне: {when} ({n})",
                 nowNoSuitable: "Немає придатного вікна в найближчі {window}.",
@@ -1243,6 +1265,13 @@
                 flightSplitToggle: "Dividir por fração",
                 nowTitle: "Posso voar agora?",
                 nowDetails: "Detalhes",
+                nowTitleAt: "Posso voar nesse horário?",
+                nowBack: "Agora",
+                nowBackTitle: "Voltar à hora atual",
+                nowScrubLabel: "Hora a verificar",
+                nowPrevHour: "Hora anterior",
+                nowNextHour: "Próxima hora",
+                nowStart: "agora",
                 nowAllGood: "Tudo dentro dos seus limites.",
                 nowLimitedBy: "Limitado por",
                 nowTile_rain: "Chuva",
@@ -1252,7 +1281,7 @@
                 nowTile_cloud: "Nuvem baixa",
                 nowTile_vis: "Visibilidade",
                 nowTileRange: "faixa de 80% {range}",
-                nowTilesNote: "Faixa sob cada bloco: esse fator nas próximas 6 horas.",
+                nowTilesNote: "Faixa sob cada bloco: esse fator por 6 horas a partir desta. Deslize a barra abaixo para ver outra hora.",
                 nowSuitableUntil: "Adequado agora até {time} ({n})",
                 nowNextSuitable: "Próximo adequado: {when} ({n})",
                 nowNoSuitable: "Nenhuma janela adequada nas próximas {window}.",
@@ -2510,12 +2539,12 @@
             return { v: formatValue(v, windParam), u: unitLabel(windParam) };
         }
 
-        // The 80% range of a factor in the current hour (tile tooltip).
-        function nowTileRange(key) {
+        // The 80% range of a factor in hour i (tile tooltip).
+        function nowTileRange(key, i) {
             const pkey = { wind: 'wind_speed_10m', gust: 'wind_gusts_10m', aloft: 'wind_aloft', cloud: 'cloud_cover_low', vis: 'visibility' }[key];
             const d = pkey && processed.params[pkey];
             if (!d || !d.members.length) return '';
-            const lo = d.stats.p10[0], hi = d.stats.p90[0];
+            const lo = d.stats.p10[i], hi = d.stats.p90[i];
             if (!Number.isFinite(lo) || !Number.isFinite(hi)) return '';
             const a = nowTileValue(key, lo), b = nowTileValue(key, hi);
             return t('nowTileRange', { range: `${a.v}–${b.v}${a.u ? ' ' + a.u : ''}` });
@@ -2539,13 +2568,36 @@
             return `<i class="fa-solid fa-calendar-check mr-1.5" style="color: ${FLIGHT_STATUS.good.color}"></i>${escapeHtml(text)}${conf}`;
         }
 
+        // The hour the card shows: the one pinned on the flight bar (shared),
+        // else the current hour.
+        function nowIndex() {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            const i = mainPin ? hours.findIndex(h => h.time === mainPin) : -1;
+            return i < 0 ? 0 : i;
+        }
+
         function renderNow() {
+            renderNowMain();
+            renderNowScrub();
+            const f = processed && processed.flight;
+            const next = document.getElementById('nowNext');
+            next.classList.toggle('hidden', !(f && f.hours.length));
+            next.innerHTML = f && f.hours.length ? nowNextHtml(f.hours) : '';
+        }
+
+        // Verdict, limiting factors and tiles for the selected hour.
+        function renderNowMain() {
             const el = document.getElementById('nowMain');
             const f = processed && processed.flight;
-            const h = f && f.hours[0];
+            const i = nowIndex();
+            const h = f && f.hours[i];
+            const isNow = i === 0;
             const title = `<div class="flex items-center justify-between gap-2">
-                <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2"><i class="fa-solid fa-plane-up text-emerald-400"></i>${escapeHtml(t('nowTitle'))}</h3>
-                ${h ? `<button type="button" data-now-details class="text-[11px] text-slate-400 hover:text-slate-200 transition">${escapeHtml(t('nowDetails'))} <i class="fa-solid fa-chevron-down text-[9px]"></i></button>` : ''}
+                <h3 class="min-w-0 font-semibold text-slate-200 text-sm flex items-center gap-2"><i class="fa-solid fa-plane-up text-emerald-400"></i><span class="truncate">${escapeHtml(isNow || !h ? t('nowTitle') : t('nowTitleAt'))}</span></h3>
+                <span class="shrink-0 flex items-center gap-2">
+                    ${h && !isNow ? `<button type="button" data-now-back class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold transition" title="${escapeHtml(t('nowBackTitle'))}" aria-label="${escapeHtml(t('nowBackTitle'))}"><i class="fa-solid fa-clock-rotate-left"></i><span class="hidden min-[400px]:inline">${escapeHtml(t('nowBack'))}</span></button>` : ''}
+                    ${h ? `<button type="button" data-now-details class="text-[11px] text-slate-400 hover:text-slate-200 transition">${escapeHtml(t('nowDetails'))} <i class="fa-solid fa-chevron-down text-[9px]"></i></button>` : ''}
+                </span>
             </div>`;
             if (!h) {
                 el.innerHTML = `${title}<p class="text-xs text-slate-500">${escapeHtml(state.loading ? t('loading') : t('statNoData'))}</p>`;
@@ -2556,7 +2608,8 @@
             const verdict = `<div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
                 <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-base font-bold border" style="color: ${st.color}; background: ${st.color}1f; border-color: ${st.color}66">
                     <i class="fa-solid ${st.icon}"></i>${escapeHtml(t(st.labelKey))}</span>
-                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(formatHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }))}</span>` : ''}</span>
+                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }))}</span>` : ''}</span>
+                <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}" class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>
             </div>`;
             const limiting = h.status === 'none' ? '' : h.status === 'good'
                 ? `<p class="text-xs text-slate-300">${escapeHtml(t('nowAllGood'))}</p>`
@@ -2567,9 +2620,9 @@
                 const c = FLIGHT_STATUS[known ? h.checks[tile.key] || 'none' : 'none'].color;
                 const label = t(tile.labelKey);
                 const val = known ? nowTileValue(tile.key, v) : { v: '–', u: '' };
-                const tip = known ? [label, nowTileRange(tile.key)].filter(Boolean).join(' · ') : `${label} · ${t('flightNoData')}`;
-                // The next 6 hours of this factor, as a thin strip.
-                const next = f.hours.slice(0, 6).map(x => `<span class="flex-1" style="background: ${FLIGHT_STATUS[x.checks[tile.key] || 'none'].color}"></span>`).join('');
+                const tip = known ? [label, nowTileRange(tile.key, i)].filter(Boolean).join(' · ') : `${label} · ${t('flightNoData')}`;
+                // The 6 hours from this one, as a thin strip.
+                const next = f.hours.slice(i, i + 6).map(x => `<span class="flex-1" style="background: ${FLIGHT_STATUS[x.checks[tile.key] || 'none'].color}"></span>`).join('');
                 return `<div class="min-w-0 flex flex-col items-center rounded-xl border px-1 pt-1.5 pb-1 text-center" style="background: ${c}1f; border-color: ${c}66" title="${escapeHtml(tip)}">
                     <i class="fa-solid ${tile.icon} text-[11px]" style="color: ${c}"></i>
                     <div class="font-mono font-bold text-sm leading-tight mt-0.5 ${known ? 'text-slate-100' : 'text-slate-500'}">${escapeHtml(val.v)}</div>
@@ -2582,8 +2635,149 @@
                 <div>
                     <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">${tiles.join('')}</div>
                     <p class="text-[10px] text-slate-500 mt-1">${escapeHtml(t('nowTilesNote'))}</p>
+                </div>`;
+        }
+
+        // The scrubber: one cell per hour of the window, stacked by the share
+        // of members / models per verdict (status colour without them),
+        // midnight marks and day names, and a marker on the selected hour.
+        // Built when the forecast changes; selecting only moves the marker.
+        function renderNowScrub() {
+            const el = document.getElementById('nowScrub');
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            el.classList.toggle('hidden', hours.length < 2);
+            RT_NOW_DAYS.width = 0;
+            if (hours.length < 2) { el.innerHTML = ''; return; }
+            const n = hours.length;
+            const c = st => FLIGHT_STATUS[st].color;
+            const cells = hours.map((h, k) => {
+                const a = h.agree;
+                const g = a ? a.shares.good * 100 : 0, m = a ? g + a.shares.marginal * 100 : 0;
+                const bg = a ? `linear-gradient(to top, ${c('good')} 0 ${g}%, ${c('marginal')} ${g}% ${m}%, ${c('bad')} ${m}% 100%)` : c(h.status);
+                return `<div class="flex-1 min-w-0" style="${k && n <= 48 ? 'margin-left: 1px;' : ''} background: ${bg}"></div>`;
+            }).join('');
+            const days = hours.map((h, k) => k > 0 && h.time.slice(11, 13) === '00'
+                ? `<span class="absolute top-0 whitespace-nowrap pl-1" style="left: ${(k / n * 100).toFixed(3)}%">${escapeHtml(formatTime(h.time, { weekday: 'short' }))}</span>` : '').join('');
+            const step = (attr, icon, key) => `<button type="button" ${attr} class="shrink-0 w-7 h-9 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition" title="${escapeHtml(t(key))}" aria-label="${escapeHtml(t(key))}"><i class="fa-solid ${icon}"></i></button>`;
+            el.innerHTML = `<div class="flex items-center gap-1">
+                    ${step('data-now-step="-1"', 'fa-chevron-left', 'nowPrevHour')}
+                    <div id="nowStrip" role="slider" tabindex="0" aria-label="${escapeHtml(t('nowScrubLabel'))}" aria-valuemin="0" aria-valuemax="${n - 1}" class="relative flex-1 min-w-0 py-1.5">
+                        <div class="relative flex h-6 rounded-md overflow-hidden bg-slate-950">${cells}</div>
+                        <div class="absolute inset-x-0 top-1.5 h-6 pointer-events-none">${daySeparatorsHtml(hours)}</div>
+                        <div id="nowMarker" class="absolute top-0.5 h-8 pointer-events-none rounded-md border-2 border-white shadow-[0_0_0_1px_#020617,0_2px_6px_rgba(0,0,0,0.6)]"></div>
+                    </div>
+                    ${step('data-now-step="1"', 'fa-chevron-right', 'nowNextHour')}
                 </div>
-                <p class="text-xs text-slate-300">${nowNextHtml(f.hours)}</p>`;
+                <div id="nowDays" class="relative h-3.5 mx-8 text-[10px] leading-none text-slate-500">
+                    <span class="absolute top-0 left-0">${escapeHtml(t('nowStart'))}</span>${days}
+                    <span class="absolute top-0 right-0">${escapeHtml(formatDayHour(addHoursToLocal(hours[n - 1].time, 1)))}</span>
+                </div>`;
+            // The end label's width changes when the web font arrives.
+            if (RT_NOW_DAYS.ro) RT_NOW_DAYS.ro.observe(el.querySelector('#nowDays span:last-child'));
+            placeNowMarker();
+        }
+
+        // Day names that would touch a neighbour (or the start / end labels) are hidden.
+        function fitNowDays() {
+            const labels = [...document.querySelectorAll('#nowDays span')];
+            if (labels.length < 3) return;
+            labels.forEach(l => { l.style.visibility = ''; });
+            const end = labels[labels.length - 1].getBoundingClientRect().left;
+            let right = labels[0].getBoundingClientRect().right;
+            labels.slice(1, -1).forEach(l => {
+                const r = l.getBoundingClientRect();
+                if (r.left < right + 6 || r.right > end - 6) l.style.visibility = 'hidden';
+                else right = r.right;
+            });
+        }
+
+        function placeNowMarker() {
+            const strip = document.getElementById('nowStrip');
+            const marker = document.getElementById('nowMarker');
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            if (!strip || !marker || !hours.length) return;
+            const n = hours.length, i = nowIndex();
+            const w = strip.clientWidth, cell = w / n;
+            // At least 8 px wide, so the hour stays visible in long windows.
+            const mw = Math.max(8, cell + 4);
+            marker.style.width = `${mw}px`;
+            marker.style.left = `${Math.max(-2, Math.min(w - mw + 2, i * cell + cell / 2 - mw / 2))}px`;
+            if (RT_NOW_DAYS.width !== w) { RT_NOW_DAYS.width = w; fitNowDays(); }
+            strip.setAttribute('aria-valuenow', i);
+            strip.setAttribute('aria-valuetext', formatDayHour(hours[i].time));
+        }
+
+        const RT_NOW_DAYS = { width: 0, ro: null };
+
+        // Selecting an hour (card or flight bar): one shared pin.
+        // `fromStrip`: the card above may change height (longer limiting
+        // text…); the view scrolls with it so the strip stays under the finger.
+        function selectHour(i, fromStrip) {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            if (!hours.length) return;
+            i = Math.max(0, Math.min(hours.length - 1, i));
+            const time = i === 0 ? null : hours[i].time;
+            if (time === mainPin) return;
+            const strip = fromStrip && document.getElementById('nowStrip');
+            const top = strip ? strip.getBoundingClientRect().top : 0;
+            mainPin = time;
+            pinChanged();
+            if (strip) {
+                const d = strip.getBoundingClientRect().top - top;
+                if (d) document.getElementById('forecastView').scrollTop += d;
+            }
+        }
+
+        function pinChanged() {
+            renderNowMain();
+            placeNowMarker();
+            renderNowCheck();
+            markMainPin();
+            document.getElementById('flightDetail').innerHTML = mainDetailHtml();
+        }
+
+        // Tap, or slide along the strip (pointer capture: the finger can
+        // leave the strip and keep going); arrows / Home / End by keyboard.
+        function setupNowScrub() {
+            const scrub = document.getElementById('nowScrub');
+            // Width changes (window, styles arriving, the card shown): marker and day names follow.
+            if (window.ResizeObserver) { RT_NOW_DAYS.ro = new ResizeObserver(() => { RT_NOW_DAYS.width = 0; placeNowMarker(); }); RT_NOW_DAYS.ro.observe(scrub); }
+            let drag = null;
+            const hourAtX = (strip, x) => {
+                const r = strip.getBoundingClientRect(), n = processed.flight.hours.length;
+                return Math.floor(Math.max(0, Math.min(0.9999, (x - r.left) / r.width)) * n);
+            };
+            scrub.addEventListener('pointerdown', e => {
+                const strip = e.target.closest('#nowStrip');
+                if (!strip || !processed || !processed.flight || (e.pointerType === 'mouse' && e.button !== 0)) return;
+                drag = { id: e.pointerId, strip };
+                strip.setPointerCapture(e.pointerId);
+                strip.classList.add('dragging');
+                selectHour(hourAtX(strip, e.clientX), true);
+            });
+            scrub.addEventListener('pointermove', e => {
+                if (drag && e.pointerId === drag.id) selectHour(hourAtX(drag.strip, e.clientX), true);
+            });
+            const end = e => {
+                if (!drag || e.pointerId !== drag.id) return;
+                drag.strip.classList.remove('dragging');
+                drag = null;
+            };
+            scrub.addEventListener('pointerup', end);
+            scrub.addEventListener('pointercancel', end);
+            scrub.addEventListener('click', e => {
+                const b = e.target.closest('[data-now-step]');
+                if (b) selectHour(nowIndex() + Number(b.dataset.nowStep), true);
+            });
+            scrub.addEventListener('keydown', e => {
+                if (!e.target.closest('#nowStrip') || !processed || !processed.flight) return;
+                const n = processed.flight.hours.length;
+                const to = { ArrowLeft: nowIndex() - 1, ArrowDown: nowIndex() - 1, ArrowRight: nowIndex() + 1, ArrowUp: nowIndex() + 1,
+                    PageDown: nowIndex() - 6, PageUp: nowIndex() + 6, Home: 0, End: n - 1 }[e.key];
+                if (to === undefined) return;
+                e.preventDefault();
+                selectHour(to, true);
+            });
         }
 
         // Satellite now at the location (hazard.js) against the current
@@ -2591,7 +2785,8 @@
         function renderNowCheck() {
             const el = document.getElementById('nowCheck');
             const sat = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard.nowState() : null;
-            const h = processed && processed.flight ? processed.flight.hours[0] : null;
+            // Only for the current hour (it compares the satellite now with it).
+            const h = processed && processed.flight && nowIndex() === 0 ? processed.flight.hours[0] : null;
             const notes = [];
             if (sat && h) {
                 const chance = h.values.rain, cloud = h.values.cloud;
@@ -2756,8 +2951,8 @@
                 const h = hourAt(e);
                 if (!h) return;
                 mainPin = mainPin === h.time ? null : h.time;
+                pinChanged();
                 detail.innerHTML = mainDetailHtml(mainPin ? h : null);
-                markMainPin();
             });
             main.addEventListener('mouseleave', () => { detail.innerHTML = mainDetailHtml(); });
             detail.addEventListener('click', e => {
@@ -2766,7 +2961,10 @@
             });
             document.getElementById('nowCard').addEventListener('click', e => {
                 if (e.target.closest('[data-now-details]')) document.getElementById('flightCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                else if (e.target.closest('[data-now-back]')) selectHour(0);
+                else if (e.target.closest('[data-flight-map]')) openMapAt(e.target.closest('[data-flight-map]').dataset.flightMap);
             });
+            setupNowScrub();
             document.getElementById('btnFlightSplit').addEventListener('click', () => {
                 state.flightSplit = !state.flightSplit;
                 saveToStorage('flysky_flight_split', state.flightSplit);
