@@ -23,11 +23,12 @@ Every external request is answered locally, so the suites run offline and are re
 - CDN files (Tailwind, Chart.js, Font Awesome, Leaflet) from `node_modules`. The mock serves Tailwind v4
   instead of the app's v3 Play CDN, so a `tailwind is not defined` page error is expected and ignored.
 - **EUMETView WMS**: full and per-layer GetCapabilities (fog, microphysics, natural colour, GeoColour,
-  Cloud Type / Phase, Cloud Mask, IR, precipitation h40b, lightning li_afa, fires frp / fire, borders,
+  Cloud Type / Phase, Cloud Mask, IR, blended precipitation, lightning li_afa, fires frp / fire, borders,
   plus layers that must be ignored), GetMap PNGs (lightning NW and a fire SW of Kyiv at known times),
   GetFeatureInfo, GetLegendGraphic, WMS exceptions. Options: `badTime`, `noCors`, `capsFail`,
   `noLayerCaps`, `noPrecip`, `leafletFail`, `windFail`, `wmsDelay`, `gfiRgb`, `now` (pretend it is
-  this time, e.g. for daytime images).
+  this time, e.g. for daytime images), `rainCell` (adds the alerts' rain product h40b with a cell
+  NW of Kyiv closing in at 30 km/h).
 - **Open-Meteo**: ensemble / models forecasts (members and per-model columns like the real API),
   the map readout's point request (one column per model) and the wind-arrow grid request.
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
@@ -45,6 +46,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |
 | `map-route.mjs` | map defaults for new users, zoom 18; flight time calculator: Aim mode (B at the crosshair while panning, zoom keeps it, tap recentres), Tap mode (tap sets B, free map), switching between them, MGRS for A / B (waypoints, bad input, cancel, round trip), route tag (beside the line, stays in view, hidden off screen), start here, swap, clear, wind triangle, airspeed, height, return leg, hazards folded while open |
 | `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
+| `hazard-alerts.mjs` | nearby-hazard alerts: movement read back for a new alert (small images, last 40 min, once), "Show" on the map alert (layer on, cell in view), time bar hidden with nothing to show / in the calculator, time pill |
 | `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
 | `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
 

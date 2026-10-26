@@ -344,6 +344,9 @@
             mapPrev: 'Previous frame',
             mapNext: 'Next frame',
             mapLatest: 'Latest frame',
+            mapLatestShort: 'latest',
+            mapImageAge: 'Image {time} · {age} ago',
+            mapImageTime: 'Time of the satellite image shown',
             mapSpeed: 'Speed',
             mapFrameOf: 'frame {i} of {n}',
             mapLoadingFrames: 'loading {done}/{n}',
@@ -617,6 +620,9 @@
             mapPrev: 'Попередній кадр',
             mapNext: 'Наступний кадр',
             mapLatest: 'Останній кадр',
+            mapLatestShort: 'останній',
+            mapImageAge: 'Знімок {time} · {age} тому',
+            mapImageTime: 'Час показаного супутникового знімка',
             mapSpeed: 'Швидкість',
             mapFrameOf: 'кадр {i} з {n}',
             mapLoadingFrames: 'завантаження {done}/{n}',
@@ -890,6 +896,9 @@
             mapPrev: 'Quadro anterior',
             mapNext: 'Próximo quadro',
             mapLatest: 'Último quadro',
+            mapLatestShort: 'mais recente',
+            mapImageAge: 'Imagem {time} · há {age}',
+            mapImageTime: 'Hora da imagem de satélite mostrada',
             mapSpeed: 'Velocidade',
             mapFrameOf: 'quadro {i} de {n}',
             mapLoadingFrames: 'carregando {done}/{n}',
@@ -1034,6 +1043,8 @@
             .fs-route-tag b i { font-size: 10px; color: #22d3ee; }
             .fs-route-tag b.bad { color: #fda4af; }
             .fs-route-dot { display: inline-flex; flex-shrink: 0; width: 15px; height: 15px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 9px/1 Inter, system-ui, sans-serif; color: #020617; }
+            /* No time bar: the notes and panels move down. */
+            .fs-nobar #mapSide { bottom: 1.75rem; }
             /* Phones in landscape: timeline bottom-left, notes + readout in a
                scrolling column bottom-right (left of the map buttons), so
                the middle of the map (crosshair) stays clear. */
@@ -1045,6 +1056,8 @@
                 #mapPanelBtn { top: 0.5rem; left: 0.5rem; }
                 #mapView .leaflet-top.leaflet-right .leaflet-control-zoom { margin-top: 0.5rem; }
                 #mapTools { top: 5rem; }
+                .fs-nobar #mapSide { bottom: 0.5rem; }
+                #mapTimePill { top: 3rem; left: 0.5rem; }
             }`;
         document.head.appendChild(st);
     })();
@@ -2019,6 +2032,7 @@
             <button type="button" id="mapPanelBtn" class="absolute top-3 left-3 z-[500] flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-slate-200 shadow-xl backdrop-blur-md hover:border-cyan-600 transition max-w-[calc(100vw-5.5rem)]">
                 <i class="fa-solid fa-layer-group text-cyan-400"></i><span id="mapPanelBtnLabel" class="truncate"></span><span id="mapPanelBtnBadges" class="flex items-center gap-1 text-[10px]"></span><i class="fa-solid fa-sliders text-[11px] text-slate-500"></i>
             </button>
+            <button type="button" id="mapTimePill" class="hidden absolute top-[3.4rem] left-3 z-[500] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700 text-[11px] text-slate-300 shadow-lg backdrop-blur-md max-w-[calc(100vw-5.5rem)]"></button>
             <div id="mapCrosshair" class="hidden absolute left-1/2 top-1/2 z-[420] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                 <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
                     <g stroke="#020617" stroke-width="4" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
@@ -2632,6 +2646,33 @@
         renderSlider();
         renderTimeLabel();
         renderProgress();
+        renderBarVisibility();
+    }
+
+    // The time bar: hidden with the calculator open (a small pill keeps the
+    // image time) and when nothing on the map has times (no satellite
+    // product, no precipitation / lightning / fire layer).
+    function renderBarVisibility() {
+        const hasTimes = S.product !== 'none' || OVERLAYS.some(o => S.overlays[o.id].on);
+        const hide = S.route.on || !hasTimes;
+        $('mapBar').classList.toggle('hidden', hide);
+        $('mapView').classList.toggle('fs-nobar', hide);
+        renderTimePill();
+    }
+
+    // Image time and age; when an earlier image is shown, a tap goes to the latest.
+    function renderTimePill() {
+        const el = $('mapTimePill');
+        if (!el) return;
+        const tl = timelineFrames(), f = tl[R.index];
+        const on = S.route.on && f && f.t !== null;
+        el.classList.toggle('hidden', !on);
+        if (!on) return;
+        const latest = R.index === tl.length - 1;
+        el.disabled = latest;
+        el.title = latest ? t('mapImageTime') : t('mapLatest');
+        el.innerHTML = `<i class="fa-regular fa-clock text-slate-400"></i><span class="truncate">${h(t('mapImageAge', { time: fmtClock(f.t), age: fmtAge(Date.now() - f.t) }))}</span>`
+            + (latest ? '' : `<span class="shrink-0 font-semibold text-cyan-300"><i class="fa-solid fa-forward-fast mr-1"></i>${h(t('mapLatestShort'))}</span>`);
     }
 
     function renderSlider() {
@@ -2649,6 +2690,7 @@
         const name = activeLayer() ? (S.product === 'auto' ? `${t('mapRole_auto')}: ${t('mapProduct_' + (f.product || shownProduct()))}` : t('mapProduct_' + S.product)) : d ? t('mapOv_' + d.id) : '';
         el.textContent = `${f.t === null ? t('mapNow') : fmtTime(f.t)} · ${name}`;
         el.title = `${t('mapFrameOf', { i: R.index + 1, n: tl.length })}`;
+        renderTimePill();
     }
 
     function renderProgress() {
@@ -2725,7 +2767,7 @@
         // calculator open they start as icons.
         const hz = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard : null;
         const folded = S.route.on ? !RT.hazardOpen : S.hazardMin;
-        const hazards = hz && !folded ? hz.chipsHtml('map') : '';
+        const hazards = hz && !folded ? hz.chipsHtml('map', { showable: id => { const o = S.overlays[id === 'rain' ? 'precip' : id]; return !!o && !o.on; } }) : '';
         $('mapHazardIcons').innerHTML = hz && folded ? hz.chipsHtml('icon') : '';
         el.innerHTML = hazards + notes.join('');
     }
@@ -2748,6 +2790,7 @@
         $('mapCenterBtn').addEventListener('click', () => centerOnLocation(true));
         $('mapFullBtn').addEventListener('click', toggleFullscreen);
         $('mapRouteBtn').addEventListener('click', () => setRouteOn(!S.route.on));
+        $('mapTimePill').addEventListener('click', () => { const n = timelineFrames().length; if (n) { clearForecastHour(); showFrame(n - 1); } });
         document.addEventListener('fullscreenchange', renderFullBtn);
         document.addEventListener('webkitfullscreenchange', renderFullBtn);
         const view = $('mapView');
@@ -2795,6 +2838,7 @@
                 const rev = routeLine().reverse();
                 if (rev.length > 1) { RT.a = rev[0]; RT.pts = rev.slice(1); if (RT.follow) R.map.panTo(rev[rev.length - 1]); routeChanged(); }
             }
+            else if (q('[data-hazard-show]')) showHazard(q('[data-hazard-show]').dataset.hazardShow);
             else if (q('[data-hazard]')) { if (S.route.on) RT.hazardOpen = !RT.hazardOpen; else { S.hazardMin = !S.hazardMin; save(); } renderStatus(); }
             else if (q('[data-map-draw]')) startDrawing();
             else if (q('[data-map-saveview]')) { const f = $('drawerMap').querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
@@ -3506,7 +3550,8 @@
         S.route.on = !!on;
         save();
         RT.edit = null; RT.hazardOpen = false;
-        if (on) { RT.a = R.map.getCenter(); RT.pts = []; RT.follow = S.route.mode === 'aim'; }
+        if (on) { play(false); RT.a = R.map.getCenter(); RT.pts = []; RT.follow = S.route.mode === 'aim'; }
+        renderBarVisibility();
         setRouteZoom();
         renderProbe();
         renderStatus();
@@ -3830,14 +3875,15 @@
         wrap.style.visibility = '';
     }
 
-    // Zoom that shows A around the crosshair at `c` (B, when aiming).
-    function aimZoom(c) {
+    // Zoom that shows `p` with `c` at the centre (clear of the panels).
+    function zoomToShow(c, p, max = 15) {
         const size = R.map.getSize(), f = routeFreeRect();
         const hx = Math.max(40, Math.min(size.x / 2 - f.l, f.r - size.x / 2)), hy = Math.max(40, Math.min(size.y / 2 - f.t, f.b - size.y / 2));
-        const a = RT.a;
-        const bounds = L.latLngBounds([c, a, L.latLng(2 * c.lat - a.lat, 2 * c.lng - a.lng)]);
-        return Math.min(15, R.map.getBoundsZoom(bounds, false, L.point(size.x - 2 * hx + 40, size.y - 2 * hy + 40)));
+        const bounds = L.latLngBounds([c, p, L.latLng(2 * c.lat - p.lat, 2 * c.lng - p.lng)]);
+        return Math.min(max, R.map.getBoundsZoom(bounds, false, L.point(size.x - 2 * hx + 40, size.y - 2 * hy + 40)));
     }
+    // Zoom that shows A around the crosshair at `c` (B, when aiming).
+    const aimZoom = c => zoomToShow(c, RT.a);
 
     // Pasted MGRS for A or B (several for B: waypoints … B). The map goes
     // there: aiming, B is the crosshair; otherwise it shows the route.
@@ -3992,7 +4038,7 @@
         setTimeout(() => R.map && R.map.invalidateSize(), 50);
         clearInterval(R.refreshTimer);
         R.refreshTimer = setInterval(() => {
-            if (document.visibilityState === 'visible' && R.visible) reloadFrames({ forceTimes: true });
+            if (document.visibilityState === 'visible' && R.visible) { reloadFrames({ forceTimes: true }); renderTimePill(); }
         }, MAP_CONFIG.autoRefreshMs);
     }
 
@@ -4033,7 +4079,37 @@
             reloadFrames();
         }
         clearForecastHour();
-        centerOnLocation(true);
+        frameHazard(kindId, true);
+    }
+
+    // The location in the middle, zoomed out as far as needed to show the
+    // alert's flash / rain too (never zoomed in past 10 for it).
+    function frameHazard(kindId, always) {
+        const loc = state.location, w = window.FlySkyHazard && window.FlySkyHazard.where(kindId);
+        if (!loc || !w) { if (always) centerOnLocation(true); return; }
+        R.centeredLoc = locKey();
+        const c = L.latLng(loc.latitude, loc.longitude);
+        const r = w.deg * Math.PI / 180, km = Math.max(w.km, 5) + 5;
+        const p = L.latLng(c.lat + km / 111.32 * Math.cos(r), c.lng + km / (111.32 * Math.cos(c.lat * Math.PI / 180)) * Math.sin(r));
+        if (!always) {
+            // Already in view (clear of the panels): leave the map alone.
+            const f = routeFreeRect(), q = [c, p].map(x => R.map.latLngToContainerPoint(x));
+            if (q.every(x => x.x >= f.l && x.x <= f.r && x.y >= f.t && x.y <= f.b)) return;
+        }
+        R.anchor = c;
+        R.map.setView(c, Math.max(4, zoomToShow(c, p, 10)), { animate: true });
+    }
+
+    // "Show" on an alert: its layer on, and the flash / rain in view.
+    function showHazard(kindId) {
+        const id = kindId === 'rain' ? 'precip' : kindId;
+        if (S.overlays[id] && !S.overlays[id].on) {
+            S.overlays[id].on = true;
+            save();
+            renderAllMapUi();
+            reloadFrames();
+        }
+        frameHazard(kindId, false);
     }
 
     // Forecast hour picked in the forecast view (UTC ms). Satellite images

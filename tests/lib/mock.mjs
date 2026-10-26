@@ -45,6 +45,9 @@ export function makeWms(opts = {}) {
     { name: 'msg_fes:rgb_dust', title: 'Dust RGB - MSG - 0 degree', bbox: [-77, -77, 77, 77], time: `${iso(fogEnd - 6 * 3600e3)}/${iso(fogEnd)}/PT15M` },
   ];
   if (opts.noPrecip) layers.splice(5, 1);
+  // opts.rainCell: the alert's rain product, with a cell NW of Kyiv closing in at 30 km/h.
+  const rainEnd = floor(now - 10 * 60e3, s10);
+  if (opts.rainCell) layers.push({ name: 'mtg_fd:h40b', title: 'Precipitation rate - MTG', bbox: [-60, -60, 60, 60], time: `${iso(rainEnd - 12 * 3600e3)}/${iso(rainEnd)}/PT10M` });
   const layerXml = (l, local) => `<Layer queryable="1"><Name>${local ? l.name.split(':')[1] : l.name}</Name><Title>${l.title}</Title><Abstract>abstract</Abstract>
     <EX_GeographicBoundingBox><westBoundLongitude>${l.bbox[0]}</westBoundLongitude><eastBoundLongitude>${l.bbox[2]}</eastBoundLongitude><southBoundLatitude>${l.bbox[1]}</southBoundLatitude><northBoundLatitude>${l.bbox[3]}</northBoundLatitude></EX_GeographicBoundingBox>
     ${l.time ? `<Dimension name="time" default="current" units="ISO8601">${l.time}</Dimension>` : ''}
@@ -176,6 +179,15 @@ export async function routeAll(page, opts = {}) {
         const isPrecip = /precip/.test(p.LAYERS);
         const [bx0, by0, bx1, by1] = p.BBOX.split(',').map(Number);
         const toPx = (lat, lon) => { const X = lon * 20037508.34 / 180, Y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) * 20037508.34 / Math.PI; return [(X - bx0) / (bx1 - bx0) * w, (by1 - Y) / (by1 - by0) * hgt]; };
+        if (/h40b/.test(p.LAYERS)) {
+          // 30 km NW of Kyiv now (latest image), 0.5 km further per minute earlier; 4 km across.
+          log.rain = (log.rain || []).concat({ time: p.TIME, w: +p.WIDTH });
+          const d = 30 + (wms.now - 10 * 60e3 - ms) / 60e3 * 0.5;
+          const lat = 50.45 + d / 111.32 * Math.SQRT1_2, lon = 30.52 - d / (111.32 * Math.cos(50.45 * Math.PI / 180)) * Math.SQRT1_2;
+          const c = toPx(lat, lon), r = 2 / ((bx1 - bx0) / w / 1000 * Math.cos(50.45 * Math.PI / 180));
+          const body = png(w, hgt, (x, y) => ((x + 0.5 - c[0]) ** 2 + (y + 0.5 - c[1]) ** 2 <= Math.max(1, r) ** 2 ? [102, 204, 102, 255] : [0, 0, 0, 0]));
+          return route.fulfill({ body, contentType: 'image/png', headers: cors });
+        }
         if (/li_afa|frp|:fire/.test(p.LAYERS)) {
           log.marks = (log.marks || []).concat({ layer: p.LAYERS, time: p.TIME });
           const age = (wms.now - ms) / 3600e3;

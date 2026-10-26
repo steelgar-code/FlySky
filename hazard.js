@@ -9,17 +9,19 @@
 //  - Data: EUMETSAT EUMETView WMS — MTG Lightning Imager accumulated flash
 //    area, and MTG (or MSG) blended precipitation. Both are transparent where
 //    there is nothing, so any opaque pixel is a flash / rain.
-//  - Only the LATEST image of each product is requested: a small one
-//    (96 × 96 px, ~160 km across) around the forecast location, every 5 min
-//    while the app is open. Earlier images are never fetched for this.
+//  - The LATEST image of each product is requested: a small one (96 × 96
+//    px, ~160 km across) around the forecast location, every 5 min while
+//    the app is open.
 //  - Movement: the distance of the nearest flash / rain is compared between
 //    the images seen so far — the ones polled here over time, the
 //    lightning / precipitation images the satellite map loads (map.js feeds
 //    them in), and, while an alert is on, a small image here for each time
-//    the map shows (so playing the map tracks it, from the selected image
-//    forward, at any zoom and with the overlays off). Too few images →
-//    "no motion yet"; distances that jump about (several cells) → "no clear
-//    movement".
+//    the map shows (playing the map tracks it, from the selected image
+//    forward, at any zoom and with the overlays off). When an alert shows
+//    up without known movement, the last ~40 min of that product are read
+//    once in small images (about 4), so the ETA needs neither the map
+//    played nor the app left open. Too few images → "no movement seen yet";
+//    distances that jump about (several cells) → "no clear movement".
 //
 // Satellite rain is an estimate and lightning has a few minutes' latency;
 // the alert is a heads-up, not a warning service.
@@ -46,6 +48,8 @@
         maxAgeMs: 45 * 60e3,      // older images no longer alert
         motionMs: 45 * 60e3,
         minMotionSpanMs: 8 * 60e3,
+        backfillMs: 40 * 60e3,    // read back this far for a new alert's movement
+        backfillStepMs: 10 * 60e3,
         storageKey: 'flysky_hazard'
     };
 
@@ -78,7 +82,10 @@
             hzApproachSlow: 'approaching slowly',
             hzAway: 'moving away',
             hzSteady: 'not getting closer',
-            hzNoMotion: 'no motion yet — play the map to track it',
+            hzNoMotion: 'no movement seen yet',
+            hzMeasuring: 'measuring movement…',
+            hzShow: 'Show',
+            hzShowTitle: 'Show this layer on the map',
             hzUnclear: 'no clear movement',
             hzMin: '{n} min',
             hzHourMin: '{h} h {m} min',
@@ -106,7 +113,10 @@
             hzApproachSlow: 'повільно наближається',
             hzAway: 'віддаляється',
             hzSteady: 'не наближається',
-            hzNoMotion: 'руху ще не видно — відтворіть карту, щоб відстежити',
+            hzNoMotion: 'руху поки не видно',
+            hzMeasuring: 'вимірюю рух…',
+            hzShow: 'Показати',
+            hzShowTitle: 'Показати цей шар на карті',
             hzUnclear: 'чіткого руху немає',
             hzMin: '{n} хв',
             hzHourMin: '{h} год {m} хв',
@@ -134,7 +144,10 @@
             hzApproachSlow: 'aproximando-se devagar',
             hzAway: 'afastando-se',
             hzSteady: 'não está se aproximando',
-            hzNoMotion: 'sem movimento ainda — reproduza o mapa para acompanhar',
+            hzNoMotion: 'sem movimento visto ainda',
+            hzMeasuring: 'medindo o movimento…',
+            hzShow: 'Mostrar',
+            hzShowTitle: 'Mostrar esta camada no mapa',
             hzUnclear: 'sem movimento claro',
             hzMin: '{n} min',
             hzHourMin: '{h} h {m} min',
@@ -312,14 +325,14 @@
         const deg = (Math.atan2(best.dx, -best.dy) * 180 / Math.PI + 360) % 360;
         // Rain strength only when the whole alert radius was seen.
         const tier = !tiers || !maxMm || scanKm < HZ.alertKm ? null : maxMm <= 2 ? 'light' : maxMm <= 10 ? 'moderate' : 'heavy';
-        return { km: best.km, dir: Math.round(deg / 45) % 8, tier };
+        return { km: best.km, dir: Math.round(deg / 45) % 8, deg: Math.round(deg), tier };
     }
 
     function addObs(kindId, layerName, tm, result) {
         if (!result) return;
         const list = H.obs[kindId];
         if (list.some(o => o.t === tm && o.layer === layerName)) return;
-        list.push({ t: tm, layer: layerName, km: result.km, dir: result.dir, tier: result.tier || null });
+        list.push({ t: tm, layer: layerName, km: result.km, dir: result.dir, deg: result.deg, tier: result.tier || null });
         list.sort((a, b) => a.t - b.t);
         const keepFrom = Date.now() - HZ.keepMs;
         H.obs[kindId] = list.filter(o => o.t >= keepFrom);
@@ -416,7 +429,7 @@
     }
 
     // ---- Tracking at the times the map shows
-    const T = { queue: [], active: 0, seen: new Set() };
+    const T = { queue: [], running: [], seen: new Set(), back: {} };
 
     // `times`: the image the map shows and the later ones (ms, in order).
     // Queued requests for times no longer ahead are dropped.
@@ -435,16 +448,49 @@
                 jobs.push({ kindId: kind.id, name, t: at, loc: H.locKey, key });
             });
         });
-        T.queue = jobs.sort((a, b) => a.t - b.t);
+        // Read-backs for an alert's movement stay queued.
+        const back = T.queue.filter(j => j.back && !jobs.some(x => x.key === j.key));
+        T.queue = back.concat(jobs.sort((a, b) => a.t - b.t));
         pumpTrack();
     }
 
+    // A new alert without known movement: the product's images of the last
+    // ~40 min, 10 min apart (once per alert; again only after 30 min).
+    function backfill() {
+        if (!H.on || !state.location) return;
+        let added = false;
+        KINDS.forEach(kind => {
+            const a = assess(kind.id);
+            const name = H.layer[kind.id], info = H.times[name];
+            if (!a || a.motion || a.km < 3 || !info) return;
+            const list = H.obs[kind.id].filter(o => o.layer === name);
+            const newest = list[list.length - 1].t;
+            const mark = `${H.locKey}|${name}`;
+            if (T.back[mark] && newest - T.back[mark] < 30 * 60e3) return;
+            T.back[mark] = newest;
+            const step = Math.max(info.step || 0, HZ.backfillStepMs);
+            for (let back = step; back <= HZ.backfillMs; back += step) {
+                // On the layer's own time steps.
+                const at = info.step ? newest - Math.round(back / info.step) * info.step : newest - back;
+                const key = `${H.locKey}|${name}|${at}`;
+                if (T.seen.has(key) || T.queue.some(j => j.key === key) || list.some(o => o.t === at)) continue;
+                T.queue.unshift({ kindId: kind.id, name, t: at, loc: H.locKey, key, back: true });
+                added = true;
+            }
+        });
+        if (added) pumpTrack();
+    }
+
+    function measuring(kindId) {
+        return T.queue.concat(T.running).some(j => j.back && j.kindId === kindId && j.loc === H.locKey);
+    }
+
     function pumpTrack() {
-        while (T.active < 2 && T.queue.length) {
+        while (T.running.length < 2 && T.queue.length) {
             const job = T.queue.shift();
             if (job.loc !== locKey()) continue;
             T.seen.add(job.key);
-            T.active++;
+            T.running.push(job);
             const loc = state.location;
             const bbox = boxAround(loc.latitude, loc.longitude);
             fetchImage(job.name, job.t, bbox).then(img => {
@@ -452,7 +498,11 @@
                 addObs(job.kindId, job.name, job.t, analyse(img, bbox, HZ.size, HZ.size, job.kindId, job.name));
                 if (img.close) img.close();
                 emit();
-            }).catch(() => T.seen.delete(job.key)).finally(() => { T.active--; pumpTrack(); });
+            }).catch(() => T.seen.delete(job.key)).finally(() => {
+                T.running = T.running.filter(j => j !== job);
+                pumpTrack();
+                if (job.back && !measuring(job.kindId)) emit();
+            });
         }
     }
 
@@ -503,7 +553,7 @@
             hit = list.filter(o => o.km !== null && o.km <= HZ.alertKm && newest.t - o.t <= HZ.lightningMs).pop() || null;
         } else if (newest.km !== null && newest.km <= HZ.alertKm) hit = newest;
         if (!hit) return null;
-        return { kind: kindId, km: hit.km, dir: hit.dir, t: hit.t, tier: hit.tier, motion: closingSpeed(list, newest.t) };
+        return { kind: kindId, km: hit.km, dir: hit.dir, deg: hit.deg, t: hit.t, tier: hit.tier, motion: closingSpeed(list, newest.t) };
     }
 
     function etaText(min) {
@@ -513,7 +563,7 @@
 
     function motionText(a) {
         if (a.km < 3) return '';
-        if (!a.motion) return t('hzNoMotion');
+        if (!a.motion) return t(measuring(a.kind) ? 'hzMeasuring' : 'hzNoMotion');
         const { v, r2 } = a.motion;
         // Several cells or a storm building in place: distances jump about.
         if (Math.abs(v) >= 5 && r2 < 0.5) return t('hzUnclear');
@@ -532,7 +582,8 @@
     // Chips for the current alerts ('' when there are none). `variant`:
     // 'forecast' (inline chips) or 'map' (full-width pills like the map's
     // other notes).
-    function chipsHtml(variant) {
+    // `opts.showable(kindId)`: the map's layer for it is off ("Show" button).
+    function chipsHtml(variant, opts = {}) {
         if (!H.on || !state.location) return '';
         return KINDS.map(kind => {
             const a = assess(kind.id);
@@ -550,8 +601,11 @@
             // Two lines on the map: what and where, then age and movement
             // (wrapping, never cut off). A tap folds them into icons.
             if (variant === 'map') {
-                return `<button type="button" data-hazard="${kind.id}" title="${h(t('hzCollapse'))}" class="pointer-events-auto w-full flex items-start gap-2 px-3 py-1.5 rounded-xl text-[11px] leading-snug text-left shadow-lg backdrop-blur-md border ${kind.cls}">
-                    <i class="fa-solid ${kind.icon} ${kind.accent} mt-0.5"></i><span class="flex-1 min-w-0"><span class="block font-semibold">${h(label.charAt(0).toUpperCase() + label.slice(1))} ${h(where)}</span><span class="block opacity-80">${h(sub)}</span></span></button>`;
+                const show = opts.showable && opts.showable(kind.id)
+                    ? `<button type="button" data-hazard-show="${kind.id}" title="${h(t('hzShowTitle'))}" class="shrink-0 self-center mr-2 px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 font-semibold"><i class="fa-solid fa-eye mr-1 text-[10px]"></i>${h(t('hzShow'))}</button>` : '';
+                return `<div class="pointer-events-auto w-full flex rounded-xl text-[11px] leading-snug shadow-lg backdrop-blur-md border ${kind.cls}">
+                    <button type="button" data-hazard="${kind.id}" title="${h(t('hzCollapse'))}" class="flex-1 min-w-0 flex items-start gap-2 px-3 py-1.5 text-left">
+                    <i class="fa-solid ${kind.icon} ${kind.accent} mt-0.5"></i><span class="flex-1 min-w-0"><span class="block font-semibold">${h(label.charAt(0).toUpperCase() + label.slice(1))} ${h(where)}</span><span class="block opacity-80">${h(sub)}</span></span></button>${show}</div>`;
             }
             return `<button type="button" data-hazard="${kind.id}" title="${h(title)}" class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2.5 py-1 rounded-lg text-xs text-left border ${kind.cls} hover:brightness-125 transition">
                 ${head}<span class="text-[11px] opacity-80">${h(sub)}</span><i class="fa-solid fa-satellite text-[10px] opacity-60"></i></button>`;
@@ -591,6 +645,7 @@
     }
 
     function emit() {
+        backfill();
         render();
         if (typeof renderNowCheck === 'function') renderNowCheck();
         if (window.FlySkyMap && window.FlySkyMap.onHazardChange) window.FlySkyMap.onHazardChange();
@@ -637,11 +692,13 @@
         },
         chipsHtml,
         statusText,
+        // Where the alert's flash / rain is: { km, deg } (bearing from the location), or null.
+        where(kindId) { const a = assess(kindId); return a && a.deg !== undefined ? { km: a.km, deg: a.deg } : null; },
         nowState,
         // The map shows an image taken at `tm` (ms).
         track,
         alertKm: HZ.alertKm,
         // exposed for tests / diagnostics
-        _internals: { H, HZ, analyse, assess, closingSpeed, poll }
+        _internals: { H, HZ, T, analyse, assess, closingSpeed, poll, backfill }
     };
 })();
