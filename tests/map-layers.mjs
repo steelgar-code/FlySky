@@ -12,7 +12,7 @@ await page.evaluate(() => {
   localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' }));
   localStorage.setItem('flysky_view', JSON.stringify('map'));
   // a user of the previous version with precipitation switched on
-  localStorage.setItem('flysky_map_settings', JSON.stringify({ precipOn: true, precipOpacity: 0.85, basemap: 'osm', panelOpen: true }));
+  localStorage.setItem('flysky_map_settings', JSON.stringify({ precipOn: true, precipOpacity: 0.85, basemap: 'osm', panelOpen: true, wind: { on: false }, labels: true }));
 });
 await page.reload(); await page.waitForTimeout(3500);
 const I = fn => page.evaluate(fn);

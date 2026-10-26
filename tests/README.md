@@ -43,7 +43,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |
-| `map-route.mjs` | flight time calculator: points (tap, drag, swap, clear), wind triangle (tail / head / too strong a crosswind), airspeed, height, return leg, readout hidden while open |
+| `map-route.mjs` | map defaults for new users, zoom 18; flight time calculator: A at the crosshair, B following it while panning, pinning by tap / drag, MGRS paste (waypoints, bad input, round trip), start here, swap, clear, wind triangle (tail / head / too strong a crosswind), airspeed, height, return leg |
 | `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
 | `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
 | `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
