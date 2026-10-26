@@ -418,7 +418,38 @@
             mapVsClear: 'satellite: no low cloud',
             mapVsAll: 'all {n} models agree',
             mapVsDry: 'dry',
-            mapVsLowPct: 'low clouds {v}%'
+            mapVsLowPct: 'low clouds {v}%',
+            rtTool: "Flight time calculator",
+            rtTitle: "Flight time",
+            rtSwap: "Swap A and B",
+            rtClear: "Clear the points",
+            rtClose: "Close",
+            rtAirspeed: "Airspeed",
+            rtWindAt: "Wind at",
+            rtDepart: "Departure",
+            rtNow: "now",
+            rtIn: "in {n} h",
+            rtLevel_10m: "10 m",
+            rtLevel_120m: "120 m",
+            rtLevel_500m: "~500 m",
+            rtLevel_800m: "~800 m",
+            rtLevel_1500m: "~1500 m",
+            rtHintSetA: "Tap the map to set the start A, then the destination B.",
+            rtHintSetB: "Tap the map to set the destination B. Start A is the forecast location; drag A or B to move them.",
+            rtHintMove: "A → B {d} km · tap the map to move B, drag A or B. Forecast wind (Open-Meteo) along the route.",
+            rtReading: "Reading the wind along the route…",
+            rtNoWind: "Wind unavailable ({msg}). In still air: {time}.",
+            rtBlocked: "Can't make headway: on part of the route the crosswind or headwind is too strong for {v} m/s airspeed.",
+            rtTail: "tailwind {v} m/s",
+            rtHead: "headwind {v} m/s",
+            rtCross: "crosswind up to {v} m/s",
+            rtGround: "ground speed {v} m/s",
+            rtEta: "ETA {time}",
+            rtBack: "Back: {time} · ETA {eta}",
+            rtBackBlocked: "Back: can't make headway against this wind.",
+            rtBackNoWind: "Back: no wind data for the return.",
+            rtDurMin: "{m} min",
+            rtDurHourMin: "{h} h {m} min"
         },
         uk: {
             mapProductTitle: 'Супутниковий продукт',
@@ -649,7 +680,38 @@
             mapVsClear: 'супутник: низької хмарності немає',
             mapVsAll: 'усі {n} моделей згодні',
             mapVsDry: 'сухо',
-            mapVsLowPct: 'низька хмарність {v}%'
+            mapVsLowPct: 'низька хмарність {v}%',
+            rtTool: "Калькулятор часу польоту",
+            rtTitle: "Час польоту",
+            rtSwap: "Поміняти A і B",
+            rtClear: "Очистити точки",
+            rtClose: "Закрити",
+            rtAirspeed: "Повітряна швидкість",
+            rtWindAt: "Вітер на",
+            rtDepart: "Виліт",
+            rtNow: "зараз",
+            rtIn: "через {n} год",
+            rtLevel_10m: "10 м",
+            rtLevel_120m: "120 м",
+            rtLevel_500m: "~500 м",
+            rtLevel_800m: "~800 м",
+            rtLevel_1500m: "~1500 м",
+            rtHintSetA: "Торкніться карти, щоб задати старт A, а потім ціль B.",
+            rtHintSetB: "Торкніться карти, щоб задати ціль B. Старт A — локація прогнозу; A чи B можна перетягувати.",
+            rtHintMove: "A → B {d} км · торкніться карти, щоб перенести B, перетягуйте A чи B. Прогноз вітру (Open-Meteo) вздовж маршруту.",
+            rtReading: "Читаю вітер уздовж маршруту…",
+            rtNoWind: "Вітер недоступний ({msg}). У штиль: {time}.",
+            rtBlocked: "Не пролетіти: на частині маршруту бічний чи зустрічний вітер завеликий для повітряної швидкості {v} m/s.",
+            rtTail: "попутний {v} m/s",
+            rtHead: "зустрічний {v} m/s",
+            rtCross: "бічний до {v} m/s",
+            rtGround: "шляхова швидкість {v} m/s",
+            rtEta: "прибуття {time}",
+            rtBack: "Назад: {time} · прибуття {eta}",
+            rtBackBlocked: "Назад: проти цього вітру не пролетіти.",
+            rtBackNoWind: "Назад: немає даних про вітер.",
+            rtDurMin: "{m} хв",
+            rtDurHourMin: "{h} год {m} хв"
         },
         'pt-BR': {
             mapProductTitle: 'Produto de satélite',
@@ -880,7 +942,38 @@
             mapVsClear: 'satélite: sem nuvem baixa',
             mapVsAll: 'todos os {n} modelos concordam',
             mapVsDry: 'seco',
-            mapVsLowPct: 'nuvens baixas {v}%'
+            mapVsLowPct: 'nuvens baixas {v}%',
+            rtTool: "Calculadora de tempo de voo",
+            rtTitle: "Tempo de voo",
+            rtSwap: "Trocar A e B",
+            rtClear: "Limpar os pontos",
+            rtClose: "Fechar",
+            rtAirspeed: "Velocidade do ar",
+            rtWindAt: "Vento a",
+            rtDepart: "Partida",
+            rtNow: "agora",
+            rtIn: "em {n} h",
+            rtLevel_10m: "10 m",
+            rtLevel_120m: "120 m",
+            rtLevel_500m: "~500 m",
+            rtLevel_800m: "~800 m",
+            rtLevel_1500m: "~1500 m",
+            rtHintSetA: "Toque no mapa para marcar a partida A e depois o destino B.",
+            rtHintSetB: "Toque no mapa para marcar o destino B. A partida A é o local da previsão; arraste A ou B para movê-los.",
+            rtHintMove: "A → B {d} km · toque no mapa para mover B, arraste A ou B. Vento previsto (Open-Meteo) ao longo da rota.",
+            rtReading: "Lendo o vento ao longo da rota…",
+            rtNoWind: "Vento indisponível ({msg}). Sem vento: {time}.",
+            rtBlocked: "Não dá para avançar: em parte da rota o vento lateral ou contrário é forte demais para {v} m/s de velocidade do ar.",
+            rtTail: "vento a favor {v} m/s",
+            rtHead: "vento contra {v} m/s",
+            rtCross: "vento lateral até {v} m/s",
+            rtGround: "velocidade no solo {v} m/s",
+            rtEta: "chegada {time}",
+            rtBack: "Volta: {time} · chegada {eta}",
+            rtBackBlocked: "Volta: não dá para avançar contra este vento.",
+            rtBackNoWind: "Volta: sem dados de vento.",
+            rtDurMin: "{m} min",
+            rtDurHourMin: "{h} h {m} min"
         }
     };
     Object.keys(MAP_I18N).forEach(lang => {
@@ -902,6 +995,8 @@
             .fs-fav { display: flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer; }
             .fs-fav i { color: #fbbf24; font-size: 12px; filter: drop-shadow(0 0 1.5px #020617) drop-shadow(0 0 1px #020617); }
             .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }
+            .fs-route-pt span { display: flex; width: 26px; height: 26px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 12px/1 Inter, system-ui, sans-serif; color: #020617; border: 2px solid #020617; box-shadow: 0 0 0 2px #f8fafc, 0 2px 6px rgba(0, 0, 0, 0.5); cursor: grab; }
+            .fs-route-label { font: 700 11px/1.2 Inter, system-ui, sans-serif; color: #f8fafc; white-space: nowrap; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; pointer-events: none; }
             /* Phones in landscape: timeline bottom-left, notes + readout in a
                scrolling column bottom-right (left of the map buttons), so
                the middle of the map (crosshair) stays clear. */
@@ -1062,13 +1157,20 @@
         overlays: { precip: { on: false, opacity: 0.4 }, lightning: { on: false, opacity: 0.9 }, fire: { on: false, opacity: 0.9 } },
         wind: { on: false, level: '10m' },
         basemap: 'osmDark', labels: true, borders: true, rings: true, favs: true, hazardMin: false, windowH: 6, utc: true, speed: 1,
-        view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true
+        view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true,
+        // Flight time calculator: points [lat, lng] (A null = the forecast
+        // location), airspeed m/s, wind height, departure in hours from now.
+        route: { on: false, a: null, b: null, airspeed: 22, level: '120m', depart: 0 }
     };
     const stored = loadFromStorage(MAP_CONFIG.settingsKey, {}) || {};
     const S = Object.assign({}, defaults, stored);
     S.overlays = {};
     OVERLAYS.forEach(o => { S.overlays[o.id] = Object.assign({}, defaults.overlays[o.id], (stored.overlays || {})[o.id]); });
     S.wind = Object.assign({}, defaults.wind, stored.wind);
+    S.route = Object.assign({}, defaults.route, stored.route, { on: false });
+    if (!(S.route.airspeed >= 18 && S.route.airspeed <= 30)) S.route.airspeed = 22;
+    if (!['10m', '120m', '500m', '800m', '1500m'].includes(S.route.level)) S.route.level = '120m';
+    if (![0, 1, 2, 3, 6].includes(S.route.depart)) S.route.depart = 0;
     // Earlier versions kept precipitation settings at the top level.
     if (stored.precipOn !== undefined) S.overlays.precip.on = !!stored.precipOn;
     if (stored.precipOpacitySet) { S.overlays.precip.opacity = stored.precipOpacity; S.overlays.precip.opacitySet = true; }
@@ -1875,10 +1977,12 @@
                 <button type="button" id="mapProbeBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-crosshairs"></i></button>
                 <button type="button" id="mapCenterBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-location-dot"></i></button>
                 <button type="button" id="mapFullBtn" class="hidden w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-expand"></i></button>
+                <button type="button" id="mapRouteBtn" class="w-[34px] h-[34px] rounded-lg border-2 border-black/20 bg-white text-slate-800 hover:bg-slate-100 transition"><i class="fa-solid fa-stopwatch"></i></button>
                 <div id="mapHazardIcons" class="contents"></div>
             </div>
             <div id="mapSide" class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
                 <div id="mapStatus" class="space-y-1.5"></div>
+                <div id="mapRoute" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
                 <div id="mapProbe" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
             </div>
             <div id="mapBar" class="absolute bottom-7 left-1/2 -translate-x-1/2 z-[500] w-[min(44rem,calc(100vw-1rem))] p-2 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-2xl backdrop-blur-md"></div>`;
@@ -1886,10 +1990,10 @@
         R.map = map;
         L.control.zoom({ position: 'topright' }).addTo(map);
         map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
-        [['sat', 410], ['ov_precip', 420], ['ov_fire', 430], ['ov_lightning', 440], ['borders', 600], ['rings', 610], ['wind', 620], ['labels', 640], ['loc', 650]].forEach(([name, z]) => {
+        [['sat', 410], ['ov_precip', 420], ['ov_fire', 430], ['ov_lightning', 440], ['borders', 600], ['rings', 610], ['wind', 620], ['labels', 640], ['loc', 650], ['route', 660]].forEach(([name, z]) => {
             const pane = map.createPane(name);
             pane.style.zIndex = z;
-            if (name !== 'loc') pane.style.pointerEvents = 'none';
+            if (name !== 'loc' && name !== 'route') pane.style.pointerEvents = 'none';
         });
         if (state.location) {
             R.anchor = L.latLng(state.location.latitude, state.location.longitude);
@@ -1920,6 +2024,8 @@
             updatePlaces();
             if (windShown()) { clearTimeout(W.timer); W.timer = setTimeout(updateWind, 400); }
         });
+        // Flight time calculator: a tap sets the destination (or the start).
+        map.on('click', e => { if (S.route.on && !R.drawing) setRoutePoint(e.latlng); });
         setupDrawing();
         setupUiEvents();
         R.built = true;
@@ -2569,6 +2675,7 @@
         renderControls();
         renderStatus();
         renderProbe();
+        renderRoute();
     }
 
     function setupUiEvents() {
@@ -2576,6 +2683,7 @@
         $('mapProbeBtn').addEventListener('click', () => { S.probe = !S.probe; save(); renderProbe(); scheduleProbe(0); });
         $('mapCenterBtn').addEventListener('click', () => centerOnLocation(true));
         $('mapFullBtn').addEventListener('click', toggleFullscreen);
+        $('mapRouteBtn').addEventListener('click', () => setRouteOn(!S.route.on));
         document.addEventListener('fullscreenchange', renderFullBtn);
         document.addEventListener('webkitfullscreenchange', renderFullBtn);
         const view = $('mapView');
@@ -2612,6 +2720,12 @@
             else if (q('[data-map-next]')) step(1);
             else if (q('[data-map-latest]')) { clearForecastHour(); play(false); showFrame(timelineFrames().length - 1); }
             else if (q('[data-map-windclear]')) clearForecastHour();
+            else if (q('[data-route-close]')) setRouteOn(false);
+            else if (q('[data-route-clear]')) { S.route.a = null; S.route.b = null; save(); updateRouteLayer(); renderRoute(); }
+            else if (q('[data-route-swap]')) {
+                const a = routeA(), b = routeB();
+                if (a && b) { S.route.a = [b.lat, b.lng]; S.route.b = [a.lat, a.lng]; save(); updateRouteLayer(); renderRoute(); loadRouteWind(); }
+            }
             else if (q('[data-hazard]')) { S.hazardMin = !S.hazardMin; save(); renderStatus(); }
             else if (q('[data-map-draw]')) startDrawing();
             else if (q('[data-map-saveview]')) { const f = $('drawerMap').querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
@@ -2648,6 +2762,10 @@
                 setHazardEnabled(el.checked); renderPanel(); renderStatus();
             } else if (el.matches('[data-map-region]')) {
                 selectRegion(el.value);
+            } else if (el.matches('[data-route-level]')) {
+                S.route.level = el.value; save(); loadRouteWind();
+            } else if (el.matches('[data-route-depart]')) {
+                S.route.depart = Number(el.value); save(); renderRouteResult();
             } else if (el.matches('[data-map-speed]')) {
                 S.speed = Number(el.value); save();
             }
@@ -2655,6 +2773,7 @@
         view.addEventListener('input', e => {
             const el = e.target;
             if (el.id === 'mapSlider') { clearForecastHour(); play(false); showFrame(Number(el.value)); }
+            else if (el.matches('[data-route-speed]')) { S.route.airspeed = Number(el.value); save(); renderRouteResult(); }
             else if (el.matches('[data-map-opacity]')) {
                 const v = Number(el.value);
                 const id = el.dataset.mapOpacity;
@@ -3009,7 +3128,7 @@
 
     function scheduleProbe(delay = 350) {
         clearTimeout(P.timer);
-        if (!R.built || !R.visible || !S.probe) return;
+        if (!R.built || !R.visible || !S.probe || S.route.on) return;
         P.timer = setTimeout(runProbe, delay);
     }
 
@@ -3059,11 +3178,12 @@
 
     function renderProbe() {
         if (!R.built) return;
-        const on = !!S.probe;
+        // The flight time tool takes the place of the readout while open.
+        const on = !!S.probe && !S.route.on;
         $('mapCrosshair').classList.toggle('hidden', !on);
         const btn = $('mapProbeBtn');
-        btn.classList.toggle('!bg-cyan-500', on);
-        btn.title = t('mapProbeToggle'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.classList.toggle('!bg-cyan-500', !!S.probe);
+        btn.title = t('mapProbeToggle'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', S.probe ? 'true' : 'false');
         const cbtn = $('mapCenterBtn');
         cbtn.title = t('mapCenterLoc'); cbtn.setAttribute('aria-label', cbtn.title);
         cbtn.classList.toggle('hidden', !state.location);
@@ -3206,6 +3326,265 @@
         renderProbeHeader();
     }
 
+    // ================= Flight time calculator =================
+    // An optional tool: start A (the forecast location, or a first tap) and
+    // destination B (a tap on the map), both draggable; airspeed 18–30 m/s;
+    // the forecast wind along the route at the chosen height (Open-Meteo,
+    // sampled about every 15 km) → flight time, ETA and the way back. Each
+    // part of the route uses the wind of the hour the drone gets there, with
+    // the usual wind triangle (heading into the crosswind, then ground speed).
+    const ROUTE_LEVELS = { '10m': '10m', '120m': '120m', '500m': '950hPa', '800m': '925hPa', '1500m': '850hPa' };
+    const ROUTE_DEPART = [0, 1, 2, 3, 6];
+    const RT = { group: null, ma: null, mb: null, line: null, casing: null, label: null, lastText: '', wind: new Map(), seq: 0, loading: false, error: '' };
+
+    function routeA() {
+        if (S.route.a) return L.latLng(S.route.a);
+        return state.location ? L.latLng(state.location.latitude, state.location.longitude) : null;
+    }
+
+    function routeB() {
+        return S.route.b ? L.latLng(S.route.b) : null;
+    }
+
+    function setRouteOn(on) {
+        S.route.on = !!on;
+        save();
+        renderProbe();
+        if (!on) scheduleProbe(0);
+        renderRoute();
+        updateRouteLayer();
+        if (on) loadRouteWind();
+    }
+
+    function setRoutePoint(ll) {
+        const p = [Math.round(ll.lat * 1e4) / 1e4, Math.round(ll.lng * 1e4) / 1e4];
+        if (!routeA()) S.route.a = p; else S.route.b = p;
+        save();
+        updateRouteLayer();
+        renderRoute();
+        loadRouteWind();
+    }
+
+    const toRad = d => d * Math.PI / 180;
+    function distM(a, b) {
+        const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+        const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+        return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(x)));
+    }
+    function courseDeg(a, b) {
+        const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
+        const x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) - Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lng - a.lng));
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    // Points along A → B, about every 15 km (2–12 points).
+    function routeSamples(a, b) {
+        const n = Math.max(2, Math.min(12, Math.ceil(distM(a, b) / 15000) + 1));
+        return Array.from({ length: n }, (_, i) => {
+            const f = i / (n - 1);
+            const ll = L.latLng(a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f);
+            return { ll, key: `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)}` };
+        });
+    }
+
+    // Forecast wind at the sample points (one request for the missing ones).
+    async function loadRouteWind() {
+        const a = routeA(), b = routeB();
+        if (!S.route.on || !a || !b) { renderRouteResult(); return; }
+        const lvl = ROUTE_LEVELS[S.route.level];
+        const pts = routeSamples(a, b);
+        const missing = pts.filter(p => { const c = RT.wind.get(`${lvl}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3; });
+        const id = ++RT.seq;
+        RT.error = '';
+        if (missing.length) {
+            RT.loading = true;
+            renderRouteResult();
+            try {
+                const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
+                    latitude: missing.map(p => p.ll.lat.toFixed(2)).join(','), longitude: missing.map(p => p.ll.lng.toFixed(2)).join(','),
+                    hourly: `wind_speed_${lvl},wind_direction_${lvl}`, forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
+                }, []);
+                const res = await fetch(url);
+                const body = await res.json();
+                if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
+                const list = Array.isArray(body) ? body : [body];
+                missing.forEach((p, k) => { if (list[k] && list[k].hourly) RT.wind.set(`${lvl}|${p.key}`, { at: Date.now(), hourly: list[k].hourly }); });
+                if (RT.wind.size > 300) [...RT.wind.keys()].slice(0, RT.wind.size - 300).forEach(k => RT.wind.delete(k));
+            } catch (err) {
+                if (id === RT.seq) RT.error = err instanceof TypeError ? t('mapErrNetwork') : err.message;
+            }
+            if (id === RT.seq) RT.loading = false;
+        }
+        if (id === RT.seq) renderRouteResult();
+    }
+
+    // Wind at a sample point for time `ms`, as the vector it blows towards
+    // (east, north; m/s), or null.
+    function windVector(p, ms, lvl) {
+        const c = RT.wind.get(`${lvl}|${p.key}`);
+        if (!c) return null;
+        const key = new Date(Math.round(ms / 3600e3) * 3600e3).toISOString().slice(0, 13);
+        const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
+        const sp = i < 0 ? null : c.hourly[`wind_speed_${lvl}`][i], dir = i < 0 ? null : c.hourly[`wind_direction_${lvl}`][i];
+        if (!Number.isFinite(sp) || !Number.isFinite(dir)) return null;
+        const to = toRad(dir + 180);
+        return { u: sp * Math.sin(to), v: sp * Math.cos(to) };
+    }
+
+    // One leg over the sample points, leaving at t0: { ms, dist, gs, along
+    // (+ tailwind / − headwind, distance-weighted), cross (largest) } or
+    // { blocked } when the wind is too strong, { missing } without wind.
+    function flyLeg(pts, V, t0, lvl) {
+        let t = t0, dist = 0, alongSum = 0, cross = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p = pts[i], q = pts[i + 1];
+            const d = distM(p.ll, q.ll);
+            if (d < 1) continue;
+            const w1 = windVector(p, t, lvl), w2 = windVector(q, t, lvl);
+            if (!w1 || !w2) return { missing: true };
+            const u = (w1.u + w2.u) / 2, v = (w1.v + w2.v) / 2;
+            const W = Math.hypot(u, v);
+            const delta = Math.atan2(u, v) - toRad(courseDeg(p.ll, q.ll));
+            const along = W * Math.cos(delta), cr = W * Math.sin(delta);
+            if (Math.abs(cr) >= V) return { blocked: true };
+            const gs = Math.sqrt(V * V - cr * cr) + along;
+            if (gs < 1) return { blocked: true };
+            t += d / gs * 1000;
+            dist += d; alongSum += along * d; cross = Math.max(cross, Math.abs(cr));
+        }
+        const ms = t - t0;
+        return { ms, dist, gs: ms ? dist / (ms / 1000) : V, along: dist ? alongSum / dist : 0, cross };
+    }
+
+    function fmtDuration(ms) {
+        const m = Math.max(1, Math.round(ms / 60000));
+        return m < 60 ? t('rtDurMin', { m }) : t('rtDurHourMin', { h: Math.floor(m / 60), m: m % 60 });
+    }
+
+    function fmtClock(ms) {
+        const key = `${currentLang}|clock|${S.utc}`;
+        let f = timeFormats.get(key);
+        if (!f) { f = new Intl.DateTimeFormat(currentLang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: S.utc ? 'UTC' : undefined }); timeFormats.set(key, f); }
+        return f.format(ms) + (S.utc ? ' UTC' : '');
+    }
+
+    const num1 = v => v.toLocaleString(currentLang, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+
+    function updateRouteLayer() {
+        if (!R.map) return;
+        if (!RT.group) RT.group = L.layerGroup();
+        const a = routeA(), b = routeB();
+        if (!S.route.on || !a) { if (R.map.hasLayer(RT.group)) R.map.removeLayer(RT.group); return; }
+        if (!R.map.hasLayer(RT.group)) RT.group.addTo(R.map);
+        const point = (letter, color, ll, which) => {
+            const m = L.marker(ll, { pane: 'route', draggable: true, autoPan: true, keyboard: false, title: letter,
+                icon: L.divIcon({ className: 'fs-route-pt', html: `<span style="background: ${color}">${letter}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) });
+            m.on('drag', () => drawRouteLine());
+            m.on('dragend', () => {
+                const p = m.getLatLng();
+                S.route[which] = [Math.round(p.lat * 1e4) / 1e4, Math.round(p.lng * 1e4) / 1e4];
+                save(); renderRoute(); loadRouteWind();
+            });
+            return m.addTo(RT.group);
+        };
+        if (!RT.ma) RT.ma = point('A', '#4ade80', a, 'a'); else RT.ma.setLatLng(a);
+        if (b) { if (!RT.mb) RT.mb = point('B', '#f87171', b, 'b'); else { RT.mb.setLatLng(b); if (!RT.group.hasLayer(RT.mb)) RT.mb.addTo(RT.group); } }
+        else if (RT.mb) RT.group.removeLayer(RT.mb);
+        drawRouteLine();
+    }
+
+    // Line A – B (live while dragging) with distance and time at its middle.
+    function drawRouteLine(text) {
+        if (!RT.group) return;
+        [RT.casing, RT.line, RT.label].forEach(x => x && RT.group.removeLayer(x));
+        RT.casing = RT.line = RT.label = null;
+        const a = RT.ma && RT.ma.getLatLng(), b = RT.mb && RT.group.hasLayer(RT.mb) && RT.mb.getLatLng();
+        if (!a || !b) return;
+        RT.casing = L.polyline([a, b], { pane: 'route', color: '#020617', weight: 5, opacity: 0.55, interactive: false }).addTo(RT.group);
+        RT.line = L.polyline([a, b], { pane: 'route', color: '#f8fafc', weight: 2.5, dashArray: '7 6', interactive: false }).addTo(RT.group);
+        const km = distM(a, b) / 1000;
+        const label = [`${num1(km)} km`, text || RT.lastText].filter(Boolean).join(' · ');
+        RT.label = L.marker(L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2), { pane: 'route', interactive: false, keyboard: false,
+            icon: L.divIcon({ className: 'fs-route-label', html: h(label), iconSize: null, iconAnchor: [-8, 16] }) }).addTo(RT.group);
+        // The markers stay above the line.
+        [RT.ma, RT.mb].forEach(m => m && m.setZIndexOffset(1000));
+    }
+
+    function renderRoute() {
+        const el = $('mapRoute');
+        if (!el) return;
+        const btn = $('mapRouteBtn');
+        btn.classList.toggle('!bg-cyan-500', S.route.on);
+        btn.title = t('rtTool'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', S.route.on ? 'true' : 'false');
+        el.classList.toggle('hidden', !S.route.on);
+        if (!S.route.on) return;
+        const iconBtn = (attr, icon, key) => `<button type="button" ${attr} class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t(key))}" aria-label="${h(t(key))}"><i class="fa-solid ${icon}"></i></button>`;
+        el.innerHTML = `
+            <div class="flex items-center gap-1 pl-3 pr-1.5 pt-1">
+                <i class="fa-solid fa-stopwatch text-cyan-400 mr-1"></i><span class="flex-1 font-semibold text-slate-100">${h(t('rtTitle'))}</span>
+                ${iconBtn('data-route-swap', 'fa-right-left', 'rtSwap')}${iconBtn('data-route-clear', 'fa-trash-can', 'rtClear')}${iconBtn('data-route-close', 'fa-xmark', 'rtClose')}
+            </div>
+            <div class="px-3 pb-2.5 space-y-2">
+                <p id="mapRouteHint" class="text-[10.5px] text-slate-400 leading-snug"></p>
+                <label class="flex items-center gap-2"><span class="shrink-0 text-slate-400">${h(t('rtAirspeed'))}</span>
+                    <input type="range" min="18" max="30" step="1" value="${S.route.airspeed}" data-route-speed class="flex-1 min-w-0 accent-cyan-500" aria-label="${h(t('rtAirspeed'))}">
+                    <span id="mapRouteSpeed" class="shrink-0 font-mono text-slate-100 text-right"></span></label>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="text-slate-400">${h(t('rtWindAt'))}</span>
+                    <select data-route-level class="unit-select !py-0.5 !text-[11px]">${Object.keys(ROUTE_LEVELS).map(k => `<option value="${k}" ${k === S.route.level ? 'selected' : ''}>${h(t('rtLevel_' + k))}</option>`).join('')}</select>
+                    <span class="text-slate-400 ml-1">${h(t('rtDepart'))}</span>
+                    <select data-route-depart class="unit-select !py-0.5 !text-[11px]">${ROUTE_DEPART.map(n => `<option value="${n}" ${n === S.route.depart ? 'selected' : ''}>${h(n ? t('rtIn', { n }) : t('rtNow'))}</option>`).join('')}</select>
+                </div>
+                <div id="mapRouteResult" class="pt-1.5 border-t border-slate-800 leading-snug"></div>
+            </div>`;
+        renderRouteResult();
+    }
+
+    function renderRouteResult() {
+        const el = $('mapRouteResult');
+        if (!el || !S.route.on) return;
+        const V = S.route.airspeed;
+        $('mapRouteSpeed').textContent = `${V} m/s · ${Math.round(V * 3.6)} km/h`;
+        const a = routeA(), b = routeB();
+        const hint = $('mapRouteHint');
+        if (!a || !b) {
+            hint.textContent = t(a ? 'rtHintSetB' : 'rtHintSetA');
+            el.innerHTML = '';
+            RT.lastText = '';
+            drawRouteLine();
+            return;
+        }
+        const pts = routeSamples(a, b);
+        const dist = distM(a, b);
+        hint.textContent = t('rtHintMove', { d: num1(dist / 1000) });
+        const lvl = ROUTE_LEVELS[S.route.level];
+        const t0 = Date.now() + S.route.depart * 3600e3;
+        const out = flyLeg(pts, V, t0, lvl);
+        let html;
+        if (out.missing) {
+            const still = fmtDuration(dist / V * 1000);
+            html = RT.loading ? `<span class="text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-1"></i>${h(t('rtReading'))}</span>`
+                : `<span class="text-amber-300">${h(t('rtNoWind', { msg: RT.error || t('mapProbeNoData'), time: still }))}</span>`;
+            RT.lastText = RT.loading ? '' : `≈ ${still}`;
+        } else if (out.blocked) {
+            html = `<span class="text-rose-300 font-semibold">${h(t('rtBlocked', { v: V }))}</span>`;
+            RT.lastText = '';
+        } else {
+            const eta = t0 + out.ms;
+            const back = flyLeg(pts.slice().reverse(), V, eta, lvl);
+            const wind = out.along >= 0 ? t('rtTail', { v: num1(out.along) }) : t('rtHead', { v: num1(-out.along) });
+            const backText = back.missing || back.blocked ? t(back.blocked ? 'rtBackBlocked' : 'rtBackNoWind')
+                : t('rtBack', { time: fmtDuration(back.ms), eta: fmtClock(eta + back.ms) });
+            html = `<div class="flex items-baseline gap-2 flex-wrap"><span class="text-base font-bold text-white">${h(fmtDuration(out.ms))}</span>
+                    <span class="text-slate-300">${h(t('rtEta', { time: fmtClock(eta) }))}</span></div>
+                <div class="text-slate-400">${h(t('rtGround', { v: num1(out.gs) }))} · ${h(wind)} · ${h(t('rtCross', { v: num1(out.cross) }))}</div>
+                <div class="text-slate-300 mt-0.5"><i class="fa-solid fa-rotate-left mr-1 text-slate-500"></i>${h(backText)}</div>`;
+            RT.lastText = fmtDuration(out.ms);
+        }
+        el.innerHTML = html;
+        drawRouteLine();
+    }
+
     // ================= Public API =================
     function show() {
         R.visible = true;
@@ -3310,6 +3689,7 @@
     function onLocationChange() {
         if (!R.built) return;
         updateLocationMarker();
+        if (S.route.on && !S.route.a) { updateRouteLayer(); renderRoute(); loadRouteWind(); }
         updateRings();
         updateFavorites();
         renderPanel();

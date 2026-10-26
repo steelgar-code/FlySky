@@ -11,7 +11,12 @@ async function open(opts, ctxOpts = {}, before) {
   if (before) await before(page);
   const r = await routeAll(page, opts);
   await page.goto(BASE_URL);
-  await page.evaluate(() => localStorage.setItem('flysky_view', JSON.stringify('map')));
+  // Fog RGB pinned (its image times are what the checks count), unless the
+  // scenario is about Auto (opts.auto): Auto follows the time of day.
+  await page.evaluate(auto => {
+    localStorage.setItem('flysky_view', JSON.stringify('map'));
+    if (!auto) localStorage.setItem('flysky_map_settings', JSON.stringify({ product: 'fog', productAt: Date.now() }));
+  }, !!opts.auto);
   await page.reload();
   await page.waitForTimeout(3500);
   const st = () => page.evaluate(() => {
@@ -82,7 +87,7 @@ async function open(opts, ctxOpts = {}, before) {
 {
   const noon = new Date(); noon.setUTCHours(10, 0, 0, 0);
   // Images from the same daytime as the page's clock.
-  const { page, st, ctx } = await open({ now: noon.getTime() }, {}, async p => { await p.clock.setFixedTime(noon); });
+  const { page, st, ctx } = await open({ now: noon.getTime(), auto: true }, {}, async p => { await p.clock.setFixedTime(noon); });
   let s = await st();
   ok('daytime: Auto shows Day Microphysics', s.product === 'auto' && s.shown === 'dayMicro', [s.product, s.shown]);
   await page.evaluate(() => document.querySelector('#drawerMap [data-map-product="fog"]').click()); await page.waitForTimeout(800);

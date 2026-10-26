@@ -125,6 +125,19 @@ export async function routeAll(page, opts = {}) {
       });
       return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', timezone_abbreviation: 'EET', elevation: 179, hourly } });
     }
+    if (url.includes('api.open-meteo.com/v1/forecast') && /hourly=wind_speed_/.test(url) && !url.includes('models=')) {
+      // Flight time calculator: wind at the route's points, for any height asked.
+      // opts.routeWind = { speed (m/s), from (deg) } — default 6 m/s from the west.
+      const u = new URL(url);
+      const lats = u.searchParams.get('latitude').split(','), lons = u.searchParams.get('longitude').split(',');
+      const [sv, dv] = u.searchParams.get('hourly').split(',');
+      const w = opts.routeWind || { speed: 6, from: 270 };
+      log.routeReq = (log.routeReq || []).concat(u.searchParams.get('hourly'));
+      const start = Math.floor(Date.now() / 86400e3) * 86400e3;
+      const time = []; for (let i = 0; i < 48; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
+      const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: { time, [sv]: time.map(() => w.speed), [dv]: time.map(() => w.from) } }));
+      return route.fulfill({ json: list.length === 1 ? list[0] : list });
+    }
     if (url.includes('open-meteo.com')) return route.fulfill({ status: 503, json: { error: true, reason: 'offline in test' } });
     if (url.startsWith('https://view.eumetsat.int/')) {
       // Playwright-fulfilled responses skip CORS checks, so a server without

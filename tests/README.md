@@ -31,7 +31,8 @@ Every external request is answered locally, so the suites run offline and are re
 - **Open-Meteo**: ensemble / models forecasts (members and per-model columns like the real API),
   the map readout's point request (one column per model) and the wind-arrow grid request.
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
-  forecast requests get a 429 "limit exceeded".
+  forecast requests get a 429 "limit exceeded". The flight time calculator's wind request gets a
+  uniform wind, `routeWind: { speed, from }` (default 6 m/s from the west).
 - OSM tiles: flat dark tiles.
 
 ## Suites
@@ -42,6 +43,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |
+| `map-route.mjs` | flight time calculator: points (tap, drag, swap, clear), wind triangle (tail / head / too strong a crosswind), airspeed, height, return leg, readout hidden while open |
 | `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
 | `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
 | `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
