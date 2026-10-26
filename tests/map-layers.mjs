@@ -12,7 +12,7 @@ await page.evaluate(() => {
   localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' }));
   localStorage.setItem('flysky_view', JSON.stringify('map'));
   // a user of the previous version with precipitation switched on
-  localStorage.setItem('flysky_map_settings', JSON.stringify({ precipOn: true, precipOpacity: 0.85, basemap: 'osm', panelOpen: true, wind: { on: false }, labels: true }));
+  localStorage.setItem('flysky_map_settings', JSON.stringify({ precipOn: true, precipOpacity: 0.85, basemap: 'osm', panelOpen: true, wind: { on: false, level: '10m' }, labels: true }));
 });
 await page.reload(); await page.waitForTimeout(3500);
 const I = fn => page.evaluate(fn);
@@ -100,14 +100,14 @@ await page.locator('#drawerMap label:has([data-map-wind])').click(); await page.
 const arrows = await I(() => document.querySelectorAll('.fs-wind').length);
 ok('wind arrows drawn from one grid request', arrows > 10 && log.windReq === 1, { arrows, req: log.windReq, pts: log.windPts });
 const rot10 = await I(() => document.querySelector('.fs-wind svg').style.transform);
-await page.click('#drawerMap [data-map-windlevel="925"]'); await page.waitForTimeout(800);
+await page.click('#drawerMap [data-map-windlevel="800m"]'); await page.waitForTimeout(800);
 const rot925 = await I(() => document.querySelector('.fs-wind svg').style.transform);
 // Only the level shown is requested (Open-Meteo counts every variable):
 // the first switch asks once for the other level, later switches are cached.
 ok('level switch: one request for that level, arrows turn', log.windReq === 2 && rot10 === 'rotate(45deg)' && rot925 === 'rotate(90deg)', { rot10, rot925, req: log.windReq });
 await page.click('#drawerMap [data-map-windlevel="10m"]'); await page.waitForTimeout(600);
 const rotBack = await I(() => document.querySelector('.fs-wind svg').style.transform);
-await page.click('#drawerMap [data-map-windlevel="925"]'); await page.waitForTimeout(600);
+await page.click('#drawerMap [data-map-windlevel="800m"]'); await page.waitForTimeout(600);
 ok('switching back and forth: no more requests', log.windReq === 2 && rotBack === 'rotate(45deg)', { rotBack, req: log.windReq });
 const colors = await I(() => [...new Set([...document.querySelectorAll('.fs-wind path')].map(p => p.getAttribute('fill')))]);
 ok('arrow colours follow flight thresholds', colors.length >= 2, colors);

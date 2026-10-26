@@ -17,14 +17,26 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
     await page.goto(BASE_URL);
     await page.evaluate(k => { localStorage.setItem('flysky_last_location', JSON.stringify(k)); localStorage.setItem('flysky_view', JSON.stringify('map')); }, KYIV);
     await page.reload(); await page.waitForTimeout(3000);
-    const d = await page.evaluate(() => { const { S, R } = FlySkyMap._internals; return { labels: S.labels, borders: S.borders, wind: S.wind.on, utc: S.utc, max: R.map.getMaxZoom() }; });
-    ok('new users: place names and borders off, wind on, local time', !d.labels && !d.borders && d.wind && !d.utc, d);
+    const d = await page.evaluate(() => { const { S, R } = FlySkyMap._internals; return { labels: S.labels, borders: S.borders, wind: S.wind.on, level: S.wind.level, utc: S.utc, max: R.map.getMaxZoom() }; });
+    ok('new users: place names and borders off, wind on at 120 m, local time', !d.labels && !d.borders && d.wind && d.level === '120m' && !d.utc, d);
     ok('map zooms in to 18', d.max === 18, d.max);
     // Deep zoom: the satellite image stays at its own resolution (zoom 11 extent).
     await page.evaluate(() => FlySkyMap._internals.R.map.setZoom(16, { animate: false }));
     await page.waitForTimeout(1500);
     const z = await page.evaluate(() => { const { R } = FlySkyMap._internals; return { zoom: R.map.getZoom(), ext: R.extent && R.extent.zoom }; });
     ok('zoom 16: satellite extent capped at zoom 11', z.zoom === 16 && z.ext === 11, z);
+    await ctx.close();
+}
+
+// ---- earlier versions' wind height ('925' for the arrows) carries over
+{
+    const ctx = await b.newContext(ctxOpts);
+    const page = await ctx.newPage();
+    await routeAll(page, {});
+    await page.goto(BASE_URL);
+    await page.evaluate(k => { localStorage.setItem('flysky_last_location', JSON.stringify(k)); localStorage.setItem('flysky_view', JSON.stringify('map')); localStorage.setItem('flysky_map_settings', JSON.stringify({ wind: { on: true, level: '925' }, route: { level: '1500m' } })); }, KYIV);
+    await page.reload(); await page.waitForTimeout(2500);
+    ok("earlier '925' wind height → ~800 m for arrows and calculator", await page.evaluate(() => { const { S } = FlySkyMap._internals; return S.wind.level === '800m' && !('level' in S.route); }));
     await ctx.close();
 }
 
@@ -98,6 +110,16 @@ ok('airspeed shown in m/s and km/h', await page.locator('#mapRouteSpeed').innerT
 // another height: one request for it
 await page.selectOption('[data-route-level]', '800m'); await page.waitForTimeout(1000);
 ok('wind height ~800 m asks 925 hPa', (log.routeReq || []).at(-1) === 'wind_speed_925hPa,wind_direction_925hPa', log.routeReq);
+ok('one wind height: the calculator sets the map wind height (saved)', await I(() => FlySkyMap._internals.S.wind.level === '800m' && JSON.parse(localStorage.getItem('flysky_map_settings')).wind.level === '800m'));
+// Arrows on from the side menu: they ask that height, and the menu shows it.
+await page.click('#mapPanelBtn'); await page.waitForTimeout(300);
+await page.click('#drawerMap label:has([data-map-wind])'); await page.waitForTimeout(1200);
+ok('wind arrows at the calculator height', (log.windVars || []).length > 0 && log.windVars.every(r => r === 'wind_speed_925hPa,wind_direction_925hPa') && await I(() => document.querySelectorAll('.fs-wind').length > 0) && await page.getAttribute('#drawerMap [data-map-windlevel="800m"]', 'class') === 'active', log.windVars);
+// …and the side menu sets the calculator's height.
+await page.click('#drawerMap [data-map-windlevel="500m"]'); await page.waitForTimeout(1000);
+ok('side menu height → calculator and arrows', await page.inputValue('[data-route-level]') === '500m' && (log.routeReq || []).includes('wind_speed_950hPa,wind_direction_950hPa') && log.windVars.at(-1) === 'wind_speed_950hPa,wind_direction_950hPa');
+await page.click('#drawerMap label:has([data-map-wind])'); await page.waitForTimeout(300);
+await page.click('#btnSettingsClose'); await page.waitForTimeout(300);
 await page.selectOption('[data-route-level]', '120m'); await page.waitForTimeout(800);
 
 // Tap mode: B pinned, map free

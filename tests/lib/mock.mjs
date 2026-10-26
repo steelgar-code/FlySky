@@ -84,7 +84,11 @@ export async function routeAll(page, opts = {}) {
       if (lats.length > 1 || url.includes('925hPa')) {
         log.windReq = (log.windReq || 0) + 1; log.windPts = (log.windPts || 0) + lats.length;
         if (opts.windFail) return route.fulfill({ status: 500, json: { error: true, reason: 'boom' } });
-        const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: series(+la, +lons[i]) }));
+        // Any other wind height asked: like 925 hPa.
+        const asked = (u.searchParams.get('hourly') || '').split(',');
+        log.windVars = (log.windVars || []).concat(u.searchParams.get('hourly'));
+        const withLevels = (la, lo) => { const o = series(la, lo); asked.forEach(v => { if (!o[v] && /^wind_(speed|direction)_/.test(v)) o[v] = o[v.startsWith('wind_speed') ? 'wind_speed_925hPa' : 'wind_direction_925hPa']; }); return o; };
+        const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: withLevels(+la, +lons[i]) }));
         return route.fulfill({ json: list.length === 1 ? list[0] : list });
       }
       log.model = (log.model || 0) + 1; log.modelUrls = (log.modelUrls || []).concat(url);
