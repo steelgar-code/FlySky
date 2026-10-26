@@ -2433,9 +2433,13 @@
             const strip = document.getElementById('flightConf');
             strip.classList.toggle('hidden', !has);
             strip.innerHTML = has ? confCellsHtml(hours) : '';
-            const sw = lvl => `<span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-1.5 rounded-full" style="background: ${CONF_BG[lvl]}"></span>${escapeHtml(t('confLevel_' + lvl))}</span>`;
+            // The three levels stay together: if the line is too narrow they
+            // move under the label as one group; only if even that line is too
+            // narrow do they wrap — between levels, never inside one.
+            const sw = (lvl, range) => `<span class="inline-flex items-center gap-1 whitespace-nowrap"><span class="inline-block w-3 h-1.5 rounded-full" style="background: ${CONF_BG[lvl]}"></span>${escapeHtml(t('confLevel_' + lvl))} ${range}</span>`;
             document.getElementById('flightConfLegend').innerHTML = has
-                ? `<span>${escapeHtml(t('confLegend', { what: t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels') }))}</span>${sw('high')} <span>≥ 80%</span>${sw('medium')}${sw('low')} <span>&lt; 60%</span>`
+                ? `<span>${escapeHtml(t('confLegend', { what: t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels') }))}</span>
+                    <span class="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1">${sw('high', '≥ 80%')}${sw('medium', '60–80%')}${sw('low', '&lt; 60%')}</span>`
                 : '';
             const btn = document.getElementById('btnFlightSplit');
             btn.classList.toggle('hidden', !has);
