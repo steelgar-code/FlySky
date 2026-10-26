@@ -434,23 +434,27 @@
             rtLevel_500m: "~500 m",
             rtLevel_800m: "~800 m",
             rtLevel_1500m: "~1500 m",
-            rtStartHere: "Start A here (crosshair)",
-            rtMore: "Options and MGRS",
-            rtFollow: "B follows the crosshair",
+            rtStartHere: "Start A here (at the crosshair)",
+            rtModeAim: "Aim",
+            rtModeAimTip: "Aim: B is the crosshair. Pan the map to measure; zooming keeps B in place.",
+            rtModeTap: "Tap",
+            rtModeTapTip: "Tap: tap the map to set B. Pan and zoom freely to look around the route.",
+            rtEditA: "Start A: tap to paste MGRS",
+            rtEditB: "Destination B: tap to paste MGRS",
             rtMgrsPlaceholder: "MGRS, e.g. 36U VU 12345 67890",
             rtMgrsGo: "Go",
+            rtMgrsCancel: "Cancel",
             rtMgrsBad: "Not an MGRS reference: {text}",
-            rtMgrsNone: "Paste one or more MGRS references (each becomes the next point).",
-            rtHintPan: "Start A is where the crosshair was. Pan the map: B follows the crosshair. Tap the map to pin B.",
-            rtHintTap: "Tap the map to move B; drag A, B or a waypoint to move it.",
-            rtWaypoints: "waypoints: {n}",
+            rtMgrsNone: "Paste an MGRS reference (for B, several make waypoints).",
+            rtHintPan: "Pan the map: B follows the crosshair. Switch to Tap to look around without moving B.",
+            rtHintTap: "Tap the map to set B. Pan and zoom freely; drag A or B to move them.",
+            rtWaypoints: "+{n} via",
             rtReading: "Reading the wind along the route…",
             rtNoWind: "Wind unavailable ({msg}).",
             rtBlocked: "Can't make headway: on part of the route the crosswind or headwind is too strong for {v} m/s airspeed.",
-            rtTail: "tailwind {v} m/s",
-            rtHead: "headwind {v} m/s",
-            rtCross: "crosswind up to {v} m/s",
-            rtGround: "ground speed {v} m/s",
+            rtStill: "in still air",
+            rtNoHeadway: "No headway",
+            rtBackShort: "back {time}",
             rtEta: "ETA {time}",
             rtBack: "Back: {time} · ETA {eta}",
             rtBackBlocked: "Back: can't make headway against this wind.",
@@ -703,23 +707,27 @@
             rtLevel_500m: "~500 м",
             rtLevel_800m: "~800 м",
             rtLevel_1500m: "~1500 м",
-            rtStartHere: "Старт A тут (приціл)",
-            rtMore: "Параметри та MGRS",
-            rtFollow: "B слідує за прицілом",
+            rtStartHere: "Старт A тут (під прицілом)",
+            rtModeAim: "Приціл",
+            rtModeAimTip: "Приціл: B — під прицілом. Рухайте карту, щоб виміряти; масштабування не зсуває B.",
+            rtModeTap: "Дотик",
+            rtModeTapTip: "Дотик: торкніться карти, щоб задати B. Карту можна вільно рухати й масштабувати.",
+            rtEditA: "Старт A: торкніться, щоб вставити MGRS",
+            rtEditB: "Ціль B: торкніться, щоб вставити MGRS",
             rtMgrsPlaceholder: "MGRS, напр. 36U VU 12345 67890",
             rtMgrsGo: "Перейти",
+            rtMgrsCancel: "Скасувати",
             rtMgrsBad: "Не схоже на MGRS: {text}",
-            rtMgrsNone: "Вставте одну чи кілька координат MGRS (кожна — наступна точка).",
-            rtHintPan: "Старт A — там, де був приціл. Рухайте карту: B слідує за прицілом. Торкніться карти, щоб закріпити B.",
-            rtHintTap: "Торкніться карти, щоб перенести B; A, B чи проміжні точки можна перетягувати.",
-            rtWaypoints: "проміжних: {n}",
+            rtMgrsNone: "Вставте координату MGRS (для B кілька — проміжні точки).",
+            rtHintPan: "Рухайте карту: B слідує за прицілом. Режим «Дотик» — щоб роздивитися карту, не зсуваючи B.",
+            rtHintTap: "Торкніться карти, щоб задати B. Карту можна вільно рухати; A чи B можна перетягувати.",
+            rtWaypoints: "+{n} через",
             rtReading: "Читаю вітер уздовж маршруту…",
             rtNoWind: "Вітер недоступний ({msg}).",
             rtBlocked: "Не пролетіти: на частині маршруту бічний чи зустрічний вітер завеликий для повітряної швидкості {v} m/s.",
-            rtTail: "попутний {v} m/s",
-            rtHead: "зустрічний {v} m/s",
-            rtCross: "бічний до {v} m/s",
-            rtGround: "шляхова швидкість {v} m/s",
+            rtStill: "у штиль",
+            rtNoHeadway: "Не пролетіти",
+            rtBackShort: "назад {time}",
             rtEta: "прибуття {time}",
             rtBack: "Назад: {time} · прибуття {eta}",
             rtBackBlocked: "Назад: проти цього вітру не пролетіти.",
@@ -972,23 +980,27 @@
             rtLevel_500m: "~500 m",
             rtLevel_800m: "~800 m",
             rtLevel_1500m: "~1500 m",
-            rtStartHere: "Partida A aqui (mira)",
-            rtMore: "Opções e MGRS",
-            rtFollow: "B segue a mira",
+            rtStartHere: "Partida A aqui (na mira)",
+            rtModeAim: "Mira",
+            rtModeAimTip: "Mira: B é a mira. Mova o mapa para medir; o zoom mantém B no lugar.",
+            rtModeTap: "Toque",
+            rtModeTapTip: "Toque: toque no mapa para marcar B. Mova e aproxime o mapa livremente.",
+            rtEditA: "Partida A: toque para colar MGRS",
+            rtEditB: "Destino B: toque para colar MGRS",
             rtMgrsPlaceholder: "MGRS, ex. 36U VU 12345 67890",
             rtMgrsGo: "Ir",
+            rtMgrsCancel: "Cancelar",
             rtMgrsBad: "Não é uma referência MGRS: {text}",
-            rtMgrsNone: "Cole uma ou mais referências MGRS (cada uma vira o próximo ponto).",
-            rtHintPan: "A partida A é onde estava a mira. Mova o mapa: B segue a mira. Toque no mapa para fixar B.",
-            rtHintTap: "Toque no mapa para mover B; arraste A, B ou um ponto intermediário para movê-lo.",
-            rtWaypoints: "intermediários: {n}",
+            rtMgrsNone: "Cole uma referência MGRS (para B, várias viram pontos intermediários).",
+            rtHintPan: "Mova o mapa: B segue a mira. Mude para Toque para olhar o mapa sem mover B.",
+            rtHintTap: "Toque no mapa para marcar B. Mova e aproxime livremente; arraste A ou B para movê-los.",
+            rtWaypoints: "+{n} via",
             rtReading: "Lendo o vento ao longo da rota…",
             rtNoWind: "Vento indisponível ({msg}).",
             rtBlocked: "Não dá para avançar: em parte da rota o vento lateral ou contrário é forte demais para {v} m/s de velocidade do ar.",
-            rtTail: "vento a favor {v} m/s",
-            rtHead: "vento contra {v} m/s",
-            rtCross: "vento lateral até {v} m/s",
-            rtGround: "velocidade no solo {v} m/s",
+            rtStill: "sem vento",
+            rtNoHeadway: "Sem avanço",
+            rtBackShort: "volta {time}",
             rtEta: "chegada {time}",
             rtBack: "Volta: {time} · chegada {eta}",
             rtBackBlocked: "Volta: não dá para avançar contra este vento.",
@@ -1017,7 +1029,11 @@
             .fs-fav i { color: #fbbf24; font-size: 12px; filter: drop-shadow(0 0 1.5px #020617) drop-shadow(0 0 1px #020617); }
             .fs-fav span { font: 600 11px/1.1 Inter, system-ui, sans-serif; color: #fde68a; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; }
             .fs-route-pt span { display: flex; width: 26px; height: 26px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 12px/1 Inter, system-ui, sans-serif; color: #020617; border: 2px solid #020617; box-shadow: 0 0 0 2px #f8fafc, 0 2px 6px rgba(0, 0, 0, 0.5); cursor: grab; }
-            .fs-route-label { font: 700 11px/1.2 Inter, system-ui, sans-serif; color: #f8fafc; white-space: nowrap; text-shadow: 0 0 3px #020617, 0 0 2px #020617, 0 0 1px #020617; pointer-events: none; }
+            .fs-route-tag { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 8px 4px; border-radius: 8px; background: rgba(2, 6, 23, 0.9); border: 1px solid rgba(34, 211, 238, 0.65); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); white-space: nowrap; pointer-events: none; font: 600 10px/1.2 Inter, system-ui, sans-serif; color: #cbd5e1; }
+            .fs-route-tag b { display: flex; align-items: center; gap: 4px; font: 700 13px/1.15 Inter, system-ui, sans-serif; color: #f8fafc; }
+            .fs-route-tag b i { font-size: 10px; color: #22d3ee; }
+            .fs-route-tag b.bad { color: #fda4af; }
+            .fs-route-dot { display: inline-flex; flex-shrink: 0; width: 15px; height: 15px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 9px/1 Inter, system-ui, sans-serif; color: #020617; }
             /* Phones in landscape: timeline bottom-left, notes + readout in a
                scrolling column bottom-right (left of the map buttons), so
                the middle of the map (crosshair) stays clear. */
@@ -1182,8 +1198,8 @@
         basemap: 'osmDark', labels: false, borders: false, rings: true, favs: true, hazardMin: false, windowH: 6, utc: false, speed: 1,
         view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true,
         // Flight time calculator: airspeed m/s, wind height, departure in
-        // hours from now, options shown (the points are not kept).
-        route: { on: false, airspeed: 22, level: '120m', depart: 0, open: false }
+        // hours from now, mode aim / tap (the points are not kept).
+        route: { on: false, airspeed: 22, level: '120m', depart: 0, mode: 'aim' }
     };
     const stored = loadFromStorage(MAP_CONFIG.settingsKey, {}) || {};
     const S = Object.assign({}, defaults, stored);
@@ -1191,7 +1207,8 @@
     OVERLAYS.forEach(o => { S.overlays[o.id] = Object.assign({}, defaults.overlays[o.id], (stored.overlays || {})[o.id]); });
     S.wind = Object.assign({}, defaults.wind, stored.wind);
     S.route = Object.assign({}, defaults.route, stored.route, { on: false });
-    delete S.route.a; delete S.route.b;
+    delete S.route.a; delete S.route.b; delete S.route.open;
+    if (!['aim', 'tap'].includes(S.route.mode)) S.route.mode = 'aim';
     if (!(S.route.airspeed >= 18 && S.route.airspeed <= 30)) S.route.airspeed = 22;
     if (!['10m', '120m', '500m', '800m', '1500m'].includes(S.route.level)) S.route.level = '120m';
     if (![0, 1, 2, 3, 6].includes(S.route.depart)) S.route.depart = 0;
@@ -2059,9 +2076,9 @@
             updatePlaces();
             if (windShown()) { clearTimeout(W.timer); W.timer = setTimeout(updateWind, 400); }
         });
-        // Flight time calculator: a tap pins B; panning moves a following B.
+        // Flight time calculator: taps, and B / the route tag following the map.
         map.on('click', e => { if (S.route.on && !R.drawing) routeTap(e.latlng); });
-        map.on('move', () => { if (S.route.on && RT.follow) routeFollow(); });
+        map.on('move zoomend resize', () => { if (S.route.on) routeMoved(); });
         setupDrawing();
         setupUiEvents();
         R.built = true;
@@ -2676,7 +2693,8 @@
                 'fa-triangle-exclamation', t('mapErrCatalog', { msg: R.catalogError })));
         }
         const layer = activeLayer();
-        if (layer) {
+        // The calculator keeps the crosshair clear: no product hints.
+        if (layer && !S.route.on) {
             const info = R.times[layer.name];
             if (info && (info.noTime || !info.ok) && R.frames.length === 1) notes.push(pill('bg-slate-900/90 border border-slate-700 text-slate-300', 'fa-clock', t('mapNoTimes')));
             if (info && info.list.length) {
@@ -2703,10 +2721,12 @@
                 `<button type="button" data-map-windclear class="w-6 h-6 -mr-1.5 rounded-md hover:bg-cyan-500/30" title="${h(t('mapWindForecastClear'))}" aria-label="${h(t('mapWindForecastClear'))}"><i class="fa-solid fa-xmark"></i></button>`));
         }
         // Nearby lightning / rain first: it matters most. A tap folds the
-        // chips into icons in the button column (and back).
+        // chips into icons in the button column (and back); with the
+        // calculator open they start as icons.
         const hz = window.FlySkyHazard && hazardEnabled() ? window.FlySkyHazard : null;
-        const hazards = hz && !S.hazardMin ? hz.chipsHtml('map') : '';
-        $('mapHazardIcons').innerHTML = hz && S.hazardMin ? hz.chipsHtml('icon') : '';
+        const folded = S.route.on ? !RT.hazardOpen : S.hazardMin;
+        const hazards = hz && !folded ? hz.chipsHtml('map') : '';
+        $('mapHazardIcons').innerHTML = hz && folded ? hz.chipsHtml('icon') : '';
         el.innerHTML = hazards + notes.join('');
     }
 
@@ -2765,14 +2785,17 @@
             else if (q('[data-map-latest]')) { clearForecastHour(); play(false); showFrame(timelineFrames().length - 1); }
             else if (q('[data-map-windclear]')) clearForecastHour();
             else if (q('[data-route-close]')) setRouteOn(false);
-            else if (q('[data-route-clear]')) { RT.a = R.map.getCenter(); RT.pts = []; RT.follow = true; renderRoute(); routeChanged(false); }
+            else if (q('[data-route-clear]')) { RT.a = R.map.getCenter(); RT.pts = []; RT.edit = null; RT.editMsg = ''; renderRoute(); routeChanged(false); }
             else if (q('[data-route-start]')) { RT.a = R.map.getCenter(); routeChanged(); }
-            else if (q('[data-route-more]')) { S.route.open = !S.route.open; save(); renderRoute(); }
+            else if (q('[data-route-mode]')) setRouteMode(q('[data-route-mode]').dataset.routeMode);
+            else if (q('[data-route-edit]')) { RT.edit = q('[data-route-edit]').dataset.routeEdit; RT.editMsg = ''; renderRouteRow(); renderRouteResult(); }
+            else if (q('[data-route-editcancel]')) { RT.edit = null; RT.editMsg = ''; renderRouteRow(); renderRouteResult(); }
             else if (q('[data-route-swap]')) {
-                const line = routeLine();
-                if (line.length > 1) { RT.a = line[line.length - 1]; RT.pts = line.slice(0, -1).reverse(); RT.follow = false; renderRoute(); routeChanged(); }
+                // Aiming, the map goes to the old A (now B).
+                const rev = routeLine().reverse();
+                if (rev.length > 1) { RT.a = rev[0]; RT.pts = rev.slice(1); if (RT.follow) R.map.panTo(rev[rev.length - 1]); routeChanged(); }
             }
-            else if (q('[data-hazard]')) { S.hazardMin = !S.hazardMin; save(); renderStatus(); }
+            else if (q('[data-hazard]')) { if (S.route.on) RT.hazardOpen = !RT.hazardOpen; else { S.hazardMin = !S.hazardMin; save(); } renderStatus(); }
             else if (q('[data-map-draw]')) startDrawing();
             else if (q('[data-map-saveview]')) { const f = $('drawerMap').querySelector('[data-map-saveform]'); f.classList.toggle('hidden'); if (!f.classList.contains('hidden')) f.elements.name.focus(); }
             else if (q('[data-map-delregion]')) {
@@ -2808,10 +2831,6 @@
                 setHazardEnabled(el.checked); renderPanel(); renderStatus();
             } else if (el.matches('[data-map-region]')) {
                 selectRegion(el.value);
-            } else if (el.matches('[data-route-follow]')) {
-                // Pinning keeps B where the crosshair is now.
-                if (!el.checked) { const line = routeLine(); RT.pts = line.slice(1); }
-                RT.follow = el.checked; routeChanged();
             } else if (el.matches('[data-route-level]')) {
                 S.route.level = el.value; save(); loadRouteWind();
             } else if (el.matches('[data-route-depart]')) {
@@ -2834,7 +2853,7 @@
         });
         view.addEventListener('submit', e => {
             const mg = e.target.closest('[data-route-mgrs]');
-            if (mg) { e.preventDefault(); if (routeFromMgrs(mg.elements.mgrs.value)) mg.elements.mgrs.blur(); return; }
+            if (mg) { e.preventDefault(); routeFromMgrs(RT.edit, mg.elements.mgrs.value); return; }
             const form = e.target.closest('[data-map-saveform]');
             if (!form) return;
             e.preventDefault();
@@ -3380,19 +3399,20 @@
     }
 
     // ================= Flight time calculator =================
-    // An optional tool. Opening it puts the start A at the crosshair; the
-    // destination B follows the crosshair while the map is panned (a live
-    // measurement), until a tap on the map, dragging B or pasted MGRS
-    // references pin it (several references = waypoints A → 1 → 2 … → B).
-    // Airspeed 18–30 m/s and the forecast wind along the route at a chosen
-    // height (Open-Meteo, sampled about every 15 km on a 0.1° grid) give the
-    // flight time, ETA and the way back. Each part of the route uses the
-    // wind of the hour the drone gets there, with the wind triangle (heading
-    // into the crosswind, then ground speed).
+    // An optional tool. Opening it puts the start A at the crosshair. Two
+    // modes: Aim — B is the crosshair, so panning measures live (zooming
+    // keeps the crosshair in place, a tap takes the crosshair there); Tap —
+    // a tap sets B and the map pans and zooms freely around the route. A
+    // and B can also be pasted as MGRS (several for B: waypoints … B), and
+    // dragged. Airspeed 18–30 m/s and the forecast wind along the route at a
+    // chosen height (Open-Meteo, sampled about every 15 km on a 0.1° grid)
+    // give the flight time, ETA and the way back. Each part of the route
+    // uses the wind of the hour the drone gets there, with the wind triangle
+    // (heading into the crosswind, then ground speed).
     const ROUTE_LEVELS = { '10m': '10m', '120m': '120m', '500m': '950hPa', '800m': '925hPa', '1500m': '850hPa' };
     const ROUTE_DEPART = [0, 1, 2, 3, 6];
-    const RT = { group: null, casing: null, line: null, label: null, markers: [], lastText: '', a: null, pts: [], follow: true,
-        wind: new Map(), seq: 0, loading: false, error: '', raf: 0, windTimer: null };
+    const RT = { group: null, casing: null, line: null, label: null, markers: [], tagHtml: '', tagShown: '', a: null, pts: [], follow: true,
+        edit: null, editMsg: '', hazardOpen: false, wind: new Map(), seq: 0, loading: false, error: '', raf: 0, windTimer: null };
 
     // ---- MGRS (military grid reference) ⇄ latitude / longitude, WGS84 / UTM.
     const MGRS = (() => {
@@ -3485,15 +3505,46 @@
     function setRouteOn(on) {
         S.route.on = !!on;
         save();
-        if (on) { RT.a = R.map.getCenter(); RT.pts = []; RT.follow = true; }
+        RT.edit = null; RT.hazardOpen = false;
+        if (on) { RT.a = R.map.getCenter(); RT.pts = []; RT.follow = S.route.mode === 'aim'; }
+        setRouteZoom();
         renderProbe();
+        renderStatus();
         if (!on) scheduleProbe(0);
         renderRoute();
         updateRouteLayer();
         if (on) loadRouteWind();
     }
 
-    // A, the waypoints and B; with "follow", B is the crosshair.
+    // Aim: zooming (pinch, wheel, double tap) keeps the crosshair, so B
+    // stays put. Otherwise zoom around the fingers / pointer as usual.
+    function setRouteZoom() {
+        const z = S.route.on && RT.follow ? 'center' : true;
+        Object.assign(R.map.options, { touchZoom: z, scrollWheelZoom: z, doubleClickZoom: z });
+    }
+
+    // Aim ⇄ Tap. Aim takes the map to B so B stays where it was; Tap pins
+    // B where the crosshair is.
+    function setRouteMode(mode) {
+        const aim = mode === 'aim';
+        S.route.mode = aim ? 'aim' : 'tap';
+        save();
+        if (aim !== RT.follow) {
+            if (aim) {
+                const b = RT.pts[RT.pts.length - 1];
+                RT.follow = true;
+                if (b) R.map.panTo(b);
+            } else {
+                RT.pts = routeLine().slice(1);
+                RT.follow = false;
+            }
+        }
+        setRouteZoom();
+        renderRoute();
+        routeChanged();
+    }
+
+    // A, the waypoints and B; when aiming, B is the crosshair.
     function routeLine() {
         if (!RT.a) return [];
         const pts = RT.pts.slice();
@@ -3507,27 +3558,29 @@
         if (fetchWind) loadRouteWind();
     }
 
-    // A tap pins B there (or moves the pinned B).
+    // Aim: a tap takes the crosshair (and B) there. Tap: a tap sets B.
     function routeTap(ll) {
+        if (RT.follow) { R.map.panTo(ll); return; }
         if (RT.pts.length) RT.pts[RT.pts.length - 1] = ll;
         else RT.pts = [ll];
-        RT.follow = false;
-        renderRoute();
         routeChanged();
     }
 
-    // While panning with "follow": B, the line and the numbers follow.
-    function routeFollow() {
-        if (RT.raf) return;
-        RT.raf = requestAnimationFrame(() => {
-            RT.raf = 0;
-            const line = routeLine();
-            const mb = RT.markers[RT.markers.length - 1];
-            if (mb && line.length > 1) mb.setLatLng(line[line.length - 1]);
-            renderRouteResult();
-        });
-        clearTimeout(RT.windTimer);
-        RT.windTimer = setTimeout(loadRouteWind, 450);
+    // While the map moves: B (when aiming), the label and the numbers follow.
+    function routeMoved() {
+        if (!RT.raf) {
+            RT.raf = requestAnimationFrame(() => {
+                RT.raf = 0;
+                if (!S.route.on) return;
+                if (RT.follow) {
+                    const line = routeLine();
+                    const mb = RT.markers[RT.markers.length - 1];
+                    if (mb && line.length > 1) mb.setLatLng(line[line.length - 1]);
+                    renderRouteResult();
+                } else placeRouteLabel();
+            });
+        }
+        if (RT.follow) { clearTimeout(RT.windTimer); RT.windTimer = setTimeout(loadRouteWind, 450); }
     }
 
     const toRad = d => d * Math.PI / 180;
@@ -3646,8 +3699,9 @@
 
     const num1 = v => v.toLocaleString(currentLang, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
-    // Markers A, 1, 2 …, B (draggable; B not while it follows the crosshair,
-    // so panning the map never grabs it) and the line between them.
+    // Markers A, 1, 2 …, B (draggable; B not while aiming, so panning the
+    // map never grabs it) and the line between them.
+    const ROUTE_COLORS = { a: '#4ade80', b: '#f87171', via: '#e2e8f0' };
     function updateRouteLayer() {
         if (!R.map) return;
         if (!RT.group) RT.group = L.layerGroup();
@@ -3660,53 +3714,156 @@
         line.forEach((ll, i) => {
             const last = i === line.length - 1 && i > 0;
             const letter = i === 0 ? 'A' : last ? 'B' : String(i);
-            const color = i === 0 ? '#4ade80' : last ? '#f87171' : '#e2e8f0';
-            const following = last && RT.follow;
-            const m = L.marker(ll, { pane: 'route', draggable: !following, interactive: !following, autoPan: true, keyboard: false, title: letter, zIndexOffset: 1000,
-                icon: L.divIcon({ className: 'fs-route-pt', html: `<span style="background: ${color}${following ? '; opacity: 0.85' : ''}">${letter}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) });
-            m.on('drag', () => { setRoutePoint(i, m.getLatLng()); drawRouteLine(); renderRouteResult(); });
-            m.on('dragend', () => { setRoutePoint(i, m.getLatLng()); renderRoute(); loadRouteWind(); });
+            const color = i === 0 ? ROUTE_COLORS.a : last ? ROUTE_COLORS.b : ROUTE_COLORS.via;
+            const aiming = last && RT.follow;
+            const m = L.marker(ll, { pane: 'route', draggable: !aiming, interactive: !aiming, autoPan: true, keyboard: false, title: letter, zIndexOffset: 1000,
+                icon: L.divIcon({ className: 'fs-route-pt', html: `<span style="background: ${color}${aiming ? '; opacity: 0.85' : ''}">${letter}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) });
+            m.on('drag', () => { setRoutePoint(i, m.getLatLng()); renderRouteResult(); });
+            m.on('dragend', () => { setRoutePoint(i, m.getLatLng()); renderRouteResult(); loadRouteWind(); });
             RT.markers.push(m.addTo(RT.group));
         });
         drawRouteLine();
     }
 
     function setRoutePoint(i, ll) {
-        if (i === 0) { RT.a = ll; return; }
-        if (i === RT.pts.length + 1 || (RT.follow && i === Math.max(1, RT.pts.length))) RT.follow = false;
-        while (RT.pts.length < i) RT.pts.push(ll);
-        RT.pts[i - 1] = ll;
+        if (i === 0) RT.a = ll;
+        else RT.pts[i - 1] = ll;
     }
 
-    // The line through the markers, with distance and time at the last leg.
+    // The line through the markers and its tag (time, distance, ground speed).
     function drawRouteLine() {
-        if (!RT.group) return;
-        [RT.casing, RT.line, RT.label].forEach(x => x && RT.group.removeLayer(x));
-        RT.casing = RT.line = RT.label = null;
+        if (!RT.group || !R.map.hasLayer(RT.group)) return;
         const line = RT.markers.map(m => m.getLatLng());
-        if (line.length < 2) return;
-        RT.casing = L.polyline(line, { pane: 'route', color: '#020617', weight: 5, opacity: 0.55, interactive: false }).addTo(RT.group);
-        RT.line = L.polyline(line, { pane: 'route', color: '#f8fafc', weight: 2.5, dashArray: '7 6', interactive: false }).addTo(RT.group);
-        const a = line[line.length - 2], b = line[line.length - 1];
-        const label = [`${num1(lineLength(line) / 1000)} km`, RT.lastText].filter(Boolean).join(' · ');
-        RT.label = L.marker(L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2), { pane: 'route', interactive: false, keyboard: false,
-            icon: L.divIcon({ className: 'fs-route-label', html: h(label), iconSize: null, iconAnchor: [-8, 16] }) }).addTo(RT.group);
+        if (!RT.line) {
+            RT.casing = L.polyline([], { pane: 'route', color: '#020617', weight: 5, opacity: 0.55, interactive: false }).addTo(RT.group);
+            RT.line = L.polyline([], { pane: 'route', color: '#f8fafc', weight: 2.5, dashArray: '7 6', interactive: false }).addTo(RT.group);
+        }
+        RT.casing.setLatLngs(line.length > 1 ? line : []);
+        RT.line.setLatLngs(line.length > 1 ? line : []);
+        if (!RT.tagHtml || line.length < 2) {
+            if (RT.label) { RT.group.removeLayer(RT.label); RT.label = null; }
+            return;
+        }
+        if (!RT.label) {
+            RT.label = L.marker(line[0], { pane: 'route', interactive: false, keyboard: false,
+                icon: L.divIcon({ className: 'fs-route-tag-wrap', html: '<div class="fs-route-tag"></div>', iconSize: [0, 0] }) }).addTo(RT.group);
+        }
+        const tag = RT.label.getElement().firstElementChild;
+        if (RT.tagShown !== RT.tagHtml || !tag.innerHTML) { tag.innerHTML = RT.tagHtml; RT.tagShown = RT.tagHtml; }
+        placeRouteLabel();
     }
 
-    // Pasted MGRS references: one = B, several = waypoints … B. The map
-    // jumps to show the route.
-    function routeFromMgrs(text) {
+    // The part of the map not covered by the controls and panels (container px).
+    function routeFreeRect() {
+        const size = R.map.getSize();
+        const top = R.map.getContainer().getBoundingClientRect().top;
+        let b = size.y - 8;
+        ['mapSide', 'mapBar'].forEach(id => {
+            const el = $(id);
+            const r = el && el.getBoundingClientRect();
+            if (r && r.height && r.top - top - 6 < b) b = r.top - top - 6;
+        });
+        return { l: 8, t: 60, r: size.x - 56, b: Math.max(100, b) };
+    }
+
+    // The part [t0, t1] of segment p–q inside box (Liang–Barsky), or null.
+    function clipSegment(p, q, box) {
+        let t0 = 0, t1 = 1;
+        const dx = q.x - p.x, dy = q.y - p.y;
+        for (const [pp, qq] of [[-dx, p.x - box.l], [dx, box.r - p.x], [-dy, p.y - box.t], [dy, box.b - p.y]]) {
+            if (pp === 0) { if (qq < 0) return null; continue; }
+            const r = qq / pp;
+            if (pp < 0) { if (r > t1) return null; t0 = Math.max(t0, r); } else { if (r < t0) return null; t1 = Math.min(t1, r); }
+        }
+        return t1 > t0 ? [t0, t1] : null;
+    }
+
+    // Controls and panels over the map (container px, with a margin).
+    function routeObstacles() {
+        const c = R.map.getContainer(), box = c.getBoundingClientRect();
+        return [$('mapSide'), $('mapBar'), $('mapTools'), $('mapPanelBtn'), c.querySelector('.leaflet-control-zoom')]
+            .filter(Boolean).map(el => el.getBoundingClientRect()).filter(r => r.width && r.height)
+            .map(r => ({ l: r.left - box.left - 6, r: r.right - box.left + 6, t: r.top - box.top - 6, b: r.bottom - box.top + 6 }));
+    }
+
+    // The tag sits beside the middle of the part of the route on screen
+    // (not under a panel), so it stays in view while any of the line is
+    // (hidden when none is) and doesn't cover the line or its points.
+    function placeRouteLabel() {
+        if (!RT.label || !RT.label.getElement()) return;
+        const wrap = RT.label.getElement(), tag = wrap.firstElementChild;
+        const w = tag.offsetWidth / 2, hh = tag.offsetHeight / 2;
+        const size = R.map.getSize(), view = { l: 4, t: 4, r: size.x - 4, b: size.y - 4 };
+        const obstacles = routeObstacles();
+        const pts = RT.markers.map(m => R.map.latLngToContainerPoint(m.getLatLng()));
+        const pieces = [];
+        let total = 0;
+        for (let i = 1; i < pts.length; i++) {
+            const p = pts[i - 1], q = pts[i], len = p.distanceTo(q);
+            let spans = [clipSegment(p, q, view)].filter(Boolean);
+            obstacles.forEach(o => {
+                const cut = clipSegment(p, q, o);
+                if (cut) spans = spans.flatMap(([a, b]) => [[a, Math.min(b, cut[0])], [Math.max(a, cut[1]), b]].filter(([x, y]) => y > x));
+            });
+            spans.forEach(([a, b]) => { pieces.push({ p, q, a, b, d: (b - a) * len }); total += (b - a) * len; });
+        }
+        if (!pieces.length || !total) { wrap.style.visibility = 'hidden'; return; }
+        let half = total / 2, at = null, dir = null;
+        for (const s of pieces) {
+            if (half <= s.d || s === pieces[pieces.length - 1]) {
+                dir = s.q.subtract(s.p); dir = dir.divideBy(dir.distanceTo(L.point(0, 0)) || 1);
+                const t = s.a + (s.b - s.a) * Math.min(1, half / (s.d || 1));
+                at = s.p.add(s.q.subtract(s.p).multiplyBy(t));
+                break;
+            }
+            half -= s.d;
+        }
+        // Off the line: above it (right of it when near vertical), else the
+        // other side, else on the line, whichever is clear of the panels.
+        let n = L.point(-dir.y, dir.x);
+        if (Math.abs(n.y) >= 0.3 ? n.y > 0 : n.x < 0) n = n.multiplyBy(-1);
+        const off = n.multiplyBy(Math.abs(n.x) * w + Math.abs(n.y) * hh + 16);
+        const clear = c => c.x - w >= view.l && c.x + w <= view.r && c.y - hh >= view.t && c.y + hh <= view.b
+            && !obstacles.some(o => c.x - w < o.r && c.x + w > o.l && c.y - hh < o.b && c.y + hh > o.t);
+        const spot = [at.add(off), at.subtract(off), at].find(clear) || at;
+        RT.label.setLatLng(R.map.containerPointToLatLng(spot));
+        wrap.style.visibility = '';
+    }
+
+    // Zoom that shows A around the crosshair at `c` (B, when aiming).
+    function aimZoom(c) {
+        const size = R.map.getSize(), f = routeFreeRect();
+        const hx = Math.max(40, Math.min(size.x / 2 - f.l, f.r - size.x / 2)), hy = Math.max(40, Math.min(size.y / 2 - f.t, f.b - size.y / 2));
+        const a = RT.a;
+        const bounds = L.latLngBounds([c, a, L.latLng(2 * c.lat - a.lat, 2 * c.lng - a.lng)]);
+        return Math.min(15, R.map.getBoundsZoom(bounds, false, L.point(size.x - 2 * hx + 40, size.y - 2 * hy + 40)));
+    }
+
+    // Pasted MGRS for A or B (several for B: waypoints … B). The map goes
+    // there: aiming, B is the crosshair; otherwise it shows the route.
+    function routeFromMgrs(which, text) {
         const { refs, bad } = MGRS.parseAll(text);
-        const msg = $('mapRouteMgrsMsg');
-        if (!refs.length) { msg.textContent = bad.length ? t('rtMgrsBad', { text: bad[0] }) : t('rtMgrsNone'); return false; }
-        msg.textContent = bad.length ? t('rtMgrsBad', { text: bad[0] }) : '';
-        RT.pts = refs.map(r => L.latLng(r.lat, r.lon));
-        RT.follow = false;
-        if (!RT.a) RT.a = R.map.getCenter();
+        if (!refs.length || bad.length) {
+            RT.editMsg = bad.length ? t('rtMgrsBad', { text: bad[0] }) : t('rtMgrsNone');
+            renderRouteResult();
+            return;
+        }
+        const pts = refs.map(r => L.latLng(r.lat, r.lon));
+        RT.edit = null; RT.editMsg = '';
+        if (which === 'a') RT.a = pts[0];
+        else {
+            if (pts.length > 1 && RT.follow) { RT.follow = false; S.route.mode = 'tap'; save(); setRouteZoom(); }
+            RT.pts = pts;
+        }
+        if (RT.follow) {
+            const c = which === 'b' ? pts[0] : R.map.getCenter();
+            R.map.setView(c, aimZoom(c));
+        } else {
+            const size = R.map.getSize(), f = routeFreeRect();
+            R.map.fitBounds(L.latLngBounds([RT.a, ...RT.pts]), { paddingTopLeft: [f.l + 24, f.t + 24], paddingBottomRight: [size.x - f.r + 24, size.y - f.b + 24], maxZoom: 15 });
+        }
         renderRoute();
         routeChanged();
-        R.map.fitBounds(L.latLngBounds([RT.a, ...RT.pts]).pad(0.25), { maxZoom: 13 });
-        return true;
     }
 
     function renderRoute() {
@@ -3717,85 +3874,103 @@
         btn.title = t('rtTool'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', S.route.on ? 'true' : 'false');
         el.classList.toggle('hidden', !S.route.on);
         if (!S.route.on) return;
-        const iconBtn = (attr, icon, key, extra = '') => `<button type="button" ${attr} class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 ${extra}" title="${h(t(key))}" aria-label="${h(t(key))}"><i class="fa-solid ${icon}"></i></button>`;
-        const open = !!S.route.open;
+        const iconBtn = (attr, icon, key) => `<button type="button" ${attr} class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t(key))}" aria-label="${h(t(key))}"><i class="fa-solid ${icon}"></i></button>`;
+        const modeBtn = (mode, icon, key) => {
+            const on = (mode === 'aim') === RT.follow;
+            return `<button type="button" data-route-mode="${mode}" aria-pressed="${on}" title="${h(t(key + 'Tip'))}" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md font-semibold transition ${on ? 'bg-cyan-500 text-slate-950' : 'text-slate-300 hover:text-white'}"><i class="fa-solid ${icon}"></i>${h(t(key))}</button>`;
+        };
+        const sel = 'unit-select !py-0.5 !text-[11px]';
         el.innerHTML = `
             <div class="flex items-center gap-0.5 pl-3 pr-1 pt-1">
-                <i class="fa-solid fa-stopwatch text-cyan-400 mr-1.5"></i><span id="mapRouteHead" class="flex-1 min-w-0 truncate font-semibold text-slate-100"></span>
-                ${iconBtn('data-route-start', 'fa-location-crosshairs', 'rtStartHere')}${iconBtn('data-route-swap', 'fa-right-left', 'rtSwap')}${iconBtn('data-route-clear', 'fa-trash-can', 'rtClear')}
-                <button type="button" data-route-more class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t('rtMore'))}" aria-label="${h(t('rtMore'))}" aria-expanded="${open}"><i class="fa-solid fa-sliders"></i></button>
-                ${iconBtn('data-route-close', 'fa-xmark', 'rtClose')}
+                <i class="fa-solid fa-stopwatch text-cyan-400 mr-1.5"></i><div id="mapRouteHead" class="flex-1 min-w-0 truncate text-slate-100"></div>
+                ${iconBtn('data-route-start', 'fa-location-crosshairs', 'rtStartHere')}${iconBtn('data-route-swap', 'fa-right-left', 'rtSwap')}${iconBtn('data-route-clear', 'fa-trash-can', 'rtClear')}${iconBtn('data-route-close', 'fa-xmark', 'rtClose')}
             </div>
-            <div id="mapRouteResult" class="px-3 pb-2 leading-snug"></div>
-            <div class="${open ? '' : 'hidden'} px-3 pb-2.5 pt-2 space-y-2 border-t border-slate-800">
-                <label class="flex items-center gap-2.5 cursor-pointer select-none"><input type="checkbox" class="sr-only" data-route-follow ${RT.follow ? 'checked' : ''}><span class="fs-switch" aria-hidden="true"></span><span class="text-slate-200">${h(t('rtFollow'))}</span></label>
-                <form data-route-mgrs class="flex gap-1.5">
-                    <input name="mgrs" autocomplete="off" spellcheck="false" placeholder="${h(t('rtMgrsPlaceholder'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 font-mono text-[11px] text-slate-100 focus:outline-none focus:border-cyan-500">
-                    <button class="chip py-1 shrink-0">${h(t('rtMgrsGo'))}</button>
-                </form>
-                <p id="mapRouteMgrsMsg" class="text-[10.5px] text-amber-300 empty:hidden"></p>
-                <label class="flex items-center gap-2"><span class="shrink-0 text-slate-400">${h(t('rtAirspeed'))}</span>
-                    <input type="range" min="18" max="30" step="1" value="${S.route.airspeed}" data-route-speed class="flex-1 min-w-0 accent-cyan-500" aria-label="${h(t('rtAirspeed'))}">
-                    <span id="mapRouteSpeed" class="shrink-0 font-mono text-slate-100 text-right"></span></label>
-                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span class="text-slate-400">${h(t('rtWindAt'))}</span>
-                    <select data-route-level class="unit-select !py-0.5 !text-[11px]">${Object.keys(ROUTE_LEVELS).map(k => `<option value="${k}" ${k === S.route.level ? 'selected' : ''}>${h(t('rtLevel_' + k))}</option>`).join('')}</select>
-                    <span class="text-slate-400 ml-1">${h(t('rtDepart'))}</span>
-                    <select data-route-depart class="unit-select !py-0.5 !text-[11px]">${ROUTE_DEPART.map(n => `<option value="${n}" ${n === S.route.depart ? 'selected' : ''}>${h(n ? t('rtIn', { n }) : t('rtNow'))}</option>`).join('')}</select>
-                </div>
-                <div id="mapRouteCoords" class="font-mono text-[10.5px] text-slate-400 select-all space-y-0.5"></div>
-            </div>`;
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 pt-0.5">
+                <div class="inline-flex p-0.5 rounded-lg bg-slate-950 border border-slate-700" role="group">${modeBtn('aim', 'fa-crosshairs', 'rtModeAim')}${modeBtn('tap', 'fa-hand-pointer', 'rtModeTap')}</div>
+                <label class="ml-auto flex items-center gap-1 text-slate-400" title="${h(t('rtWindAt'))}"><i class="fa-solid fa-wind"></i>
+                    <select data-route-level class="${sel}" aria-label="${h(t('rtWindAt'))}">${Object.keys(ROUTE_LEVELS).map(k => `<option value="${k}" ${k === S.route.level ? 'selected' : ''}>${h(t('rtLevel_' + k))}</option>`).join('')}</select></label>
+                <label class="flex items-center gap-1 text-slate-400" title="${h(t('rtDepart'))}"><i class="fa-regular fa-clock"></i>
+                    <select data-route-depart class="${sel}" aria-label="${h(t('rtDepart'))}">${ROUTE_DEPART.map(n => `<option value="${n}" ${n === S.route.depart ? 'selected' : ''}>${h(n ? t('rtIn', { n }) : t('rtNow'))}</option>`).join('')}</select></label>
+            </div>
+            <div id="mapRouteRow" class="px-2 pt-2 pb-1.5"></div>
+            <p id="mapRouteMsg" class="px-3 pb-2 -mt-0.5 text-[10.5px] text-slate-400 leading-snug empty:hidden"></p>`;
+        renderRouteRow();
         renderRouteResult();
     }
 
-    function renderRouteResult() {
-        const el = $('mapRouteResult');
-        if (!el || !S.route.on) return;
-        const V = S.route.airspeed;
-        const sp = $('mapRouteSpeed');
-        if (sp) sp.textContent = `${V} m/s · ${Math.round(V * 3.6)} km/h`;
-        const line = routeLine();
-        const head = $('mapRouteHead');
-        const coords = $('mapRouteCoords');
-        if (coords) coords.innerHTML = line.map((ll, i) => {
-            const letter = i === 0 ? 'A' : i === line.length - 1 ? 'B' : String(i);
-            return `<div>${letter} ${h(MGRS.forward(ll.lat, ll.lng) || '–')}</div>`;
-        }).join('');
-        const dist = lineLength(line);
-        if (line.length < 2 || dist < 50) {
-            head.textContent = t('rtTitle');
-            el.innerHTML = `<p class="text-[10.5px] text-slate-400">${h(t(RT.follow ? 'rtHintPan' : 'rtHintTap'))}</p>`;
-            RT.lastText = '';
-            drawRouteLine();
+    // A (MGRS) · airspeed · B (MGRS); tapping A or B opens a field to paste MGRS.
+    function renderRouteRow() {
+        const row = $('mapRouteRow');
+        if (!row) return;
+        const dot = which => `<span class="fs-route-dot" style="background: ${ROUTE_COLORS[which]}">${which.toUpperCase()}</span>`;
+        if (RT.edit) {
+            const line = routeLine();
+            const ll = RT.edit === 'a' ? line[0] : line.length > 1 ? line[line.length - 1] : null;
+            row.innerHTML = `<form data-route-mgrs class="flex items-center gap-1.5">${dot(RT.edit)}
+                <input name="mgrs" value="${h(ll ? MGRS.forward(ll.lat, ll.lng) || '' : '')}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="${h(t('rtMgrsPlaceholder'))}" aria-label="${h(t(RT.edit === 'a' ? 'rtEditA' : 'rtEditB'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-cyan-600 font-mono text-[12px] text-slate-100 focus:outline-none">
+                <button class="chip py-1 shrink-0">${h(t('rtMgrsGo'))}</button>
+                <button type="button" data-route-editcancel class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t('rtMgrsCancel'))}" aria-label="${h(t('rtMgrsCancel'))}"><i class="fa-solid fa-xmark"></i></button></form>`;
+            const input = row.querySelector('input');
+            input.focus(); input.select();
             return;
         }
-        const pts = routeSamples(line);
-        const lvl = ROUTE_LEVELS[S.route.level];
-        const t0 = Date.now() + S.route.depart * 3600e3;
-        const out = flyLeg(pts, V, t0, lvl);
-        const km = `${num1(dist / 1000)} km${line.length > 2 ? ` · ${t('rtWaypoints', { n: line.length - 2 })}` : ''}`;
-        let html;
-        if (out.missing) {
-            const still = fmtDuration(dist / V * 1000);
-            head.textContent = `≈ ${still}`;
-            html = `<div class="text-slate-400">${h(km)} · ${RT.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('rtReading'))}` : `<span class="text-amber-300">${h(t('rtNoWind', { msg: RT.error || t('mapProbeNoData') }))}</span>`}</div>`;
-            RT.lastText = `≈ ${still}`;
-        } else if (out.blocked) {
-            head.textContent = t('rtTitle');
-            html = `<div class="text-slate-400">${h(km)}</div><div class="text-rose-300 font-semibold">${h(t('rtBlocked', { v: V }))}</div>`;
-            RT.lastText = '';
+        const block = which => `<button type="button" data-route-edit="${which}" title="${h(t(which === 'a' ? 'rtEditA' : 'rtEditB'))}" class="min-w-0 text-left rounded-lg bg-slate-950/70 border border-slate-700 hover:border-cyan-600 px-2 py-1 transition">
+                <span class="flex items-center gap-1 text-[10px] text-slate-400">${dot(which)}<span id="mapRouteZ_${which}" class="truncate font-mono"></span></span>
+                <span id="mapRouteN_${which}" class="block font-mono text-[11.5px] text-slate-100 truncate"></span></button>`;
+        row.innerHTML = `<div class="grid grid-cols-[1fr_1.1fr_1fr] gap-1.5">${block('a')}
+            <label class="min-w-0 flex flex-col justify-center rounded-lg bg-slate-950/70 border border-slate-700 px-2 py-1" title="${h(t('rtAirspeed'))}">
+                <span class="flex items-baseline justify-between gap-1"><span id="mapRouteSpeed" class="font-mono font-semibold text-[11.5px] text-slate-100"></span><span id="mapRouteKmh" class="text-[10px] text-slate-400"></span></span>
+                <input type="range" min="18" max="30" step="1" value="${S.route.airspeed}" data-route-speed class="w-full h-4 accent-cyan-500" aria-label="${h(t('rtAirspeed'))}"></label>
+            ${block('b')}</div>`;
+    }
+
+    function renderRouteResult() {
+        const head = $('mapRouteHead');
+        if (!head || !S.route.on) return;
+        const V = S.route.airspeed;
+        if ($('mapRouteSpeed')) { $('mapRouteSpeed').textContent = `${V} m/s`; $('mapRouteKmh').textContent = `${Math.round(V * 3.6)} km/h`; }
+        const line = routeLine();
+        [['a', line[0]], ['b', line.length > 1 ? line[line.length - 1] : null]].forEach(([which, ll]) => {
+            const z = $('mapRouteZ_' + which), n = $('mapRouteN_' + which);
+            if (!z) return;
+            const p = ((ll && MGRS.forward(ll.lat, ll.lng)) || '').split(' ');
+            z.textContent = p.length === 4 ? `${p[0]} ${p[1]}${which === 'b' && line.length > 2 ? ` · ${t('rtWaypoints', { n: line.length - 2 })}` : ''}` : '';
+            n.textContent = p.length === 4 ? `${p[2]} ${p[3]}` : '—';
+        });
+        const dist = lineLength(line);
+        let headHtml, msg = '', tag = '';
+        if (line.length < 2 || dist < 50) {
+            headHtml = `<span class="font-semibold">${h(t('rtTitle'))}</span>`;
+            msg = h(t(RT.follow ? 'rtHintPan' : 'rtHintTap'));
         } else {
-            const eta = t0 + out.ms;
-            const back = flyLeg(pts.slice().reverse(), V, eta, lvl);
-            const wind = out.along >= 0 ? t('rtTail', { v: num1(out.along) }) : t('rtHead', { v: num1(-out.along) });
-            const backText = back.missing || back.blocked ? t(back.blocked ? 'rtBackBlocked' : 'rtBackNoWind')
-                : t('rtBack', { time: fmtDuration(back.ms), eta: fmtClock(eta + back.ms) });
-            head.innerHTML = `<span class="text-base">${h(fmtDuration(out.ms))}</span> <span class="font-normal text-slate-300">· ${h(t('rtEta', { time: fmtClock(eta) }))}</span>`;
-            html = `<div class="text-slate-400">${h(km)} · ${h(t('rtGround', { v: num1(out.gs) }))} · ${h(wind)} · ${h(t('rtCross', { v: num1(out.cross) }))}</div>
-                <div class="text-slate-300"><i class="fa-solid fa-rotate-left mr-1 text-slate-500"></i>${h(backText)}</div>`;
-            RT.lastText = fmtDuration(out.ms);
+            const pts = routeSamples(line);
+            const lvl = ROUTE_LEVELS[S.route.level];
+            const t0 = Date.now() + S.route.depart * 3600e3;
+            const out = flyLeg(pts, V, t0, lvl);
+            const km = `${num1(dist / 1000)} km`;
+            if (out.missing) {
+                const still = fmtDuration(dist / V * 1000);
+                headHtml = `<span class="text-base font-semibold">≈ ${h(still)}</span> <span class="text-slate-400">${h(t('rtStill'))}</span>`;
+                msg = RT.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('rtReading'))}` : `<span class="text-amber-300">${h(t('rtNoWind', { msg: RT.error || t('mapProbeNoData') }))}</span>`;
+                tag = `<b>≈ ${h(still)}</b><span>${h(km)}</span>`;
+            } else if (out.blocked) {
+                headHtml = `<span class="font-semibold text-rose-300">${h(t('rtNoHeadway'))}</span>`;
+                msg = `<span class="text-rose-300">${h(t('rtBlocked', { v: V }))}</span>`;
+                tag = `<b class="bad">${h(t('rtNoHeadway'))}</b><span>${h(km)}</span>`;
+            } else {
+                const eta = t0 + out.ms;
+                const back = flyLeg(pts.slice().reverse(), V, eta, lvl);
+                const backOk = !back.missing && !back.blocked;
+                const backTitle = backOk ? t('rtBack', { time: fmtDuration(back.ms), eta: fmtClock(eta + back.ms) }) : t(back.blocked ? 'rtBackBlocked' : 'rtBackNoWind');
+                headHtml = `<span class="text-base font-semibold">${h(fmtDuration(out.ms))}</span> <span class="text-slate-300">· ${h(t('rtEta', { time: fmtClock(eta) }))}</span>`
+                    + ` <span class="text-slate-400" title="${h(backTitle)}">· ${h(t('rtBackShort', { time: backOk ? fmtDuration(back.ms) : '—' }))}</span>`;
+                tag = `<b><i class="fa-solid fa-stopwatch"></i>${h(fmtDuration(out.ms))}</b><span>${h(km)} · ${h(num1(out.gs))} m/s</span>`;
+            }
         }
-        el.innerHTML = html;
+        head.innerHTML = headHtml;
+        const m = $('mapRouteMsg');
+        if (m) m.innerHTML = RT.editMsg ? `<span class="text-amber-300">${h(RT.editMsg)}</span>` : RT.edit ? h(t('rtMgrsNone')) : msg;
+        RT.tagHtml = tag;
         drawRouteLine();
     }
 
