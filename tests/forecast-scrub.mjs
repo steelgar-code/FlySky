@@ -43,7 +43,7 @@ ok('card shows the selected hour', /Can I fly then\?/.test(await title()) && mai
 ok('flight bar pins the same hour', st.pinned === 10, st.pinned);
 ok('"Now" button shown', await page.isVisible('[data-now-back]'));
 // Tiles follow the hour
-const tileOk = await I(() => { const h = processed.flight.hours[10]; const v = h.values.gust; return [...document.querySelectorAll('#nowMain .grid > div')][2].innerText.includes(formatValue(v, PARAMS.find(p => p.key === 'wind_speed_10m'))); });
+const tileOk = await I(() => { const h = processed.flight.hours[10]; const v = h.values.gust; return [...document.querySelectorAll('#nowMain .grid > button')][2].innerText.includes(formatValue(v, PARAMS.find(p => p.key === 'wind_speed_10m'))); });
 ok('tiles show the selected hour', tileOk);
 
 // Touch slide (real touch events → pointer events)

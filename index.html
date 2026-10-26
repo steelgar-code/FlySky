@@ -249,6 +249,9 @@
                     </button>
                 </div>
 
+                <!-- Today at the location: date, sunrise, sunset -->
+                <p id="flightSun" class="empty:hidden text-[11px] text-slate-400 flex items-center gap-x-3 whitespace-nowrap overflow-hidden"></p>
+
                 <!-- Search (opens when the location is clicked) -->
                 <div id="searchPanel" class="hidden relative">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
@@ -331,7 +334,6 @@
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                     <p id="flightConfLegend" class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-slate-500"></p>
                 </div>
-                <p id="flightSun" class="text-[11px] text-slate-400 flex items-center gap-x-3 whitespace-nowrap overflow-hidden"></p>
                 <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
 
                 <!-- Per-cause breakdown (collapsible) -->
@@ -522,6 +524,9 @@
 
     <!-- Toasts -->
     <div id="toastContainer" class="fixed bottom-32 lg:bottom-20 right-4 z-50 flex flex-col gap-2 items-end"></div>
+
+    <!-- Back to the top of the forecast (shown once scrolled down) -->
+    <button type="button" id="btnToTop" class="hidden fixed bottom-32 lg:bottom-6 right-4 z-40 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-600 text-slate-200 shadow-xl shadow-black/40 backdrop-blur-md hover:bg-slate-700 hover:text-white transition" data-i18n-title="toTop" title="Back to top" data-i18n-aria-label="toTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
 
     <script>
         // ================= Configuration =================
@@ -785,6 +790,8 @@
                 flightSplitToggle: "Split by share",
                 nowTitle: "Can I fly now?",
                 nowDetails: "Details",
+                gotoChart: "Show the chart",
+                toTop: "Back to top",
                 nowTitleAt: "Can I fly then?",
                 nowBack: "Now",
                 nowBackTitle: "Back to the current hour",
@@ -1025,6 +1032,8 @@
                 flightSplitToggle: "Частки",
                 nowTitle: "Чи можна літати зараз?",
                 nowDetails: "Деталі",
+                gotoChart: "Показати графік",
+                toTop: "Нагору",
                 nowTitleAt: "Чи можна літати тоді?",
                 nowBack: "Зараз",
                 nowBackTitle: "Назад до поточної години",
@@ -1265,6 +1274,8 @@
                 flightSplitToggle: "Dividir por fração",
                 nowTitle: "Posso voar agora?",
                 nowDetails: "Detalhes",
+                gotoChart: "Mostrar o gráfico",
+                toTop: "Voltar ao topo",
                 nowTitleAt: "Posso voar nesse horário?",
                 nowBack: "Agora",
                 nowBackTitle: "Voltar à hora atual",
@@ -2540,12 +2551,12 @@
         // (green / yellow / red by its own check), and the next suitable
         // window. The hazard chips and the satellite note sit below it.
         const NOW_TILES = [
-            { key: 'rain', icon: 'fa-cloud-rain', labelKey: 'nowTile_rain' },
-            { key: 'wind', icon: 'fa-wind', labelKey: 'nowTile_wind' },
-            { key: 'gust', icon: 'fa-wind', labelKey: 'nowTile_gust' },
-            { key: 'aloft', icon: 'fa-arrow-up-wide-short', labelKey: 'nowTile_windAloft' },
-            { key: 'cloud', icon: 'fa-cloud', labelKey: 'nowTile_cloud' },
-            { key: 'vis', icon: 'fa-eye', labelKey: 'nowTile_vis' }
+            { key: 'rain', icon: 'fa-cloud-rain', labelKey: 'nowTile_rain', chart: 'precipitation' },
+            { key: 'wind', icon: 'fa-wind', labelKey: 'nowTile_wind', chart: 'wind_speed_10m' },
+            { key: 'gust', icon: 'fa-wind', labelKey: 'nowTile_gust', chart: 'wind_gusts_10m' },
+            { key: 'aloft', icon: 'fa-arrow-up-wide-short', labelKey: 'nowTile_windAloft', chart: 'wind_aloft' },
+            { key: 'cloud', icon: 'fa-cloud', labelKey: 'nowTile_cloud', chart: 'cloud_cover_low' },
+            { key: 'vis', icon: 'fa-eye', labelKey: 'nowTile_vis', chart: 'visibility' }
         ];
 
         function nowTileValue(key, v) {
@@ -2641,13 +2652,13 @@
                 const tip = known ? [label, nowTileRange(tile.key, i)].filter(Boolean).join(' · ') : `${label} · ${t('flightNoData')}`;
                 // The 6 hours from this one, as a thin strip.
                 const next = f.hours.slice(i, i + 6).map(x => `<span class="flex-1" style="background: ${FLIGHT_STATUS[x.checks[tile.key] || 'none'].color}"></span>`).join('');
-                return `<div class="min-w-0 flex flex-col items-center rounded-xl border px-1 pt-1.5 pb-1 text-center" style="background: ${c}1f; border-color: ${c}66" title="${escapeHtml(tip)}">
+                return `<button type="button" data-goto-chart="${tile.chart}" class="min-w-0 flex flex-col items-center rounded-xl border px-1 pt-1.5 pb-1 text-center hover:brightness-125 transition" style="background: ${c}1f; border-color: ${c}66" title="${escapeHtml(tip + ' — ' + t('gotoChart'))}">
                     <i class="fa-solid ${tile.icon} text-[11px]" style="color: ${c}"></i>
                     <div class="font-mono font-bold text-sm leading-tight mt-0.5 ${known ? 'text-slate-100' : 'text-slate-500'}">${escapeHtml(val.v)}</div>
                     <div class="text-[9px] leading-none text-slate-500 h-2.5">${escapeHtml(val.u)}</div>
                     <div lang="${escapeHtml(currentLang)}" class="text-[9.5px] leading-tight text-slate-300 mt-0.5 [hyphens:auto] [overflow-wrap:anywhere]">${escapeHtml(label)}</div>
                     <div class="w-full mt-auto pt-1"><div class="flex gap-px h-1 rounded-full overflow-hidden">${next}</div></div>
-                </div>`;
+                </button>`;
             });
             el.innerHTML = `${title}${verdict}${limiting}
                 <div>
@@ -2948,6 +2959,46 @@
                 const shift = p.align === 'start' ? '' : p.align === 'end' ? '-translate-x-full' : '-translate-x-1/2';
                 return `<span class="absolute top-0 ${shift} whitespace-nowrap ${p.day ? 'text-slate-300 font-semibold' : ''}" style="left: ${(p.k / n) * 100}%">${escapeHtml(p.text)}</span>`;
             }).join('');
+        }
+
+        // ---- Tiles and summary cards open their chart (scrolled to, briefly
+        // outlined, with the hour in question shown when there is one).
+        function gotoChart(key, hour) {
+            const wrap = document.getElementById(`chartWrap-${key}`);
+            if (!wrap) return;
+            wrap.style.scrollMarginTop = '0.75rem';
+            wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            wrap.classList.add('ring-2', 'ring-cyan-500/70');
+            clearTimeout(wrap._flash);
+            wrap._flash = setTimeout(() => wrap.classList.remove('ring-2', 'ring-cyan-500/70'), 1600);
+            const chart = chartInstances[key];
+            if (!chart || !(hour >= 0)) return;
+            try {
+                const active = chart.data.datasets.map((d, di) => ({ datasetIndex: di, index: hour }))
+                    .filter(a => chart.isDatasetVisible(a.datasetIndex) && Number.isFinite(Number(chart.data.datasets[a.datasetIndex].data[hour])));
+                if (!active.length) return;
+                chart.setActiveElements(active);
+                chart.tooltip.setActiveElements(active, { x: chart.scales.x.getPixelForValue(hour), y: chart.chartArea.top });
+                chart.update('none');
+            } catch (err) { /* the chart just stays as it is */ }
+        }
+
+        function renderToTop() {
+            const view = document.getElementById('forecastView');
+            document.getElementById('btnToTop').classList.toggle('hidden', view.classList.contains('hidden') || view.scrollTop < 500);
+        }
+
+        function setupChartJumps() {
+            document.getElementById('forecastView').addEventListener('click', e => {
+                const el = e.target.closest('[data-goto-chart]');
+                if (!el) return;
+                // Card tiles: the hour shown in the card.
+                gotoChart(el.dataset.gotoChart, el.closest('#nowCard') ? nowIndex() : Number(el.dataset.gotoHour ?? -1));
+            });
+            const view = document.getElementById('forecastView');
+            let raf = 0;
+            view.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderToTop(); }); }, { passive: true });
+            document.getElementById('btnToTop').addEventListener('click', () => view.scrollTo({ top: 0, behavior: 'smooth' }));
         }
 
         function setupFlightStrip() {
@@ -3447,6 +3498,7 @@
         }
 
         function renderLocation() {
+            renderFlightSun();
             const nameEl = document.getElementById('locName');
             const detailsEl = document.getElementById('locDetails');
             const favBtn = document.getElementById('btnFavorite');
@@ -3568,9 +3620,10 @@
                 t('forecastMeta', { time, models, window: windowLabel(state.window), tz })) + (failed && !state.loading ? ` · ${t('metaFailed', { n: failed })}` : '');
         }
 
-        function statCard({ title, icon, color, value, sub, extra }) {
-            // Two per row on phones: smaller text, padding and icon there.
-            return `<div class="p-3 sm:p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 relative overflow-hidden">
+        function statCard({ title, icon, color, value, sub, extra, chart, hour }) {
+            // Two per row on phones: smaller text, padding and icon there. A
+            // tap opens the parameter's chart.
+            return `<button type="button" data-goto-chart="${chart}" ${hour >= 0 ? `data-goto-hour="${hour}"` : ''} title="${escapeHtml(t('gotoChart'))}" class="block w-full text-left p-3 sm:p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-600 transition relative overflow-hidden">
                 <div class="flex justify-between items-start gap-2">
                     <div class="min-w-0">
                         <p class="text-[10px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider leading-snug">${escapeHtml(title)}</p>
@@ -3584,7 +3637,7 @@
                     <p>${escapeHtml(sub)}</p>
                     ${extra ? `<p class="font-medium" style="color: rgb(${color})">${escapeHtml(extra)}</p>` : ''}
                 </div>
-            </div>`;
+            </button>`;
         }
 
         function renderStatsPanel() {
@@ -3608,17 +3661,17 @@
             renderStatsPanel();
             const grid = document.getElementById('statsGrid');
             if (!processed) {
-                grid.innerHTML = PARAMS.map(p => statCard({ title: paramTitle(p), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData') })).join('');
+                grid.innerHTML = PARAMS.map(p => statCard({ title: paramTitle(p), icon: p.icon, color: p.color, value: '–', sub: state.loading ? t('loading') : t('statNoData'), chart: p.key })).join('');
                 return;
             }
             grid.innerHTML = PARAMS.map(param => {
                 const data = processed.params[param.key];
                 const s = data && data.summary;
                 const unit = unitLabel(param);
-                if (!s) return statCard({ title: paramTitle(param), icon: param.icon, color: param.color, value: '–', sub: t('statNoData') });
+                if (!s) return statCard({ title: paramTitle(param), icon: param.icon, color: param.color, value: '–', sub: t('statNoData'), chart: param.key });
                 if (param.key === 'precipitation') {
                     return statCard({
-                        title: t('statPrecipTitle', { window: windowLabel(state.window) }), icon: param.icon, color: param.color,
+                        title: t('statPrecipTitle', { window: windowLabel(state.window) }), icon: param.icon, color: param.color, chart: param.key,
                         value: t('statPrecipValue', { median: formatValue(s.median, param), unit }),
                         sub: t('statPrecipSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param), unit }),
                         extra: t('statPrecipChance', { pct: s.chance })
@@ -3630,10 +3683,10 @@
                     let clearIdx = -1;
                     med.forEach((v, i) => { if (Number.isFinite(v) && (clearIdx < 0 || v < med[clearIdx])) clearIdx = i; });
                     return statCard({
-                        title: t('statCloudTitle'), icon: param.icon, color: param.color,
+                        title: t('statCloudTitle'), icon: param.icon, color: param.color, chart: param.key,
                         value: t('statCloudValue', { value: formatValue(s.median, param) }),
                         sub: t('statCloudSub', { lo: formatValue(s.p10, param), hi: formatValue(s.p90, param) }),
-                        extra: clearIdx >= 0 ? t('statCloudClearest', { when: formatDayHour(processed.times[clearIdx]) }) : ''
+                        extra: clearIdx >= 0 ? t('statCloudClearest', { when: formatDayHour(processed.times[clearIdx]) }) : '', hour: clearIdx
                     });
                 }
                 if (param.key === 'visibility') {
@@ -3641,20 +3694,20 @@
                     let lowIdx = -1;
                     med.forEach((v, i) => { if (Number.isFinite(v) && (lowIdx < 0 || v < med[lowIdx])) lowIdx = i; });
                     return statCard({
-                        title: t('statVisTitle'), icon: param.icon, color: param.color,
+                        title: t('statVisTitle'), icon: param.icon, color: param.color, chart: param.key,
                         value: t('statVisValue', { value: formatValue(s.median, param), unit }),
                         sub: t('statVisSub', { lo: formatValue(s.p10, param), unit }),
-                        extra: lowIdx >= 0 ? t('statVisWorst', { when: formatDayHour(processed.times[lowIdx]) }) : ''
+                        extra: lowIdx >= 0 ? t('statVisWorst', { when: formatDayHour(processed.times[lowIdx]) }) : '', hour: lowIdx
                     });
                 }
                 // Time of the highest point of the median curve.
                 let peakIdx = -1;
                 med.forEach((v, i) => { if (Number.isFinite(v) && (peakIdx < 0 || v > med[peakIdx])) peakIdx = i; });
                 return statCard({
-                    title: t(param.statTitleKey || (param.key === 'wind_gusts_10m' ? 'statGustTitle' : 'statWindTitle')), icon: param.icon, color: param.color,
+                    title: t(param.statTitleKey || (param.key === 'wind_gusts_10m' ? 'statGustTitle' : 'statWindTitle')), icon: param.icon, color: param.color, chart: param.key,
                     value: t('statPeakValue', { value: formatValue(s.median, param), unit }),
                     sub: t('statPeakSub', { hi: formatValue(s.p90, param), unit }),
-                    extra: peakIdx >= 0 ? t('statPeakWhen', { when: formatDayHour(processed.times[peakIdx]) }) : ''
+                    extra: peakIdx >= 0 ? t('statPeakWhen', { when: formatDayHour(processed.times[peakIdx]) }) : '', hour: peakIdx
                 });
             }).join('');
         }
@@ -4457,6 +4510,7 @@
             setupFavorites();
             setupControls();
             setupFlightStrip();
+            setupChartJumps();
             setupChartReorder();
             setupChartResizing();
             setupSettingsDrawer();
@@ -4605,6 +4659,7 @@
             saveToStorage(VIEW_KEY, currentView);
             const isMap = currentView === 'map';
             document.getElementById('forecastView').classList.toggle('hidden', isMap);
+            renderToTop();
             document.getElementById('modeDock').classList.toggle('hidden', isMap);
             document.getElementById('mapView').classList.toggle('hidden', !isMap);
             renderViewSwitch();

@@ -42,6 +42,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `forecast.mjs` | combined request, charts, flight bar, 72 h window, Models mode, thresholds + reset, planner, language, saved forecast |
 | `forecast-now.mjs` | "Can I fly now?" card, wind aloft as a factor, models in the side menu, 8 days asked once (no request on window switch), daily limit, confidence legend |
 | `forecast-scrub.mjs` | "Can I fly now?" hour scrubber: mouse and touch sliding (also off the strip), strip kept under the pointer, tap, ‹ › buttons, keyboard, card following the hour, shared pin with the flight bar, *Now*, *Map* |
+| `forecast-nav.mjs` | date / sunrise / sunset in the location card, card tiles and summary cards opening their chart at the hour in question, back-to-top button |
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows, place names |
