@@ -1039,6 +1039,13 @@
             .fs-route-dot { display: inline-flex; flex-shrink: 0; width: 15px; height: 15px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 9px/1 Inter, system-ui, sans-serif; color: #020617; }
             /* No time bar: the notes and panels move down. */
             .fs-nobar #mapSide { bottom: 1.75rem; }
+            /* The notes and readout never reach the crosshair (they scroll
+               instead); while the map moves the readout shows its header only. */
+            #mapSide { max-height: calc(50% - 7.75rem - 1.75rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+            /* Scrollable once taller than that (pointer events for the scroll). */
+            #mapSide.fs-scroll { pointer-events: auto; }
+            .fs-nobar #mapSide { max-height: calc(50% - 1.75rem - 1.75rem); }
+            .fs-moving #mapProbeRows { display: none; }
             /* Phones in landscape: timeline bottom-left, notes + readout in a
                scrolling column bottom-right (left of the map buttons), so
                the middle of the map (crosshair) stays clear. */
@@ -1050,7 +1057,7 @@
                 #mapPanelBtn { top: 0.5rem; left: 0.5rem; }
                 #mapView .leaflet-top.leaflet-right .leaflet-control-zoom { margin-top: 0.5rem; }
                 #mapTools { top: 5rem; }
-                .fs-nobar #mapSide { bottom: 0.5rem; }
+                .fs-nobar #mapSide { bottom: 0.5rem; max-height: calc(100% - 1rem); }
                 #mapTimePill { top: 3rem; left: 0.5rem; }
             }`;
         document.head.appendChild(st);
@@ -1251,7 +1258,8 @@
         precipLayers: [], borderLayers: [],
         ovLayers: {},             // overlayId -> [layer, ...] ordered
         ovFrames: {},             // overlayId -> [{ t, key, url }]
-        ovShown: {},              // overlayId -> Map(frameKey -> L.imageOverlay)
+        ovShown: {},              // overlayId -> Map(frameKey -> L.imageOverlay, or the stack's layer)
+        ovStack: {},              // overlayId -> { ext, canvas, g, layer, pending } for stacked overlays
         ovWant: {},               // overlayId -> Set(frameKey) for the shown time
         times: {},                // layerName -> { at, list:[ms], ok, error }
         frames: [],               // [{ t, key }]
@@ -1967,8 +1975,8 @@
         // A single image (precipitation) is swapped only once the new one is
         // ready, so the overlay never blinks off between steps.
         const single = o.show === 'nearest';
-        if (!single) shown.forEach((ov, key) => { if (!want.has(key)) { R.map.removeLayer(ov); shown.delete(key); } });
-        if (!frames.length && single) { shown.forEach(ov => R.map.removeLayer(ov)); shown.clear(); }
+        if (!single) { showStack(o, frames, gen); return; }
+        if (!frames.length) { shown.forEach(ov => R.map.removeLayer(ov)); shown.clear(); }
         frames.forEach(f => {
             if (shown.has(f.key)) return;
             const entry = cache.get(f.key) || ensureFrame(f, true);
@@ -1976,10 +1984,59 @@
                 if (gen !== R.gen || e.status !== 'ok' || !R.ovWant[o.id] || !R.ovWant[o.id].has(f.key) || shown.has(f.key)) return;
                 const ov = L.imageOverlay(e.url, R.extent.bounds, { pane: 'ov_' + o.id, opacity, interactive: false, attribution: MAP_CONFIG.eumetsatAttribution }).addTo(R.map);
                 shown.set(f.key, ov);
-                // The readout's nearest lightning / fire uses these images.
-                if (!single && !R.playing) scheduleProbe(700);
-                if (single) shown.forEach((old, key) => { if (key !== f.key) { R.map.removeLayer(old); shown.delete(key); } });
+                shown.forEach((old, key) => { if (key !== f.key) { R.map.removeLayer(old); shown.delete(key); } });
             });
+        });
+    }
+
+    // Stacked overlays (lightning: 30 min of images, fires: the whole
+    // window) are drawn into one canvas per layer — one picture on the map
+    // instead of up to dozens of full-size ones (each its own GPU texture:
+    // enough of them made phones drop parts of the map while panning).
+    // New images are drawn on top as they arrive; an image leaving the stack
+    // or a new image area redraws it.
+    function showStack(o, frames, gen) {
+        const shown = R.ovShown[o.id];   // frame key -> the stack's layer (drawn images)
+        const want = R.ovWant[o.id];
+        const ext = R.extent;
+        let st = R.ovStack[o.id];
+        const gone = st ? [...shown.keys()].filter(k => !want.has(k)) : [];
+        // Lightning's 30 min slide along while playing: its few images are
+        // kept, so dropping the oldest only redraws the rest.
+        if (st && st.ext === ext && gone.length && st.kept && frames.length) {
+            gone.forEach(k => { shown.delete(k); st.kept.delete(k); });
+            st.g.clearRect(0, 0, st.canvas.width, st.canvas.height);
+            frames.forEach(f => { const img = st.kept.get(f.key); if (img) st.g.drawImage(img, 0, 0, st.canvas.width, st.canvas.height); });
+        } else if (st && (st.ext !== ext || gone.length || !frames.length)) {
+            R.map.removeLayer(st.layer);
+            shown.clear();
+            st = R.ovStack[o.id] = null;
+        }
+        if (!frames.length || !ext) return;
+        if (!st) {
+            const canvas = document.createElement('canvas');
+            canvas.width = ext.w; canvas.height = ext.h;
+            st = R.ovStack[o.id] = { ext, canvas, g: canvas.getContext('2d'), pending: new Set(), kept: typeof o.show === 'number' ? new Map() : null,
+                layer: L.svgOverlay(canvas, ext.bounds, { pane: 'ov_' + o.id, opacity: S.overlays[o.id].opacity, interactive: false, attribution: MAP_CONFIG.eumetsatAttribution }).addTo(R.map) };
+        }
+        frames.forEach(f => {
+            if (shown.has(f.key) || st.pending.has(f.key)) return;
+            st.pending.add(f.key);
+            const entry = cache.get(f.key) || ensureFrame(f, true);
+            whenReady(entry).then(e => {
+                if (e.status !== 'ok') return null;
+                const img = new Image();
+                img.src = e.url;
+                return img.decode().then(() => img);
+            }).then(img => {
+                st.pending.delete(f.key);
+                if (!img || gen !== R.gen || R.ovStack[o.id] !== st || !R.ovWant[o.id] || !R.ovWant[o.id].has(f.key) || shown.has(f.key)) return;
+                st.g.drawImage(img, 0, 0, st.canvas.width, st.canvas.height);
+                if (st.kept) st.kept.set(f.key, img);
+                shown.set(f.key, st.layer);
+                // The readout's nearest lightning / fire uses these images.
+                if (!R.playing) scheduleProbe(700);
+            }).catch(() => st.pending.delete(f.key));
         });
     }
     const transparentPixel = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
@@ -2050,10 +2107,10 @@
         root.innerHTML = `
             <div id="satMap" class="absolute inset-0 z-0 bg-slate-950"></div>
             <div id="mapDrawHint" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-[500] px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 text-xs font-semibold shadow-lg"></div>
-            <button type="button" id="mapPanelBtn" class="absolute top-3 left-3 z-[500] flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-slate-200 shadow-xl backdrop-blur-md hover:border-cyan-600 transition max-w-[calc(100vw-5.5rem)]">
+            <button type="button" id="mapPanelBtn" class="absolute top-3 left-3 z-[500] flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/95 border border-slate-700 text-xs text-slate-200 shadow-xl hover:border-cyan-600 transition max-w-[calc(100vw-5.5rem)]">
                 <i class="fa-solid fa-layer-group text-cyan-400"></i><span id="mapPanelBtnLabel" class="truncate"></span><span id="mapPanelBtnBadges" class="flex items-center gap-1 text-[10px]"></span><i class="fa-solid fa-sliders text-[11px] text-slate-500"></i>
             </button>
-            <button type="button" id="mapTimePill" class="hidden absolute top-[3.4rem] left-3 z-[500] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-700 text-[11px] text-slate-300 shadow-lg backdrop-blur-md max-w-[calc(100vw-5.5rem)]"></button>
+            <button type="button" id="mapTimePill" class="hidden absolute top-[3.4rem] left-3 z-[500] flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/95 border border-slate-700 text-[11px] text-slate-300 shadow-lg max-w-[calc(100vw-5.5rem)]"></button>
             <div id="mapCrosshair" class="hidden absolute left-1/2 top-1/2 z-[420] -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                 <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
                     <g stroke="#020617" stroke-width="4" stroke-linecap="round"><path d="M22 3v12M22 29v12M3 22h12M29 22h12"/><circle cx="22" cy="22" r="3"/></g>
@@ -2069,10 +2126,10 @@
             </div>
             <div id="mapSide" class="absolute bottom-[7.75rem] left-1/2 -translate-x-1/2 z-[450] w-[min(30rem,calc(100vw-1rem))] flex flex-col gap-1.5 pointer-events-none">
                 <div id="mapStatus" class="space-y-1.5"></div>
-                <div id="mapRoute" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
-                <div id="mapProbe" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl backdrop-blur-md text-[11px] text-slate-300"></div>
+                <div id="mapRoute" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl text-[11px] text-slate-300"></div>
+                <div id="mapProbe" class="hidden pointer-events-auto rounded-xl bg-slate-900/95 border border-slate-700 shadow-xl text-[11px] text-slate-300"></div>
             </div>
-            <div id="mapBar" class="absolute bottom-7 left-1/2 -translate-x-1/2 z-[500] w-[min(44rem,calc(100vw-1rem))] p-2 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-2xl backdrop-blur-md"></div>`;
+            <div id="mapBar" class="absolute bottom-7 left-1/2 -translate-x-1/2 z-[500] w-[min(44rem,calc(100vw-1rem))] p-2 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl"></div>`;
         const map = L.map('satMap', { zoomControl: false, worldCopyJump: false, minZoom: 3, maxZoom: 18, attributionControl: true });
         R.map = map;
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -2095,7 +2152,17 @@
         updateFavorites();
         map.on('zoomend', () => { updatePlaces(); updateRings(); updateFavorites(); });
 
-        map.on('movestart', () => clearTimeout(R.moveTimer));
+        // While the map moves the readout folds to its header (the crosshair
+        // stays in view, less to redraw) and nothing is asked for it; it
+        // reads again once the map has settled.
+        map.on('movestart', () => {
+            clearTimeout(R.moveTimer);
+            clearTimeout(P.timer);
+            try { P.controller && P.controller.abort(); } catch (err) {}
+            if (P.loading) { P.loading = false; P.seq++; renderProbe(); }
+            root.classList.add('fs-moving');
+            fitSide();
+        });
         map.on('move', renderProbeHeader);
         map.on('moveend', () => {
             S.view = { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() };
@@ -2107,13 +2174,16 @@
             }, 450);
             // Moved away from the forecast location: follow the crosshair.
             if (R.anchor && !anchorCentred()) R.anchor = null;
-            scheduleProbe();
+            root.classList.remove('fs-moving');
+            fitSide();
+            scheduleProbe(700);
             updatePlaces();
             if (windShown()) { clearTimeout(W.timer); W.timer = setTimeout(updateWind, 400); }
         });
         // Flight time calculator: taps, and B / the route tag following the map.
         map.on('click', e => { if (S.route.on && !R.drawing) routeTap(e.latlng); });
         map.on('move zoomend resize', () => { if (S.route.on) routeMoved(); });
+        map.on('resize', fitSide);
         setupDrawing();
         setupUiEvents();
         R.built = true;
@@ -2760,7 +2830,7 @@
         const el = $('mapStatus');
         if (!el) return;
         const notes = [];
-        const pill = (cls, icon, text, action) => `<div class="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] shadow-lg backdrop-blur-md ${cls}"><i class="fa-solid ${icon}"></i><span class="flex-1">${h(text)}</span>${action || ''}</div>`;
+        const pill = (cls, icon, text, action) => `<div class="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] shadow-lg ${cls}"><i class="fa-solid ${icon}"></i><span class="flex-1">${h(text)}</span>${action || ''}</div>`;
         if (!navigator.onLine) notes.push(pill('bg-amber-950/90 border border-amber-800/60 text-amber-200', 'fa-wifi', t('mapOffline')));
         if (R.catalogStatus === 'loading') notes.push(pill('bg-slate-900/90 border border-slate-700 text-slate-300', 'fa-circle-notch fa-spin', t('mapLoadingCatalog')));
         if (R.catalogStatus === 'error') {
@@ -2805,6 +2875,7 @@
         const hazards = hz && !folded ? hz.chipsHtml('map', { showable: id => { const o = S.overlays[id === 'rain' ? 'precip' : id]; return !!o && !o.on; } }) : '';
         $('mapHazardIcons').innerHTML = hz && folded ? hz.chipsHtml('icon') : '';
         el.innerHTML = hazards + notes.join('');
+        fitSide();
     }
 
     function renderAllMapUi() {
@@ -3050,11 +3121,15 @@
 
     async function modelAt(ll, signal) {
         const ids = readoutModels();
-        const key = `${ll.lat.toFixed(2)},${ll.lng.toFixed(2)},${state.precipUnit},${state.windUnit},${ids.join('+')}`;
+        // On a 0.05° grid (~4–6 km; the models' own grids are 2–25 km): one
+        // request per cell, so panning nearby reuses it (Open-Meteo counts
+        // every model of every request).
+        const lat = (Math.round(ll.lat * 20) / 20).toFixed(2), lon = (Math.round(ll.lng * 20) / 20).toFixed(2);
+        const key = `${lat},${lon},${state.precipUnit},${state.windUnit},${ids.join('+')}`;
         const hit = P.model.get(key);
         if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
         const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
-            latitude: ll.lat.toFixed(3), longitude: ll.lng.toFixed(3), hourly: MODEL_VARS.join(','), models: ids.length ? ids.join(',') : undefined,
+            latitude: lat, longitude: lon, hourly: MODEL_VARS.join(','), models: ids.length ? ids.join(',') : undefined,
             past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined,
             wind_speed_unit: state.windUnit && state.windUnit !== 'ms' ? state.windUnit : undefined
         }, []);
@@ -3286,6 +3361,9 @@
         if (!S.probe || !R.visible) return;
         if (R.playing) { P.result = { playing: true }; renderProbe(); return; }
         const { ll } = probePoint();
+        // Satellite reads on a ~1 km grid (its pixels are 1–5 km): small
+        // moves reuse what was read.
+        const q = L.latLng(Math.round(ll.lat * 100) / 100, Math.round(ll.lng * 100) / 100);
         const frame = timelineFrames()[R.index];
         const tm = frame ? frame.t : null;
         const layer = activeLayer();
@@ -3297,16 +3375,16 @@
         const id = ++P.seq;
         P.loading = true;
         renderProbe();
-        const sat = layer ? featureInfo(layer.name, tm, ll, controller.signal) : Promise.resolve(undefined);
+        const sat = layer ? featureInfo(layer.name, tm, q, controller.signal) : Promise.resolve(undefined);
         const rain = rainLayer ? refreshTimes(rainLayer.name).then(() => {
             const pt = precipTimeFor(rainLayer.name, tm);
-            return pt === null ? null : featureInfo(rainLayer.name, pt, ll, controller.signal).then(props => ({ props, t: pt }));
+            return pt === null ? null : featureInfo(rainLayer.name, pt, q, controller.signal).then(props => ({ props, t: pt }));
         }) : Promise.resolve(undefined);
         const model = navigator.onLine ? modelAt(ll, controller.signal) : Promise.reject(new Error(t('mapOffline')));
         // Rain around the point, for the satellite-vs-models check.
         const area = rainLayer && R.requestMode === 'fetch' ? refreshTimes(rainLayer.name).then(() => {
             const pt = precipTimeFor(rainLayer.name, tm);
-            return pt === null ? null : rainAround(rainLayer.name, pt, ll, controller.signal);
+            return pt === null ? null : rainAround(rainLayer.name, pt, q, controller.signal);
         }) : Promise.resolve(null);
         const scans = ['lightning', 'fire'].map(id => (activeOverlay(id) ? scanNearest(OVERLAYS.find(o => o.id === id), ll) : Promise.resolve(undefined)));
         const [s, r, m, lt, fi, ar] = await Promise.allSettled([sat, rain, model, ...scans, area]);
@@ -3451,8 +3529,17 @@
                 <button type="button" data-map-goforecast class="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-200 font-semibold"><i class="fa-solid fa-location-dot mr-1"></i>${h(t('mapGoForecast'))}</button>
                 <button type="button" data-map-probemin class="shrink-0 w-6 h-6 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t('mapProbeCollapse'))}" aria-label="${h(t('mapProbeCollapse'))}" aria-expanded="${S.probeOpen}"><i class="fa-solid fa-chevron-down text-[10px] transition-transform" style="${S.probeOpen ? '' : 'transform: rotate(180deg)'}"></i></button>
             </div>
-            ${S.probeOpen && rows ? `<div class="px-3 pb-2 space-y-1 leading-snug">${rows}</div>` : ''}`;
+            ${S.probeOpen && rows ? `<div id="mapProbeRows" class="px-3 pb-2 space-y-1 leading-snug">${rows}</div>` : ''}`;
         renderProbeHeader();
+        fitSide();
+    }
+
+    // The notes / readout column scrolls (and takes touches) only when it
+    // is taller than its room above the timeline; otherwise touches between
+    // its cards reach the map.
+    function fitSide() {
+        const el = $('mapSide');
+        if (el) el.classList.toggle('fs-scroll', el.scrollHeight > el.clientHeight + 1);
     }
 
     function renderFullBtn() {
@@ -3953,6 +4040,7 @@
         btn.classList.toggle('!bg-cyan-500', S.route.on);
         btn.title = t('rtTool'); btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-pressed', S.route.on ? 'true' : 'false');
         el.classList.toggle('hidden', !S.route.on);
+        fitSide();
         if (!S.route.on) return;
         const iconBtn = (attr, icon, key) => `<button type="button" ${attr} class="shrink-0 w-7 h-7 rounded-md text-slate-400 hover:text-white hover:bg-slate-800" title="${h(t(key))}" aria-label="${h(t(key))}"><i class="fa-solid ${icon}"></i></button>`;
         const modeBtn = (mode, icon, key) => {

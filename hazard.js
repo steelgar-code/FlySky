@@ -603,7 +603,7 @@
             if (variant === 'map') {
                 const show = opts.showable && opts.showable(kind.id)
                     ? `<button type="button" data-hazard-show="${kind.id}" title="${h(t('hzShowTitle'))}" class="shrink-0 self-center mr-2 px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 font-semibold"><i class="fa-solid fa-eye mr-1 text-[10px]"></i>${h(t('hzShow'))}</button>` : '';
-                return `<div class="pointer-events-auto w-full flex rounded-xl text-[11px] leading-snug shadow-lg backdrop-blur-md border ${kind.cls}">
+                return `<div class="pointer-events-auto w-full flex rounded-xl text-[11px] leading-snug shadow-lg border ${kind.cls}">
                     <button type="button" data-hazard="${kind.id}" title="${h(t('hzCollapse'))}" class="flex-1 min-w-0 flex items-start gap-2 px-3 py-1.5 text-left">
                     <i class="fa-solid ${kind.icon} ${kind.accent} mt-0.5"></i><span class="flex-1 min-w-0"><span class="block font-semibold">${h(label.charAt(0).toUpperCase() + label.slice(1))} ${h(where)}</span><span class="block opacity-80">${h(sub)}</span></span></button>${show}</div>`;
             }
