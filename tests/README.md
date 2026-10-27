@@ -33,7 +33,7 @@ Every external request is answered locally, so the suites run offline and are re
   the map readout's point request (one column per model) and the wind-arrow grid request.
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
   forecast requests get a 429 "limit exceeded". The flight time calculator's wind request gets a
-  uniform wind, `routeWind: { speed, from }` (default 6 m/s from the west).
+  uniform wind, `routeWind: { speed, from, ramp }` (default 6 m/s from the west; `ramp`: m/s more per hour ahead).
 - OSM tiles: flat dark tiles.
 
 ## Suites

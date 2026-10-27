@@ -454,7 +454,10 @@
             rtWaypoints: "+{n} via",
             rtReading: "Reading the wind along the route…",
             rtNoWind: "Wind unavailable ({msg}).",
-            rtBlocked: "Can't make headway: on part of the route the crosswind or headwind is too strong for {v} m/s airspeed.",
+            rtBlockedHead: "Can't make headway: {where}, the forecast wind there is {w} m/s ({h} m/s against you), leaving under 1 m/s ground speed at {v} m/s airspeed.",
+            rtBlockedCross: "Can't hold the course: {where}, the forecast crosswind there is {c} m/s, more than the {v} m/s airspeed.",
+            rtAtKm: "about {km} km along, at {time} (after {dur} of flying)",
+            rtAtStart: "at the start, at {time}",
             rtStill: "in still air",
             rtNoHeadway: "No headway",
             rtBackShort: "back {time}",
@@ -730,7 +733,10 @@
             rtWaypoints: "+{n} через",
             rtReading: "Читаю вітер уздовж маршруту…",
             rtNoWind: "Вітер недоступний ({msg}).",
-            rtBlocked: "Не пролетіти: на частині маршруту бічний чи зустрічний вітер завеликий для повітряної швидкості {v} m/s.",
+            rtBlockedHead: "Не пролетіти: {where}, прогнозний вітер там {w} m/s ({h} m/s назустріч) — шляхова швидкість менша за 1 m/s при повітряній {v} m/s.",
+            rtBlockedCross: "Не втримати курс: {where}, прогнозний бічний вітер там {c} m/s — більше за повітряну швидкість {v} m/s.",
+            rtAtKm: "приблизно через {km} км, о {time} (після {dur} польоту)",
+            rtAtStart: "на старті, о {time}",
             rtStill: "у штиль",
             rtNoHeadway: "Не пролетіти",
             rtBackShort: "назад {time}",
@@ -1006,7 +1012,10 @@
             rtWaypoints: "+{n} via",
             rtReading: "Lendo o vento ao longo da rota…",
             rtNoWind: "Vento indisponível ({msg}).",
-            rtBlocked: "Não dá para avançar: em parte da rota o vento lateral ou contrário é forte demais para {v} m/s de velocidade do ar.",
+            rtBlockedHead: "Não dá para avançar: {where}, o vento previsto ali é de {w} m/s ({h} m/s contra), deixando menos de 1 m/s de velocidade no solo com {v} m/s de velocidade do ar.",
+            rtBlockedCross: "Não dá para manter o rumo: {where}, o vento lateral previsto ali é de {c} m/s, mais que os {v} m/s de velocidade do ar.",
+            rtAtKm: "a cerca de {km} km do início, às {time} (após {dur} de voo)",
+            rtAtStart: "no início, às {time}",
             rtStill: "sem vento",
             rtNoHeadway: "Sem avanço",
             rtBackShort: "volta {time}",
@@ -3859,14 +3868,24 @@
             const W = Math.hypot(u, v);
             const delta = Math.atan2(u, v) - toRad(courseDeg(p.ll, q.ll));
             const along = W * Math.cos(delta), cr = W * Math.sin(delta);
-            if (Math.abs(cr) >= V) return { blocked: true };
+            // Where, when and why it stalls (the wind of that hour, which can
+            // be stronger than the map's arrows for the image's hour).
+            const stall = kind => ({ blocked: kind, km: dist / 1000, at: t, flown: t - t0, wind: W, head: -along, cross: Math.abs(cr) });
+            if (Math.abs(cr) >= V) return stall('cross');
             const gs = Math.sqrt(V * V - cr * cr) + along;
-            if (gs < 1) return { blocked: true };
+            if (gs < 1) return stall('head');
             t += d / gs * 1000;
             dist += d; alongSum += along * d; cross = Math.max(cross, Math.abs(cr));
         }
         const ms = t - t0;
         return { ms, dist, gs: ms ? dist / (ms / 1000) : V, along: dist ? alongSum / dist : 0, cross };
+    }
+
+    function blockedText(b, V) {
+        const where = b.km < 0.5 ? t('rtAtStart', { time: fmtClock(b.at) })
+            : t('rtAtKm', { km: Math.round(b.km), time: fmtClock(b.at), dur: fmtDuration(b.flown) });
+        return b.blocked === 'cross' ? t('rtBlockedCross', { where, c: num1(b.cross), v: V })
+            : t('rtBlockedHead', { where, w: num1(b.wind), h: num1(b.head), v: V });
     }
 
     function fmtDuration(ms) {
@@ -4141,7 +4160,7 @@
                 tag = `<b>≈ ${h(still)}</b><span>${h(km)}</span>`;
             } else if (out.blocked) {
                 headHtml = `<span class="font-semibold text-rose-300">${h(t('rtNoHeadway'))}</span>`;
-                msg = `<span class="text-rose-300">${h(t('rtBlocked', { v: V }))}</span>`;
+                msg = `<span class="text-rose-300">${h(blockedText(out, V))}</span>`;
                 tag = `<b class="bad">${h(t('rtNoHeadway'))}</b><span>${h(km)}</span>`;
             } else {
                 const eta = t0 + out.ms;

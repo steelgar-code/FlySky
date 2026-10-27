@@ -134,7 +134,7 @@ export async function routeAll(page, opts = {}) {
     }
     if (url.includes('api.open-meteo.com/v1/forecast') && /hourly=wind_speed_/.test(url) && !url.includes('models=')) {
       // Flight time calculator: wind at the route's points, for any height asked.
-      // opts.routeWind = { speed (m/s), from (deg) } — default 6 m/s from the west.
+      // opts.routeWind = { speed (m/s), from (deg), ramp (m/s more per hour ahead) } — default 6 m/s from the west.
       const u = new URL(url);
       const lats = u.searchParams.get('latitude').split(','), lons = u.searchParams.get('longitude').split(',');
       const [sv, dv] = u.searchParams.get('hourly').split(',');
@@ -142,7 +142,7 @@ export async function routeAll(page, opts = {}) {
       log.routeReq = (log.routeReq || []).concat(u.searchParams.get('hourly'));
       const start = Math.floor(Date.now() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < 48; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
-      const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: { time, [sv]: time.map(() => w.speed), [dv]: time.map(() => w.from) } }));
+      const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: { time, [sv]: time.map(x => w.speed + (w.ramp || 0) * Math.max(0, (Date.parse(x + 'Z') - Date.now()) / 3600e3)), [dv]: time.map(() => w.from) } }));
       return route.fulfill({ json: list.length === 1 ? list[0] : list });
     }
     if (url.includes('open-meteo.com')) return route.fulfill({ status: 503, json: { error: true, reason: 'offline in test' } });
