@@ -15,7 +15,7 @@ async function open(opts, ctxOpts = {}, before) {
   // scenario is about Auto (opts.auto): Auto follows the time of day.
   await page.evaluate(auto => {
     localStorage.setItem('flysky_view', JSON.stringify('map'));
-    if (!auto) localStorage.setItem('flysky_map_settings', JSON.stringify({ product: 'fog', productAt: Date.now() }));
+    if (!auto) localStorage.setItem('flysky_map_settings', JSON.stringify({ product: 'fog', productAt: Date.now(), sections: { product: true, layers: true, map: true, region: true, time: true } }));
   }, !!opts.auto);
   await page.reload();
   await page.waitForTimeout(3500);
@@ -90,7 +90,8 @@ async function open(opts, ctxOpts = {}, before) {
   const { page, st, ctx } = await open({ now: noon.getTime(), auto: true }, {}, async p => { await p.clock.setFixedTime(noon); });
   let s = await st();
   ok('daytime: Auto shows Day Microphysics', s.product === 'auto' && s.shown === 'dayMicro', [s.product, s.shown]);
-  await page.evaluate(() => document.querySelector('#drawerMap [data-map-product="fog"]').click()); await page.waitForTimeout(800);
+  // The product card is folded for a new user: open it first.
+  await page.evaluate(() => { document.querySelector('#drawerMap [data-map-section="product"]').click(); document.querySelector('#drawerMap [data-map-product="fog"]').click(); }); await page.waitForTimeout(800);
   s = await st();
   ok('night product by day: hint offers switch', /Daytime over this area/.test(s.status), s.status);
   await page.click('#mapStatus [data-map-product]'); await page.waitForTimeout(800);

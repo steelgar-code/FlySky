@@ -1,5 +1,5 @@
 // Dragging the map: stacked overlays drawn as one canvas each, no backdrop
-// blur on the map panels, readout folded while moving and read only once the
+// blur on the map panels, readout kept open while moving and read only once the
 // map settles (on a small grid, so tiny moves reuse it), and the notes /
 // readout never covering the crosshair.
 import { routeAll } from './lib/mock.mjs';
@@ -36,20 +36,20 @@ ok('latest: the lightning canvas holds the flashes, at the image size', lit.n > 
 // ---- No backdrop blur on the map's panels
 ok('no backdrop blur on map panels', await I(() => ['mapProbe', 'mapBar', 'mapPanelBtn', 'mapStatus'].every(id => [document.getElementById(id), ...document.getElementById(id).querySelectorAll('*')].every(el => getComputedStyle(el).backdropFilter === 'none'))));
 
-// ---- Readout: folded while dragging, read once settled
+// ---- Readout: stays open while dragging, read once settled
 await page.waitForSelector('#mapProbeRows', { timeout: 10000 });
 const box = await I(() => { const r = document.getElementById('satMap').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 150 }; });
 const gfi0 = (log.gfi || []).length, model0 = log.model || 0;
 await page.mouse.move(box.x, box.y); await page.mouse.down();
 await page.mouse.move(box.x - 40, box.y + 10, { steps: 5 });
-const during = await I(() => ({ moving: document.getElementById('mapView').classList.contains('fs-moving'), rows: !!document.getElementById('mapProbeRows') && getComputedStyle(document.getElementById('mapProbeRows')).display !== 'none' }));
-ok('while dragging: readout folded to its header', during.moving && !during.rows, during);
+const during = await I(() => !!document.getElementById('mapProbeRows') && getComputedStyle(document.getElementById('mapProbeRows')).display !== 'none');
+ok('while dragging: readout stays open (previous values)', during);
 await page.mouse.move(box.x - 80, box.y + 20, { steps: 5 });
 await page.waitForTimeout(400);
 ok('no readout requests while the finger is down', (log.gfi || []).length === gfi0 && (log.model || 0) === model0);
 await page.mouse.up();
 await page.waitForTimeout(300);
-ok('released: readout back (previous values until the new ones)', await I(() => !document.getElementById('mapView').classList.contains('fs-moving') && !!document.getElementById('mapProbeRows')));
+ok('released: readout still open', await I(() => !!document.getElementById('mapProbeRows')));
 ok('…and not read yet (waits for the map to settle)', (log.gfi || []).length === gfi0);
 await page.waitForTimeout(1500);
 ok('settled: read once', (log.gfi || []).length > gfi0 && (log.model || 0) === model0 + 1, { gfi: (log.gfi || []).length - gfi0, model: (log.model || 0) - model0 });

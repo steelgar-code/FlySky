@@ -240,7 +240,9 @@
             mapSat_msg_iodc: 'MSG · Indian Ocean',
             mapEvery: 'every {n} min',
             mapEnhanced: 'enhanced',
-            mapOverlaysTitle: 'Overlays',
+            mapOverlaysTitle: 'Layers',
+            mapLayerSettings: 'Layer settings',
+            mapNothingOn: 'all off',
             mapOv_precip: 'Precipitation',
             mapOv_lightning: 'Lightning',
             mapOv_fire: 'Fires',
@@ -514,7 +516,9 @@
             mapSat_msg_iodc: 'MSG · Індійський океан',
             mapEvery: 'кожні {n} хв',
             mapEnhanced: 'посилений',
-            mapOverlaysTitle: 'Накладання',
+            mapOverlaysTitle: 'Шари',
+            mapLayerSettings: 'Налаштування шару',
+            mapNothingOn: 'усе вимкнено',
             mapOv_precip: 'Опади',
             mapOv_lightning: 'Блискавки',
             mapOv_fire: 'Пожежі',
@@ -788,7 +792,9 @@
             mapSat_msg_iodc: 'MSG · Oceano Índico',
             mapEvery: 'a cada {n} min',
             mapEnhanced: 'realçado',
-            mapOverlaysTitle: 'Sobreposições',
+            mapOverlaysTitle: 'Camadas',
+            mapLayerSettings: 'Configurações da camada',
+            mapNothingOn: 'tudo desligado',
             mapOv_precip: 'Precipitação',
             mapOv_lightning: 'Raios',
             mapOv_fire: 'Incêndios',
@@ -1037,15 +1043,16 @@
             .fs-route-tag b i { font-size: 10px; color: #22d3ee; }
             .fs-route-tag b.bad { color: #fda4af; }
             .fs-route-dot { display: inline-flex; flex-shrink: 0; width: 15px; height: 15px; border-radius: 9999px; align-items: center; justify-content: center; font: 700 9px/1 Inter, system-ui, sans-serif; color: #020617; }
+            /* A segmented control across the whole row (wind heights). */
+            .fs-seg-full .seg { display: flex; width: 100%; }
+            .fs-seg-full .seg > button { flex: 1 1 0; min-width: 0; justify-content: center; padding-left: 0.125rem; padding-right: 0.125rem; }
             /* No time bar: the notes and panels move down. */
             .fs-nobar #mapSide { bottom: 1.75rem; }
-            /* The notes and readout never reach the crosshair (they scroll
-               instead); while the map moves the readout shows its header only. */
+            /* The notes and readout never reach the crosshair (they scroll instead). */
             #mapSide { max-height: calc(50% - 7.75rem - 1.75rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
             /* Scrollable once taller than that (pointer events for the scroll). */
             #mapSide.fs-scroll { pointer-events: auto; }
             .fs-nobar #mapSide { max-height: calc(50% - 1.75rem - 1.75rem); }
-            .fs-moving #mapProbeRows { display: none; }
             /* Phones in landscape: timeline bottom-left, notes + readout in a
                scrolling column bottom-right (left of the map buttons), so
                the middle of the map (crosshair) stays clear. */
@@ -1214,6 +1221,8 @@
         // times in local time.
         basemap: 'osmDark', labels: false, borders: false, rings: true, favs: true, hazardMin: false, windowH: 6, utc: false, speed: 1,
         view: null, region: 'ukraine', diagOpen: false, keyOpen: true, probe: true, probeOpen: true,
+        // Side menu: which cards are open, which layers show their settings.
+        sections: { product: false, layers: true, map: false, region: false, time: false }, ovOpen: {},
         // Flight time calculator: airspeed m/s, departure in hours from now,
         // mode aim / tap (the points are not kept; the wind height is S.wind's).
         route: { on: false, airspeed: 22, depart: 0, mode: 'aim' }
@@ -1223,6 +1232,8 @@
     S.overlays = {};
     OVERLAYS.forEach(o => { S.overlays[o.id] = Object.assign({}, defaults.overlays[o.id], (stored.overlays || {})[o.id]); });
     S.wind = Object.assign({}, defaults.wind, stored.wind);
+    S.sections = Object.assign({}, defaults.sections, stored.sections);
+    S.ovOpen = Object.assign({}, stored.ovOpen);
     S.route = Object.assign({}, defaults.route, stored.route, { on: false });
     delete S.route.a; delete S.route.b; delete S.route.open;
     if (!['aim', 'tap'].includes(S.route.mode)) S.route.mode = 'aim';
@@ -2152,16 +2163,13 @@
         updateFavorites();
         map.on('zoomend', () => { updatePlaces(); updateRings(); updateFavorites(); });
 
-        // While the map moves the readout folds to its header (the crosshair
-        // stays in view, less to redraw) and nothing is asked for it; it
-        // reads again once the map has settled.
+        // Nothing is asked for the readout while the map moves; it reads
+        // again once the map has settled.
         map.on('movestart', () => {
             clearTimeout(R.moveTimer);
             clearTimeout(P.timer);
             try { P.controller && P.controller.abort(); } catch (err) {}
             if (P.loading) { P.loading = false; P.seq++; renderProbe(); }
-            root.classList.add('fs-moving');
-            fitSide();
         });
         map.on('move', renderProbeHeader);
         map.on('moveend', () => {
@@ -2174,8 +2182,6 @@
             }, 450);
             // Moved away from the forecast location: follow the crosshair.
             if (R.anchor && !anchorCentred()) R.anchor = null;
-            root.classList.remove('fs-moving');
-            fitSide();
             scheduleProbe(700);
             updatePlaces();
             if (windShown()) { clearTimeout(W.timer); W.timer = setTimeout(updateWind, 400); }
@@ -2541,7 +2547,7 @@
         const layer = activeLayer();
         const auto = S.product === 'auto';
         const autoOk = autoAvailable();
-        const autoRow = `<button type="button" data-map-product="auto" ${autoOk ? '' : 'disabled'} class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left border transition ${auto ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${autoOk ? '' : 'opacity-40 cursor-not-allowed'}">
+        const autoRow = `<button type="button" data-map-product="auto" ${autoOk ? '' : 'disabled'} class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left border transition ${auto ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${autoOk ? '' : 'opacity-40 cursor-not-allowed'}">
                 <i class="fa-solid fa-circle-half-stroke w-4 text-center ${auto ? 'text-cyan-400' : 'text-slate-500'}"></i>
                 <span class="flex-1 min-w-0"><span class="block truncate text-[12px]">${h(t('mapProduct_auto'))}</span>${auto ? `<span class="block text-[10px] text-slate-400 whitespace-normal leading-snug mt-0.5">${h(t('mapAutoDesc'))}</span>` : ''}</span>
                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">${h(t('mapRole_auto'))}</span>
@@ -2550,12 +2556,12 @@
             const list = R.resolved[p.id] || [];
             const available = list.length > 0;
             const active = S.product === p.id;
-            return `<button type="button" data-map-product="${p.id}" ${available ? '' : 'disabled'} class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left border transition ${active ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${available ? '' : 'opacity-40 cursor-not-allowed'}">
+            return `<button type="button" data-map-product="${p.id}" ${available ? '' : 'disabled'} class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left border transition ${active ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'} ${available ? '' : 'opacity-40 cursor-not-allowed'}">
                 <i class="fa-solid ${p.icon} w-4 text-center ${active ? 'text-cyan-400' : 'text-slate-500'}"></i>
                 <span class="flex-1 min-w-0"><span class="block truncate text-[12px]">${h(t('mapProduct_' + p.id))}</span>${available ? '' : `<span class="block text-[10px] text-slate-500">${h(t('mapNotFound'))}</span>`}</span>
                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">${h(t('mapRole_' + p.role))}</span>
             </button>`;
-        }).join('') + `<button type="button" data-map-product="none" class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left border transition ${S.product === 'none' ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'}">
+        }).join('') + `<button type="button" data-map-product="none" class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left border transition ${S.product === 'none' ? 'border-cyan-500/70 bg-cyan-950/40 text-white' : 'border-transparent hover:bg-slate-800/70'}">
                 <i class="fa-solid fa-ban w-4 text-center text-slate-500"></i><span class="flex-1 text-[12px]">${h(t('mapProduct_none'))}</span></button>`;
         const sources = S.product !== 'none' && !auto ? (R.resolved[S.product] || []) : [];
         const styleSelect = layer && (layer.styles || []).length > 1 ? `<label class="block mt-2"><span class="block text-[10px] text-slate-500 mb-1">Style</span>
@@ -2563,90 +2569,97 @@
         const opacity = (key, value) => `<label class="flex items-center gap-2 mt-2.5"><span class="text-[10px] text-slate-500 w-20 shrink-0">${h(t('mapOpacity'))}</span>
             <input type="range" min="0.1" max="1" step="0.05" value="${value}" data-map-opacity="${key}" class="flex-1 accent-cyan-500"></label>`;
 
+        // Each group is a card with a header (icon, name, what is set now)
+        // that folds; switched-on layers fold their own settings too.
+        const open = id => (id === 'diag' ? S.diagOpen : !!S.sections[id]);
+        const card = (id, icon, title, summary, body) => `<section class="rounded-xl border ${open(id) ? 'border-slate-700 bg-slate-900/70' : 'border-slate-800 bg-slate-900/40'}">
+            <button type="button" data-map-section="${id}" aria-expanded="${open(id)}" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-xl hover:bg-slate-800/40 transition">
+                <i class="fa-solid ${icon} w-4 text-center text-cyan-400"></i>
+                <span class="shrink-0 text-[11.5px] font-semibold text-slate-100 uppercase tracking-wider">${h(title)}</span>
+                <span class="flex-1 min-w-0 truncate text-right text-[11px] text-slate-400">${summary}</span>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform" style="${open(id) ? 'transform: rotate(180deg)' : ''}"></i>
+            </button>
+            ${open(id) ? `<div class="px-3 pb-3 pt-2.5 border-t border-slate-800">${body}</div>` : ''}
+        </section>`;
+        const fold = (attr, on, label) => `<button type="button" ${attr} aria-expanded="${on}" class="shrink-0 w-7 h-7 rounded-md text-slate-500 hover:text-white hover:bg-slate-800 transition" title="${h(label)}" aria-label="${h(label)}"><i class="fa-solid fa-sliders text-[11px]"></i></button>`;
+
         const overlayBlocks = OVERLAYS.map(o => {
             const list = R.ovLayers[o.id] || [];
             const cfg = S.overlays[o.id];
             const lay = overlayLayer(o.id);
             if (!list.length) {
-                return `<div class="flex items-center gap-2.5 opacity-50"><span class="fs-switch" aria-hidden="true"></span><i class="fa-solid ${o.icon} w-4 text-center text-slate-500"></i>
+                return `<div class="flex items-center gap-2.5 py-1 opacity-50"><span class="fs-switch" aria-hidden="true"></span><i class="fa-solid ${o.icon} w-4 text-center text-slate-500"></i>
                     <span class="flex-1 text-[12px] text-slate-300">${h(t('mapOv_' + o.id))}</span><span class="text-[10px] text-slate-500">${h(R.catalogStatus === 'loading' ? t('mapProbeLoading') : t('mapOvNone'))}</span></div>`;
             }
             const kind = o.id === 'precip' ? t('mapPrecipKind') : t('mapOvKind_' + o.id);
             const legend = lay ? legendUrl(lay) : '';
-            return `<div>
-                ${switchRow(`data-map-ov="${o.id}"`, cfg.on, o.icon, t('mapOv_' + o.id))}
-                ${cfg.on ? `<div class="pl-[3.6rem] mt-1.5">
+            const more = cfg.on && S.ovOpen[o.id];
+            return `<div class="${cfg.on ? 'rounded-lg bg-slate-950/40 -mx-1.5 px-1.5 py-1' : 'py-1'}">
+                <div class="flex items-center gap-1"><div class="flex-1 min-w-0">${switchRow(`data-map-ov="${o.id}"`, cfg.on, o.icon, t('mapOv_' + o.id))}</div>${cfg.on ? fold(`data-map-ovopen="${o.id}"`, !!more, t('mapLayerSettings')) : ''}</div>
+                <p id="mapOvInfo_${o.id}" class="${cfg.on ? '' : 'hidden'} pl-[3.6rem] text-[10.5px] text-slate-400 mt-0.5"></p>
+                ${more ? `<div class="pl-[3.6rem] mt-1.5 pb-1">
                     <p class="text-[10.5px] leading-snug text-slate-500">${h(kind)}</p>
                     ${sourcePicker(o.id, list, lay)}
                     ${opacity(o.id, cfg.opacity)}
                     ${lay && !covers(lay.bbox, regionBbox()) ? `<p class="text-[10px] text-amber-300 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${h(t('mapPrecipPartial'))}</p>` : ''}
-                    <p id="mapOvInfo_${o.id}" class="text-[10.5px] text-slate-400 mt-1.5"></p>
                     ${legend ? `<img src="${h(legend)}" alt="" class="mt-2 max-w-full rounded bg-white/90 p-1" loading="lazy" onerror="this.remove()">` : ''}
                 </div>` : ''}
             </div>`;
         }).join('');
-        const windBlock = `<div>
+        const windBlock = `<div class="${S.wind.on ? 'rounded-lg bg-slate-950/40 -mx-1.5 px-1.5 py-1' : 'py-1'}">
             ${switchRow('data-map-wind', S.wind.on, 'fa-wind', t('mapOv_wind'))}
-            ${S.wind.on ? `<div class="pl-[3.6rem] mt-1.5 space-y-1.5">
-                ${seg('windlevel', Object.keys(WIND_LEVELS).map(k => [k, h(t('rtLevel_' + k))]), S.wind.level)}
-                <p class="text-[10.5px] leading-snug text-slate-500">${h(t('mapWindKind'))}</p>
-                <p id="mapWindInfo" class="text-[10.5px] text-slate-400"></p>
+            ${S.wind.on ? `<div class="mt-1.5 space-y-1.5" title="${h(t('mapWindKind'))}">
+                <div class="fs-seg-full">${seg('windlevel', Object.keys(WIND_LEVELS).map(k => [k, h(t('rtLevel_' + k))]), S.wind.level)}</div>
+                <p id="mapWindInfo" class="pl-[3.6rem] text-[10.5px] text-slate-400"></p>
             </div>` : ''}
         </div>`;
 
         const hz = window.FlySkyHazard;
-        const hazardBlock = `<div>
+        const hazardBlock = `<div class="py-1" title="${h(t('mapHazardKind', { r: hz ? hz.alertKm : 50 }))}">
             ${switchRow('data-map-hazard', hazardEnabled(), 'fa-triangle-exclamation', t('mapHazardAlerts'))}
-            <div class="pl-[3.6rem] mt-1.5">
-                <p class="text-[10.5px] leading-snug text-slate-500">${h(t('mapHazardKind', { r: hz ? hz.alertKm : 50 }))}</p>
-                ${hazardEnabled() && hz ? `<p id="mapHazardStatus" class="text-[10.5px] text-slate-400 mt-1">${h(hz.statusText())}</p>` : ''}
-            </div>
+            ${hazardEnabled() && hz ? `<p id="mapHazardStatus" class="pl-[3.6rem] text-[10.5px] text-slate-400 mt-0.5">${h(hz.statusText())}</p>` : ''}
         </div>`;
 
         const regions = regionOptions();
+        const on = OVERLAYS.filter(o => S.overlays[o.id].on && (R.ovLayers[o.id] || []).length);
+        const layersSummary = on.map(o => `<i class="fa-solid ${o.icon} text-cyan-300 ml-1.5" title="${h(t('mapOv_' + o.id))}"></i>`).join('')
+            + (S.wind.on ? `<i class="fa-solid fa-wind text-cyan-300 ml-1.5"></i> <span class="font-mono">${h(t('rtLevel_' + S.wind.level))}</span>` : '')
+            + (hazardEnabled() ? `<i class="fa-solid fa-triangle-exclamation text-amber-300 ml-1.5" title="${h(t('mapHazardAlerts'))}"></i>` : '')
+            || h(t('mapNothingOn'));
+        const baseName = S.basemap === 'none' ? t('mapBase_none') : t('mapBase_' + S.basemap);
+        const regionName = (regions.find(r => r.id === S.region) || {}).label || '';
         root.innerHTML = `
-            <section>${sectionTitle('fa-satellite', 'mapProductTitle')}
-                <div class="space-y-1">${productRows}</div>
+            ${card('product', 'fa-satellite', t('mapProductTitle'), h(t('mapProduct_' + S.product)), `
+                <div class="space-y-0.5">${productRows}</div>
                 ${sourcePicker(S.product, sources, layer)}${styleSelect}
                 ${layer ? opacity('sat', S.opacity) : ''}
                 ${auto && layer ? `<p class="text-[10.5px] text-slate-400 mt-2"><i class="fa-solid fa-circle-half-stroke mr-1 text-slate-500"></i>${h(t('mapAutoNow', { name: t('mapProduct_' + shownProduct()) }))}</p>` : ''}
                 ${layer ? colourKeyHtml(layer) : ''}
-                <p class="text-[10px] text-slate-500 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>${h(t('mapDisclaimer'))}</p>
-            </section>
-            <section>${sectionTitle('fa-layer-group', 'mapOverlaysTitle')}
-                <div class="space-y-3">${overlayBlocks}${windBlock}${hazardBlock}</div>
-            </section>
-            <section>${sectionTitle('fa-map', 'mapBaseTitle')}
+                <p class="text-[10px] text-slate-500 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>${h(t('mapDisclaimer'))}</p>`)}
+            ${card('layers', 'fa-layer-group', t('mapOverlaysTitle'), layersSummary, `<div class="space-y-1.5">${overlayBlocks}${windBlock}${hazardBlock}</div>`)}
+            ${card('map', 'fa-map', t('mapBaseTitle'), h(baseName), `
                 ${seg('basemap', [['osmDark', h(t('mapBase_osmDark'))], ['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
                 <div class="space-y-2.5 mt-3">
                     ${switchRow('data-map-labels', S.labels, 'fa-font', t('mapLabels'))}
                     ${R.borderLayers.length ? switchRow('data-map-borders', S.borders, 'fa-draw-polygon', t('mapBorders')) : ''}
                     ${switchRow('data-map-rings', S.rings, 'fa-bullseye', t('mapRings'))}
                     ${switchRow('data-map-favs', S.favs, 'fa-star', t('mapFavs'))}
-                </div>
-            </section>
-            <section>${sectionTitle('fa-crop-simple', 'mapRegionTitle')}
+                </div>`)}
+            ${card('region', 'fa-crop-simple', t('mapRegionTitle'), h(regionName), `
                 <select data-map-region class="unit-select w-full">${regions.map(r => `<option value="${h(r.id)}" ${r.id === S.region ? 'selected' : ''}>${h(r.label)}</option>`).join('')}</select>
                 <div class="flex flex-wrap gap-1.5 mt-2">
                     <button type="button" data-map-draw class="chip py-1"><i class="fa-regular fa-square"></i> ${h(t('mapDraw'))}</button>
                     <button type="button" data-map-saveview class="chip py-1"><i class="fa-regular fa-bookmark"></i> ${h(t('mapSaveView'))}</button>
                     ${S.region.startsWith('saved:') ? `<button type="button" data-map-delregion class="chip py-1" title="${h(t('mapDeleteRegion'))}" aria-label="${h(t('mapDeleteRegion'))}"><i class="fa-regular fa-trash-can"></i></button>` : ''}
                 </div>
-                <form data-map-saveform class="hidden mt-2 flex gap-1.5"><input name="name" maxlength="40" placeholder="${h(t('mapSaveName'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"><button class="chip py-1"><i class="fa-solid fa-check"></i></button></form>
-            </section>
-            <section>${sectionTitle('fa-film', 'mapTimeTitle')}
+                <form data-map-saveform class="hidden mt-2 flex gap-1.5"><input name="name" maxlength="40" placeholder="${h(t('mapSaveName'))}" class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"><button class="chip py-1"><i class="fa-solid fa-check"></i></button></form>`)}
+            ${card('time', 'fa-film', t('mapTimeTitle'), `${h(t('mapWindowHours', { n: S.windowH }))} · ${h(t(S.utc ? 'mapUtc' : 'mapLocal'))}`, `
                 <div class="flex flex-wrap gap-2">
                     ${seg('window', MAP_CONFIG.windows.map(n => [n, h(t('mapWindowHours', { n }))]), S.windowH)}
                     ${seg('utc', [['1', h(t('mapUtc'))], ['0', h(t('mapLocal'))]], S.utc ? '1' : '0')}
-                </div>
-            </section>
-            <section>
-                <button type="button" data-map-diag class="w-full flex items-center gap-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider" aria-expanded="${S.diagOpen}">
-                    <i class="fa-solid fa-stethoscope"></i><span class="flex-1 text-left">${h(t('mapDiagTitle'))}</span><i class="fa-solid fa-chevron-down text-[10px] transition-transform" style="${S.diagOpen ? 'transform: rotate(180deg)' : ''}"></i>
-                </button>
-                <div id="mapDiag" class="${S.diagOpen ? '' : 'hidden'} mt-2"></div>
-            </section>
-            <p class="text-[10px] text-slate-500">${h(t('mapAttrNote'))}</p>`;
+                </div>`)}
+            ${card('diag', 'fa-stethoscope', t('mapDiagTitle'), '', '<div id="mapDiag"></div>')}
+            <p class="text-[10px] text-slate-500 px-1">${h(t('mapAttrNote'))}</p>`;
         renderDiagnostics();
         renderOverlayInfo();
         renderWindInfo();
@@ -2953,7 +2966,11 @@
                 savedRegions.splice(i, 1);
                 saveToStorage(MAP_CONFIG.regionsKey, savedRegions);
                 S.region = 'custom'; save(); renderPanel();
-            } else if (q('[data-map-diag]')) { S.diagOpen = !S.diagOpen; save(); renderPanel(); }
+            } else if (q('[data-map-section]')) {
+                const id = q('[data-map-section]').dataset.mapSection;
+                if (id === 'diag') S.diagOpen = !S.diagOpen; else S.sections[id] = !S.sections[id];
+                save(); renderPanel();
+            } else if (q('[data-map-ovopen]')) { const id = q('[data-map-ovopen]').dataset.mapOvopen; S.ovOpen[id] = !S.ovOpen[id]; save(); renderPanel(); }
             else if (q('[data-map-key]')) { S.keyOpen = !S.keyOpen; save(); renderPanel(); }
             else if (q('[data-map-probemin]')) { S.probeOpen = !S.probeOpen; save(); renderProbe(); }
             else if (q('[data-map-goforecast]')) setLocationHere();
@@ -2966,7 +2983,8 @@
             } else if (el.matches('[data-map-style]')) {
                 S.sources[`${el.dataset.mapStyle}#style`] = el.value; save(); reloadFrames();
             } else if (el.matches('[data-map-ov]')) {
-                S.overlays[el.dataset.mapOv].on = el.checked; save(); renderAllMapUi(); reloadFrames();
+                // Switched on: its settings show (fold them with the sliders button).
+                S.overlays[el.dataset.mapOv].on = el.checked; if (el.checked) S.ovOpen[el.dataset.mapOv] = true; save(); renderAllMapUi(); reloadFrames();
             } else if (el.matches('[data-map-wind]')) {
                 S.wind.on = el.checked; save(); renderAllMapUi(); updateWind();
             } else if (el.matches('[data-map-labels]')) {

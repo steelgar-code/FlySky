@@ -9,7 +9,7 @@ const tileHosts = new Set();
 page.on('request', r => { const u = r.url(); if (/tile|basemaps/.test(u)) tileHosts.add(new URL(u).hostname); });
 const { log } = await routeAll(page, {});
 await page.goto(BASE_URL);
-await page.evaluate(() => localStorage.setItem('flysky_map_settings', JSON.stringify({ basemap: 'dark', product: 'fog', productAt: Date.now() })));
+await page.evaluate(() => localStorage.setItem('flysky_map_settings', JSON.stringify({ basemap: 'dark', product: 'fog', productAt: Date.now(), sections: { product: true, layers: true, map: true, region: true, time: true } })));
 await page.click('[data-view="map"]');
 await page.waitForTimeout(3000);
 const satReqs = () => log.getmap.filter(g => /rgb_fog/.test(g.layer));
