@@ -1,5 +1,7 @@
 # FlySky Weather Forecasts
 
+English · [Українська](README.uk.md) · [Português (BR)](README.pt-BR.md)
+
 Weather for drone/UAV pilots. Instead of a single "best guess", FlySky shows the full spread of answers from several weather models, so you can see how likely rain, strong wind, gusts, low clouds or poor visibility really are over the coming hours or week — and checks it against live satellite imagery. Runs entirely in your browser, no backend required.
 
 The app has two views, switched with the buttons in the header: **Forecast** and **Satellite map**.
