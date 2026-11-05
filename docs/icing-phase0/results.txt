@@ -546,3 +546,31 @@ D3  flight level 950 hPa (bracketing for IFS/AIFS/JMA) vs 925 hPa (native everyw
    MF        78%    73%    66%   100%    80%    75%
    UKMO      83%    77%    74%    80%   100%    77%
    GFS       77%    75%    71%    75%    77%   100%
+
+## layers.py (level drift, icing layers)
+=== kyiv (elevation 169 m), winter 2025/26, 2160 h
+  ICON: Q1 nearest level to a fixed 400 m AGL: 975 hPa 5%, 950 hPa 73%, 925 hPa 22% | 950 hPa minus 400 m: p5 -186 / p50 -20 / p95 +106 m
+  ICON: Q3 hours with an icing layer (975–850 hPa or ground fog): 1291 (60% of hours)
+      base: ground: 47%, 950: 26%, 925: 12%, 900: 6%, 850: 9%
+      top:  ground: 1%, 975: 0%, 950: 16%, 925: 18%, 900: 22%, 850: 44%
+      clear below 400 m (base at 925 hPa or higher): 28% | top below 850 hPa with no icing signs at the next level up: 29% (and dry or above 0 °C there: 29%) | layer reaches 850 hPa (~1.3 km) or above: 44% | two separate layers: 6%
+      temperature at red levels: 0…−5 °C 56%, −5…−10 °C 28%, −10…−15 °C 14%, −15…−20 °C 2%
+  UKMO: Q1 nearest level to a fixed 400 m AGL: 975 hPa 5%, 950 hPa 73%, 925 hPa 22% | 950 hPa minus 400 m: p5 -187 / p50 -19 / p95 +106 m
+  UKMO: Q3 hours with an icing layer (975–850 hPa or ground fog): 1554 (72% of hours)
+      base: ground: 60%, 950: 15%, 925: 11%, 900: 5%, 850: 9%
+      top:  ground: 15%, 975: 8%, 950: 11%, 925: 15%, 900: 16%, 850: 36%
+      clear below 400 m (base at 925 hPa or higher): 25% | top below 850 hPa with no icing signs at the next level up: 31% (and dry or above 0 °C there: 31%) | layer reaches 850 hPa (~1.3 km) or above: 36% | two separate layers: 6%
+      temperature at red levels: 0…−5 °C 55%, −5…−10 °C 31%, −10…−15 °C 12%, −15…−20 °C 2%
+=== zap (elevation 117 m), winter 2025/26, 2160 h
+  ICON: Q1 nearest level to a fixed 400 m AGL: 975 hPa 18%, 950 hPa 76%, 925 hPa 7% | 950 hPa minus 400 m: p5 -120 / p50 +38 / p95 +135 m
+  ICON: Q3 hours with an icing layer (975–850 hPa or ground fog): 1111 (51% of hours)
+      base: ground: 48%, 950: 20%, 925: 13%, 900: 7%, 850: 12%
+      top:  ground: 2%, 975: 2%, 950: 14%, 925: 10%, 900: 24%, 850: 49%
+      clear below 400 m (base at 925 hPa or higher): 32% | top below 850 hPa with no icing signs at the next level up: 25% (and dry or above 0 °C there: 25%) | layer reaches 850 hPa (~1.3 km) or above: 49% | two separate layers: 5%
+      temperature at red levels: 0…−5 °C 58%, −5…−10 °C 31%, −10…−15 °C 10%, −15…−20 °C 0%
+  UKMO: Q1 nearest level to a fixed 400 m AGL: 975 hPa 19%, 950 hPa 74%, 925 hPa 7% | 950 hPa minus 400 m: p5 -118 / p50 +40 / p95 +138 m
+  UKMO: Q3 hours with an icing layer (975–850 hPa or ground fog): 1253 (58% of hours)
+      base: ground: 57%, 950: 18%, 925: 12%, 900: 6%, 850: 8%
+      top:  ground: 1%, 975: 13%, 950: 12%, 925: 15%, 900: 19%, 850: 40%
+      clear below 400 m (base at 925 hPa or higher): 25% | top below 850 hPa with no icing signs at the next level up: 32% (and dry or above 0 °C there: 32%) | layer reaches 850 hPa (~1.3 km) or above: 40% | two separate layers: 7%
+      temperature at red levels: 0…−5 °C 56%, −5…−10 °C 27%, −10…−15 °C 15%, −15…−20 °C 2%
