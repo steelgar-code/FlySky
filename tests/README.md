@@ -53,6 +53,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
 | `hazard-alerts.mjs` | nearby-hazard alerts: movement read back for a new alert (small images, last 40 min, once), "Show" on the map alert (layer on, cell in view), time bar hidden with nothing to show / in the calculator, time pill |
 | `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
+| `icing-engine.mjs` | icing engine (`icing.js`, not wired into the app yet) — Node only, no browser: request and call cost, response split per model, level rules, RH conversion, surface cues (fog, freezing rain incl. warm nose), heights (below-ground masking, missing levels, high ground), a flight's climb / cruise / descent, icing layers, two models (red if either, model beyond its forecast length), thresholds |
 | `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
 
 Notes:
