@@ -1,0 +1,548 @@
+# Phase 0 results — generated 2026-11-05T01:13Z from the saved responses (live API run 2026-11-05 00:05–00:40 UTC)
+
+## ensemble.py (V7)
+925 hPa temperature / relative humidity: member columns with any value
+icon_eu_eps                      cost   8.0  T   0/ 40  RH   0/ 40
+icon_seamless                    cost   8.0  T   0/ 40  RH   0/ 40
+ecmwf_ifs025                     cost  10.2  T  51/ 51  RH  51/ 51
+ecmwf_ifs_europe_ensemble        cost  10.2  T   0/ 51  RH   0/ 51
+ecmwf_aifs025                    cost  10.2  T  51/ 51  RH  51/ 51
+google_weathernext2_ensemble     cost  12.8  T  64/ 64  RH  64/ 64
+gfs_seamless                     cost   6.2  T  31/ 31  RH  31/ 31
+ukmo_global_ensemble_20km        cost   3.6  T   0/ 18  RH   0/ 18
+gem_global                       cost   4.2  T   0/ 21  RH   0/ 21
+bom_access_global_ensemble       cost   3.6  T   0/ 18  RH   0/ 18
+
+Other low levels, for the ensembles that have 925 hPa
+ecmwf_ifs025                   cost  20.4 1000:yes  975:—  950:—  900:—
+ecmwf_aifs025                  cost  20.4 1000:yes  975:—  950:—  900:—
+google_weathernext2_ensemble   cost  25.6 1000:yes  975:—  950:—  900:—
+gfs_seamless                   cost  12.4 1000:yes  975:—  950:—  900:—
+
+## analyze.py
+
+====================================================================================================
+V9  X-RateLimit-Cost per request
+====================================================================================================
+v7_icon_eu_eps                     cost 8.0
+v7_icon_seamless                   cost 8.0
+v7_ecmwf_ifs025                    cost 10.2
+v7_ecmwf_ifs_europe_ensemble       cost 10.2
+v7_ecmwf_aifs025                   cost 10.2
+v7_google_weathernext2_ensemble    cost 12.8
+v7_gfs_seamless                    cost 6.2
+v7_ukmo_global_ensemble_20km       cost 3.6
+v7_gem_global                      cost 4.2
+v7_bom_access_global_ensemble      cost 3.6
+v7b_ecmwf_ifs025                   cost 20.4
+v7b_ecmwf_aifs025                  cost 20.4
+v7b_google_weathernext2_ensemble   cost 25.6
+v7b_gfs_seamless                   cost 12.4
+live_v1_kyiv                       cost 38.4
+live_v1_zap                        cost 38.4
+live_v1_carp                       cost 38.4
+live_v2_bm4                        cost 4.0
+live_v2_2m4                        cost 4.0
+live_v2_bm_kyiv                    cost 1.5
+live_v9_r16_5v                     cost 16.0
+live_v9_r16_2v                     cost 16.0
+live_v9_icing5                     cost 8.5
+hist_win_kyiv_12                   cost 47.82857  (8 models in one archive request: stream failed "timeoutReached" — billed anyway)
+hw_kyiv_icon_seamless              cost 17.357143
+hw_zap_icon_seamless               cost 17.357143
+hw_kyiv_ecmwf_ifs025               cost 17.357143
+hw_kyiv_ecmwf_aifs025_single       cost 17.357143
+hw_kyiv_meteofrance_seamless       cost 17.357143
+hw_kyiv_ukmo_seamless              cost 17.357143
+hw_kyiv_gfs_seamless               cost 17.357143
+hw_kyiv_gem_seamless               cost 17.357143
+hw_kyiv_jma_seamless               cost 17.357143
+hw_zap_icon_seamless               cost 17.357143
+hw_zap_ecmwf_ifs025                cost 17.357143
+hw_zap_ecmwf_aifs025_single        cost 17.357143
+hw_zap_meteofrance_seamless        cost 17.357143
+hw_zap_ukmo_seamless               cost 17.357143
+hw_zap_gfs_seamless                cost 17.357143
+
+====================================================================================================
+V1  kyiv: share of the 192 forecast hours (8 days) with a value — T / RH / gph per level   (elevation 169.0 m, cell 50.4375,30.5)
+====================================================================================================
+   level           ICON           IFS          AIFS            MF          UKMO           GFS           GEM           JMA
+ 1000hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  985hPa              —             —             —             —             —             —   100/100/100             —
+  975hPa       88/88/88             —             —             —      82/82/82   100/100/100             —             —
+  970hPa              —             —             —             —             —             —   100/100/100             —
+  950hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  925hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  900hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  875hPa              —             —             —             —             —   100/100/100   100/100/100             —
+  850hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  800hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  700hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+        temperature_2m          88        100        100         51         82        100        100        100
+  relative_humidity_2m          88        100        100         51         82        100        100        100
+       temperature_80m          88          —          —         51          —        100        100          —
+      temperature_120m          88          —          —         51          —        100        100          —
+      temperature_180m          88          —          —         51          —          —          —          —
+          weather_code          88        100        100         51         82        100        100        100
+            visibility          60          —          —          —         82        100          —          —
+       cloud_cover_low          88        100        100         51         82        100        100        100
+ freezing_level_height          88          —          —          —          —        100          —          —
+      surface_pressure          88        100        100         51         82        100        100        100
+last hour with T925 | T950 | T2m:
+   ICON       11-12T00     11-12T00     11-12T00
+   IFS        11-12T23            —     11-12T23
+   AIFS       11-12T23            —     11-12T23
+   MF         11-09T00     11-09T00     11-09T00
+   UKMO       11-11T12     11-11T12     11-11T12
+   GFS        11-12T23     11-12T23     11-12T23
+   GEM        11-12T23     11-12T23     11-12T23
+   JMA        11-12T23            —     11-12T23
+
+====================================================================================================
+V1  zap: share of the 192 forecast hours (8 days) with a value — T / RH / gph per level   (elevation 117.0 m, cell 47.875,35.8125)
+====================================================================================================
+   level           ICON           IFS          AIFS            MF          UKMO           GFS           GEM           JMA
+ 1000hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  985hPa              —             —             —             —             —             —   100/100/100             —
+  975hPa       88/88/88             —             —             —      82/82/82   100/100/100             —             —
+  970hPa              —             —             —             —             —             —   100/100/100             —
+  950hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  925hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  900hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  875hPa              —             —             —             —             —   100/100/100   100/100/100             —
+  850hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  800hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  700hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+        temperature_2m          88        100        100         51         82        100        100        100
+  relative_humidity_2m          88        100        100         51         82        100        100        100
+       temperature_80m          88          —          —         51          —        100        100          —
+      temperature_120m          88          —          —         51          —        100        100          —
+      temperature_180m          88          —          —         51          —          —          —          —
+          weather_code          88        100        100         51         82        100        100        100
+            visibility          60          —          —          —         82        100          —          —
+       cloud_cover_low          88        100        100         51         82        100        100        100
+ freezing_level_height          88          —          —          —          —        100          —          —
+      surface_pressure          88        100        100         51         82        100        100        100
+last hour with T925 | T950 | T2m:
+   ICON       11-12T00     11-12T00     11-12T00
+   IFS        11-12T23            —     11-12T23
+   AIFS       11-12T23            —     11-12T23
+   MF         11-09T00     11-09T00     11-09T00
+   UKMO       11-11T12     11-11T12     11-11T12
+   GFS        11-12T23     11-12T23     11-12T23
+   GEM        11-12T23     11-12T23     11-12T23
+   JMA        11-12T23            —     11-12T23
+
+====================================================================================================
+V1  carp: share of the 192 forecast hours (8 days) with a value — T / RH / gph per level   (elevation 2025.0 m, cell 48.125,24.5)
+====================================================================================================
+   level           ICON           IFS          AIFS            MF          UKMO           GFS           GEM           JMA
+ 1000hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  985hPa              —             —             —             —             —             —   100/100/100             —
+  975hPa       88/88/88             —             —             —      82/82/82   100/100/100             —             —
+  970hPa              —             —             —             —             —             —   100/100/100             —
+  950hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  925hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  900hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  875hPa              —             —             —             —             —   100/100/100   100/100/100             —
+  850hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+  800hPa       88/88/88             —             —      51/51/51      82/82/82   100/100/100   100/100/100             —
+  700hPa       88/88/88   100/100/100   100/100/100      51/51/51      82/82/82   100/100/100   100/100/100   100/100/100
+        temperature_2m          88        100        100         51         82        100        100        100
+  relative_humidity_2m          88        100        100         51         82        100        100        100
+       temperature_80m          88          —          —         51          —        100        100          —
+      temperature_120m          88          —          —         51          —        100        100          —
+      temperature_180m          88          —          —         51          —          —          —          —
+          weather_code          88        100        100         51         82        100        100        100
+            visibility          60          —          —          —         82        100          —          —
+       cloud_cover_low          88        100        100         51         82        100        100        100
+ freezing_level_height          88          —          —          —          —        100          —          —
+      surface_pressure          88        100        100         51         82        100        100        100
+last hour with T925 | T950 | T2m:
+   ICON       11-12T00     11-12T00     11-12T00
+   IFS        11-12T23            —     11-12T23
+   AIFS       11-12T23            —     11-12T23
+   MF         11-09T00     11-09T00     11-09T00
+   UKMO       11-11T12     11-11T12     11-11T12
+   GFS        11-12T23     11-12T23     11-12T23
+   GEM        11-12T23     11-12T23     11-12T23
+   JMA        11-12T23            —     11-12T23
+
+====================================================================================================
+V5  carp: level height above the response elevation (2025.0 m): median [min..max] of gph − elevation; "bg" = hours with level pressure > model surface_pressure but a temperature returned
+====================================================================================================
+ICON  sp  798.3 | 1000: -1806 [-1845..-1762] bg169 | 975: -1598 [-1637..-1557] bg169 | 950: -1385 [-1425..-1348] bg169 | 925: -1168 [-1209..-1135] bg169 | 900: -945 [-988..-916] bg169 | 850: -489 [-530..-458] bg169
+IFS   sp  796.2 | 1000: -1815 [-1899..-1763] bg192 | 975: — | 950: — | 925: -1175 [-1265..-1137] bg192 | 900: — | 850: -500 [-585..-456] bg192
+AIFS  sp  795.8 | 1000: -1815 [-1987..-1761] bg192 | 975: — | 950: — | 925: -1180 [-1340..-1136] bg192 | 900: — | 850: -500 [-648..-463] bg192
+MF    sp  798.1 | 1000: -1791 [-1825..-1759] bg97 | 975: — | 950: -1369 [-1404..-1347] bg97 | 925: -1151 [-1186..-1134] bg97 | 900: -927 [-964..-916] bg97 | 850: -470 [-508..-458] bg97
+UKMO  sp  796.6 | 1000: -1803 [-1890..-1777] bg157 | 975: -1593 [-1681..-1569] bg157 | 950: -1381 [-1468..-1356] bg157 | 925: -1166 [-1250..-1139] bg157 | 900: -945 [-1027..-917] bg157 | 850: -488 [-570..-458] bg157
+GFS   sp  796.3 | 1000: -1821 [-1902..-1763] bg192 | 975: -1610 [-1696..-1558] bg192 | 950: -1400 [-1486..-1349] bg192 | 925: -1183 [-1271..-1135] bg192 | 900: -962 [-1051..-913] bg192 | 850: -501 [-596..-456] bg192
+GEM   sp  795.8 | 1000: -1808 [-2040..-1763] bg192 | 975: — | 950: -1395 [-1612..-1353] bg192 | 925: -1181 [-1390..-1140] bg192 | 900: -962 [-1162..-921] bg192 | 850: -504 [-688..-465] bg192
+JMA   sp  797.7 | 1000: -1809 [-1996..-1770] bg192 | 975: — | 950: — | 925: -1177 [-1339..-1142] bg192 | 900: — | 850: -500 [-632..-466] bg192
+
+====================================================================================================
+V5  kyiv: level height above the response elevation (169.0 m): median [min..max] of gph − elevation; "bg" = hours with level pressure > model surface_pressure but a temperature returned
+====================================================================================================
+ICON  sp 1004.2 | 1000: 35 [-32..74] bg28 | 975: 238 [174..278] | 950: 446 [385..486] | 925: 659 [600..698] | 900: 878 [819..917] | 850: 1332 [1273..1373]
+IFS   sp 1001.8 | 1000: 15 [-59..88] bg75 | 975: — | 950: — | 925: 642 [567..715] | 900: — | 850: 1316 [1241..1381]
+AIFS  sp 1002.3 | 1000: 18 [-144..67] bg76 | 975: — | 950: — | 925: 646 [497..693] | 900: — | 850: 1318 [1180..1360]
+MF    sp 1005.7 | 1000: 45 [-41..71] bg22 | 975: — | 950: 456 [376..484] | 925: 669 [591..697] | 900: 886 [811..915] | 850: 1335 [1265..1367]
+UKMO  sp 1003.4 | 1000: 29 [-60..87] bg52 | 975: 233 [143..290] | 950: 440 [351..497] | 925: 652 [562..709] | 900: 871 [780..926] | 850: 1324 [1233..1373]
+GFS   sp 1001.5 | 1000: 12 [-71..60] bg81 | 975: 216 [136..263] | 950: 424 [347..471] | 925: 638 [562..683] | 900: 858 [781..899] | 850: 1310 [1236..1350]
+GEM   sp 1000.0 | 1000: 1 [-192..67] bg95 | 975: — | 950: 413 [234..474] | 925: 626 [446..685] | 900: 842 [674..902] | 850: 1295 [1135..1356]
+JMA   sp 1001.0 | 1000: 8 [-149..57] bg89 | 975: — | 950: — | 925: 645 [488..684] | 900: — | 850: 1312 [1184..1351]
+
+====================================================================================================
+V5  zap: level height above the response elevation (117.0 m): median [min..max] of gph − elevation; "bg" = hours with level pressure > model surface_pressure but a temperature returned
+====================================================================================================
+ICON  sp 1008.7 | 1000: 71 [-8..129] bg6 | 975: 277 [199..332] | 950: 487 [410..540] | 925: 701 [625..753] | 900: 919 [844..970] | 850: 1372 [1298..1424]
+IFS   sp 1007.9 | 1000: 64 [-13..151] bg17 | 975: — | 950: — | 925: 691 [624..772] | 900: — | 850: 1360 [1299..1436]
+AIFS  sp 1008.8 | 1000: 70 [-58..129] bg30 | 975: — | 950: — | 925: 698 [588..751] | 900: — | 850: 1366 [1281..1416]
+MF    sp 1008.0 | 1000: 64 [-11..123] bg7 | 975: — | 950: 476 [406..534] | 925: 689 [621..745] | 900: 906 [840..962] | 850: 1358 [1294..1411]
+UKMO  sp 1008.0 | 1000: 66 [-32..150] bg22 | 975: 271 [175..353] | 950: 479 [387..560] | 925: 692 [602..771] | 900: 908 [823..985] | 850: 1359 [1282..1430]
+GFS   sp 1006.5 | 1000: 53 [-46..108] bg29 | 975: 260 [163..313] | 950: 470 [375..522] | 925: 685 [593..735] | 900: 904 [815..953] | 850: 1356 [1275..1403]
+GEM   sp 1005.9 | 1000: 48 [-112..132] bg52 | 975: — | 950: 464 [324..540] | 925: 678 [546..750] | 900: 898 [778..965] | 850: 1352 [1251..1419]
+JMA   sp 1006.0 | 1000: 50 [-78..109] bg55 | 975: — | 950: — | 925: 677 [579..736] | 900: — | 850: 1344 [1276..1413]
+
+====================================================================================================
+V6  hours with a value per forecast day (24 = hourly) — T925, T2m
+====================================================================================================
+ICON  temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 1]   mean |dev from linear 3-h| 0.155
+ICON  temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 1]   mean |dev from linear 3-h| 0.120
+IFS   temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.054
+IFS   temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.098
+AIFS  temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.056
+AIFS  temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.111
+MF    temperature_925hPa   per day [24, 24, 24, 24, 1, 0, 0, 0]   mean |dev from linear 3-h| 0.156
+MF    temperature_2m       per day [24, 24, 24, 24, 1, 0, 0, 0]   mean |dev from linear 3-h| 0.165
+UKMO  temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 13, 0]   mean |dev from linear 3-h| 0.114
+UKMO  temperature_2m       per day [24, 24, 24, 24, 24, 24, 13, 0]   mean |dev from linear 3-h| 0.103
+GFS   temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.095
+GFS   temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.121
+GEM   temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.165
+GEM   temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.147
+JMA   temperature_925hPa   per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.094
+JMA   temperature_2m       per day [24, 24, 24, 24, 24, 24, 24, 24]   mean |dev from linear 3-h| 0.133
+
+====================================================================================================
+V2  best_match at Kyiv: share of hours with a value per level, and mean |difference| to each model (0 = same source)
+====================================================================================================
+best_match cell 50.423317 30.491209 | v1 cell 50.4375 30.5
+temperature_1000hPa        have 100.0%  ICON:0.13 IFS:1.24 AIFS:1.31 MF:0.63 UKMO:1.04 GFS:1.46 GEM:1.73 JMA:1.58
+relative_humidity_1000hPa  have 100.0%  ICON:0.59 IFS:7.25 AIFS:3.97 MF:6.25 UKMO:12.29 GFS:9.23 GEM:6.21 JMA:8.03
+temperature_975hPa         have 100.0%  ICON:0.12 IFS:— AIFS:— MF:— UKMO:1.02 GFS:1.56 GEM:— JMA:—
+relative_humidity_975hPa   have 100.0%  ICON:0.96 IFS:— AIFS:— MF:— UKMO:9.18 GFS:9.64 GEM:— JMA:—
+temperature_950hPa         have 100.0%  ICON:0.12 IFS:— AIFS:— MF:0.73 UKMO:1.32 GFS:1.70 GEM:2.17 JMA:—
+relative_humidity_950hPa   have 100.0%  ICON:1.44 IFS:— AIFS:— MF:8.57 UKMO:8.13 GFS:9.62 GEM:9.69 JMA:—
+temperature_925hPa         have 100.0%  ICON:0.14 IFS:1.58 AIFS:1.85 MF:0.98 UKMO:1.91 GFS:1.61 GEM:2.40 JMA:2.56
+relative_humidity_925hPa   have 100.0%  ICON:1.57 IFS:14.98 AIFS:11.40 MF:11.68 UKMO:12.97 GFS:10.13 GEM:16.15 JMA:13.74
+temperature_900hPa         have 100.0%  ICON:0.11 IFS:— AIFS:— MF:1.33 UKMO:2.20 GFS:1.22 GEM:2.21 JMA:—
+relative_humidity_900hPa   have 100.0%  ICON:2.14 IFS:— AIFS:— MF:15.58 UKMO:18.38 GFS:14.53 GEM:17.88 JMA:—
+temperature_850hPa         have 100.0%  ICON:0.09 IFS:1.63 AIFS:2.22 MF:0.98 UKMO:2.06 GFS:1.10 GEM:2.00 JMA:2.48
+relative_humidity_850hPa   have 100.0%  ICON:2.09 IFS:18.64 AIFS:19.62 MF:12.90 UKMO:20.11 GFS:16.11 GEM:24.20 JMA:21.32
+T925 equal to ICON for hours 0..153 (92 h)
+T925 equal to IFS for hours 182..182 (1 h)
+T925 equal to GFS for hours 52..191 (25 h)
+live_v2_bm4: 4 location objects; keys of first hourly: ['geopotential_height_950hPa', 'relative_humidity_950hPa', 'temperature_950hPa', 'time', 'wind_direction_950hPa', 'wind_speed_950hPa']
+    50.423317 30.491209 elev 169.0 wind_speed_950hPa:100.0% wind_direction_950hPa:100.0% temperature_950hPa:100.0% relative_humidity_950hPa:100.0% geopotential_height_950hPa:100.0%
+    50.56425 30.699791 elev 157.0 wind_speed_950hPa:100.0% wind_direction_950hPa:100.0% temperature_950hPa:100.0% relative_humidity_950hPa:100.0% geopotential_height_950hPa:100.0%
+    50.664803 30.949589 elev 115.0 wind_speed_950hPa:100.0% wind_direction_950hPa:100.0% temperature_950hPa:100.0% relative_humidity_950hPa:100.0% geopotential_height_950hPa:100.0%
+    50.76052 31.1053 elev 114.0 wind_speed_950hPa:100.0% wind_direction_950hPa:100.0% temperature_950hPa:100.0% relative_humidity_950hPa:100.0% geopotential_height_950hPa:100.0%
+live_v2_2m4: 4 location objects; keys of first hourly: ['geopotential_height_950hPa_ecmwf_ifs025', 'geopotential_height_950hPa_icon_seamless', 'relative_humidity_950hPa_ecmwf_ifs025', 'relative_humidity_950hPa_icon_seamless', 'temperature_950hPa_ecmwf_ifs025', 'temperature_950hPa_icon_seamless', 'time', 'wind_direction_950hPa_ecmwf_ifs025', 'wind_direction_950hPa_icon_seamless', 'wind_speed_950hPa_ecmwf_ifs025', 'wind_speed_950hPa_icon_seamless']
+    50.4375 30.5 elev 169.0 wind_speed_950hPa_icon_seamless:100.0% wind_direction_950hPa_icon_seamless:100.0% temperature_950hPa_icon_seamless:100.0% relative_humidity_950hPa_icon_seamless:100.0% geopotential_height_950hPa_icon_seamless:100.0% wind_speed_950hPa_ecmwf_ifs025:  0.0% wind_direction_950hPa_ecmwf_ifs025:  0.0% temperature_950hPa_ecmwf_ifs025:  0.0% relative_humidity_950hPa_ecmwf_ifs025:  0.0% geopotential_height_950hPa_ecmwf_ifs025:  0.0%
+    50.5625 30.75 elev 157.0 wind_speed_950hPa_icon_seamless:100.0% wind_direction_950hPa_icon_seamless:100.0% temperature_950hPa_icon_seamless:100.0% relative_humidity_950hPa_icon_seamless:100.0% geopotential_height_950hPa_icon_seamless:100.0% wind_speed_950hPa_ecmwf_ifs025:  0.0% wind_direction_950hPa_ecmwf_ifs025:  0.0% temperature_950hPa_ecmwf_ifs025:  0.0% relative_humidity_950hPa_ecmwf_ifs025:  0.0% geopotential_height_950hPa_ecmwf_ifs025:  0.0%
+    50.625 30.9375 elev 115.0 wind_speed_950hPa_icon_seamless:100.0% wind_direction_950hPa_icon_seamless:100.0% temperature_950hPa_icon_seamless:100.0% relative_humidity_950hPa_icon_seamless:100.0% geopotential_height_950hPa_icon_seamless:100.0% wind_speed_950hPa_ecmwf_ifs025:  0.0% wind_direction_950hPa_ecmwf_ifs025:  0.0% temperature_950hPa_ecmwf_ifs025:  0.0% relative_humidity_950hPa_ecmwf_ifs025:  0.0% geopotential_height_950hPa_ecmwf_ifs025:  0.0%
+    50.75 31.125 elev 114.0 wind_speed_950hPa_icon_seamless:100.0% wind_direction_950hPa_icon_seamless:100.0% temperature_950hPa_icon_seamless:100.0% relative_humidity_950hPa_icon_seamless:100.0% geopotential_height_950hPa_icon_seamless:100.0% wind_speed_950hPa_ecmwf_ifs025:  0.0% wind_direction_950hPa_ecmwf_ifs025:  0.0% temperature_950hPa_ecmwf_ifs025:  0.0% relative_humidity_950hPa_ecmwf_ifs025:  0.0% geopotential_height_950hPa_ecmwf_ifs025:  0.0%
+
+====================================================================================================
+V3a dew point returned vs dew point from T and RH (Magnus over water): mean |diff| — 0 means dew point is derived from RH
+====================================================================================================
+ICON  925: 0.03  850: 0.03  700: 0.10
+IFS   925: 0.03  850: 0.03  700: 0.10
+AIFS  925: 0.03  850: 0.03  700: 0.08
+MF    925: 0.04  850: 0.03  700: 0.11
+UKMO  925: 0.03  850: 0.03  700: 0.10
+GFS   925: 0.03  850: 0.03  700: 0.09
+GEM   925: 0.03  850: 0.04  700: 0.13
+JMA   925: 0.03  850: 0.03  700: 0.13
+
+====================================================================================================
+V3b RH at cold levels, winter 2025/26 (Dec–Feb): RH p50 / p95 / p99 / max, hours > 100 %; "ice sat." = RH over water of air saturated over ice at the median T (water-RH models cannot exceed it much)
+====================================================================================================
+-- kyiv
+  300 hPa
+    ICON  T50  -52.5  RH    40    62    64    66  >100:    0   ice sat.    60%
+    IFS   T50  -52.5  RH    64   100   100   100  >100:    0   ice sat.    60%
+    AIFS  T50  -52.5  RH    42    92   100   100  >100:    0   ice sat.    60%
+    MF    T50  -52.5  RH    60   100   100   100  >100:    0   ice sat.    60%
+    UKMO  T50  -52.5  RH    38    68    74    92  >100:    0   ice sat.    60%
+    GFS   T50  -52.5  RH    64   100   100   100  >100:    0   ice sat.    60%
+    GEM   T50  -52.5  RH    38    60    62    68  >100:    0   ice sat.    60%
+    JMA   T50  -52.5  RH    62    96   100   100  >100:    0   ice sat.    60%
+  500 hPa
+    ICON  T50  -25.9  RH    40    83    84    89  >100:    0   ice sat.    77%
+    IFS   T50  -26.1  RH    50   100   100   100  >100:    0   ice sat.    77%
+    AIFS  T50  -26.1  RH    41    83   100   100  >100:    0   ice sat.    77%
+    MF    T50  -26.1  RH    49    97   100   100  >100:    0   ice sat.    77%
+    UKMO  T50  -26.1  RH    43    81    84    93  >100:    0   ice sat.    77%
+    GFS   T50  -25.9  RH    51   100   100   100  >100:    0   ice sat.    77%
+    GEM   T50  -25.9  RH    39    79    80    84  >100:    0   ice sat.    77%
+    JMA   T50  -25.9  RH    47    93    99   100  >100:    0   ice sat.    77%
+  850 hPa
+    ICON  T50   -4.7  RH    75   100   100   100  >100:    0   ice sat.    95%
+    IFS   T50   -4.2  RH    77   100   100   100  >100:    0   ice sat.    96%
+    AIFS  T50   -4.2  RH    74    99   100   100  >100:    0   ice sat.    96%
+    MF    T50   -4.2  RH    72   100   100   100  >100:    0   ice sat.    96%
+    UKMO  T50   -4.1  RH    74   100   100   100  >100:    0   ice sat.    96%
+    GFS   T50   -4.8  RH    77   100   100   100  >100:    0   ice sat.    95%
+    GEM   T50   -4.0  RH    70    99   100   100  >100:    0   ice sat.    96%
+    JMA   T50   -4.6  RH    74    95    98   100  >100:    0   ice sat.    96%
+  925 hPa
+    ICON  T50   -4.2  RH    89   100   100   100  >100:    0   ice sat.    96%
+    IFS   T50   -4.4  RH    96   100   100   100  >100:    0   ice sat.    96%
+    AIFS  T50   -4.5  RH    90   100   100   100  >100:    0   ice sat.    96%
+    MF    T50   -4.6  RH    89   100   100   100  >100:    0   ice sat.    96%
+    UKMO  T50   -4.4  RH    88   100   100   100  >100:    0   ice sat.    96%
+    GFS   T50   -4.3  RH    87   100   100   100  >100:    0   ice sat.    96%
+    GEM   T50   -4.4  RH    87    99   100   100  >100:    0   ice sat.    96%
+    JMA   T50   -4.5  RH    84    99   100   100  >100:    0   ice sat.    96%
+-- zap
+  300 hPa
+    ICON  T50  -52.0  RH    42    64    64    66  >100:    0   ice sat.    61%
+    IFS   T50  -52.0  RH    66   100   100   100  >100:    0   ice sat.    61%
+    AIFS  T50  -52.0  RH    42    88   100   100  >100:    0   ice sat.    61%
+    MF    T50  -52.0  RH    64   100   100   100  >100:    0   ice sat.    61%
+    UKMO  T50  -52.0  RH    42    70    76    84  >100:    0   ice sat.    61%
+    GFS   T50  -52.0  RH    66   100   100   100  >100:    0   ice sat.    61%
+    GEM   —
+    JMA   —
+  500 hPa
+    ICON  T50  -25.4  RH    46    83    86    93  >100:    0   ice sat.    78%
+    IFS   T50  -25.4  RH    57   100   100   100  >100:    0   ice sat.    78%
+    AIFS  T50  -25.4  RH    47    81   100   100  >100:    0   ice sat.    78%
+    MF    T50  -25.4  RH    60    97   100   100  >100:    0   ice sat.    78%
+    UKMO  T50  -25.7  RH    49    83    84    89  >100:    0   ice sat.    77%
+    GFS   T50  -25.4  RH    59   100   100   100  >100:    0   ice sat.    78%
+    GEM   —
+    JMA   —
+  850 hPa
+    ICON  T50   -3.5  RH    78   100   100   100  >100:    0   ice sat.    97%
+    IFS   T50   -3.0  RH    80   100   100   100  >100:    0   ice sat.    97%
+    AIFS  T50   -3.0  RH    78   100   100   100  >100:    0   ice sat.    97%
+    MF    T50   -3.1  RH    73   100   100   100  >100:    0   ice sat.    97%
+    UKMO  T50   -3.4  RH    76   100   100   100  >100:    0   ice sat.    97%
+    GFS   T50   -3.4  RH    78   100   100   100  >100:    0   ice sat.    97%
+    GEM   —
+    JMA   —
+  925 hPa
+    ICON  T50   -2.4  RH    87   100   100   100  >100:    0   ice sat.    98%
+    IFS   T50   -2.2  RH    91   100   100   100  >100:    0   ice sat.    98%
+    AIFS  T50   -2.3  RH    89   100   100   100  >100:    0   ice sat.    98%
+    MF    T50   -2.7  RH    87   100   100   100  >100:    0   ice sat.    97%
+    UKMO  T50   -2.4  RH    88   100   100   100  >100:    0   ice sat.    98%
+    GFS   T50   -2.1  RH    84   100   100   100  >100:    0   ice sat.    98%
+    GEM   —
+    JMA   —
+
+====================================================================================================
+V4  winter weather codes: hours with 45 / 48 (fog, rime fog), 56 / 57 (freezing drizzle), 66 / 67 (freezing rain) per model
+====================================================================================================
+-- kyiv (2160 h)
+  ICON  45:  99 48:   7 56:  3 57:  2 66: 22 67:  3  | freezing codes with T2m<0: 30/30  | hours precip>0 & T2m<0: 312   coverage 100.0%
+  IFS   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 339   coverage 100.0%
+  AIFS  45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 409   coverage 100.0%
+  MF    45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 314   coverage 100.0%
+  UKMO  45:  37 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 334   coverage 100.0%
+  GFS   45: 115 48:   0 56: 36 57:  6 66:  0 67:  0  | freezing codes with T2m<0: 41/42  | hours precip>0 & T2m<0: 308   coverage 100.0%
+  GEM   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 446   coverage 100.0%
+  JMA   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 416   coverage 100.0%
+-- zap (2160 h)
+  ICON  45:  92 48:  16 56:  1 57:  1 66: 27 67:  0  | freezing codes with T2m<0: 26/29  | hours precip>0 & T2m<0: 179   coverage 100.0%
+  IFS   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 173   coverage 100.0%
+  AIFS  45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 254   coverage 100.0%
+  MF    45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 179   coverage 100.0%
+  UKMO  45:  32 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 183   coverage 100.0%
+  GFS   45:  59 48:   0 56:  9 57:  6 66:  0 67:  0  | freezing codes with T2m<0: 15/15  | hours precip>0 & T2m<0: 140   coverage 100.0%
+  GEM   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 0   coverage   0.0%
+  JMA   45:   0 48:   0 56:  0 57:  0 66:  0 67:  0  | freezing codes with T2m<0: 0/0  | hours precip>0 & T2m<0: 0   coverage   0.0%
+
+====================================================================================================
+Flag rates, winter 2025/26 — per model, all hours Dec–Feb, flight level 950 hPa, rules of §7.4 (RH ≥ 90 % red)
+cruise = state at the flight level; any = climb + cruise + surface cues (one instant); climb-only = red only below the flight level;
+variant "2m=PIE": the ground layer takes the T/RH rule at 2 m (as §5.3 reads); "2m=fog": only the fog cue at the ground
+====================================================================================================
+-- kyiv (elevation 169.0 m, 2160 h)
+  model  cruise red cruise yel cruise unk | any red 2m=PIE climb-only | any red 2m=fog climb-only | red at RH≥85 / 95
+  ICON        42.8%      17.6%       0.0% |          46.0%       3.2% |          44.5%       1.7% |  50.8% /  27.8%
+  IFS         61.9%      19.7%       0.0% |          62.3%       0.4% |          59.3%       0.0% |  63.9% /  52.8%
+  AIFS        46.3%      32.7%       0.0% |          47.8%       1.5% |          42.7%       0.0% |  59.3% /  29.5%
+  MF          46.2%      15.1%       0.0% |          65.2%      19.0% |          53.2%       7.0% |  51.9% /  36.8%
+  UKMO        36.2%      25.9%       0.0% |          59.2%      23.0% |          54.9%      18.6% |  50.6% /  22.3%
+  GFS         40.2%      12.0%       0.0% |          50.7%      10.6% |          49.0%       8.8% |  45.1% /  31.5%
+  GEM         32.3%      26.8%       0.0% |          36.9%       4.5% |          34.1%       1.8% |  48.8% /  17.5%
+  JMA         35.8%      27.3%       0.0% |          39.4%       3.6% |          33.4%       0.8% |  44.2% /  17.0%
+  5 default models, 2m=PIE: any model red  79.3% | ≥60 % red  59.2% | all red  28.6% | low agreement (<60 %)   5.8%
+  5 default models, 2m=fog: any model red  75.5% | ≥60 % red  52.5% | all red  24.0% | low agreement (<60 %)   9.3%
+  2 h flight, 2m=PIE: departure hours red  ICON  53.0%  IFS  66.4%  AIFS  52.5%  MF  72.4%  UKMO  67.4%
+  2 h flight, 2m=fog: departure hours red  ICON  51.3%  IFS  63.5%  AIFS  46.7%  MF  60.3%  UKMO  63.9%
+  2025-12 cruise red: ICON  45.4%  IFS  53.2%  AIFS  50.5%  MF  45.4%  UKMO  40.7%
+  2026-01 cruise red: ICON  51.2%  IFS  75.4%  AIFS  35.9%  MF  54.8%  UKMO  34.8%
+  2026-02 cruise red: ICON  30.7%  IFS  48.1%  AIFS  41.5%  MF  37.5%  UKMO  32.9%
+-- zap (elevation 117.0 m, 2160 h)
+  model  cruise red cruise yel cruise unk | any red 2m=PIE climb-only | any red 2m=fog climb-only | red at RH≥85 / 95
+  ICON        33.1%      16.8%       0.0% |          40.0%       6.9% |          38.1%       5.0% |  40.5% /  22.5%
+  IFS         48.8%      18.9%       0.0% |          48.9%       0.1% |          47.5%       0.0% |  54.2% /  39.9%
+  AIFS        42.5%      22.8%       0.0% |          42.8%       0.3% |          41.1%       0.0% |  51.3% /  26.5%
+  MF          38.4%      14.3%       0.0% |          56.4%      18.1% |          52.1%      13.7% |  44.9% /  31.2%
+  UKMO        33.2%      19.7%       0.0% |          48.7%      15.4% |          44.1%      10.8% |  41.7% /  18.4%
+  GFS         25.0%      13.8%       0.0% |          35.4%      10.5% |          33.2%       8.2% |  30.8% /  18.6%
+  GEM          0.0%       0.0%     100.0% |           0.0%       0.0% |           0.0%       0.0% |   0.0% /   0.0%
+  JMA          0.0%       0.0%     100.0% |           0.0%       0.0% |           0.0%       0.0% |   0.0% /   0.0%
+  5 default models, 2m=PIE: any model red  68.2% | ≥60 % red  48.0% | all red  25.5% | low agreement (<60 %)   5.9%
+  5 default models, 2m=fog: any model red  66.2% | ≥60 % red  43.8% | all red  23.2% | low agreement (<60 %)   8.8%
+  2 h flight, 2m=PIE: departure hours red  ICON  46.6%  IFS  53.6%  AIFS  47.0%  MF  63.1%  UKMO  55.6%
+  2 h flight, 2m=fog: departure hours red  ICON  44.2%  IFS  52.2%  AIFS  45.1%  MF  59.5%  UKMO  51.1%
+  2025-12 cruise red: ICON  46.9%  IFS  61.6%  AIFS  59.4%  MF  48.8%  UKMO  46.8%
+  2026-01 cruise red: ICON  29.8%  IFS  53.8%  AIFS  39.7%  MF  37.9%  UKMO  31.3%
+  2026-02 cruise red: ICON  21.3%  IFS  24.9%  AIFS  22.5%  MF  27.4%  UKMO  20.4%
+
+====================================================================================================
+D3  flight level 950 hPa (bracketing for IFS/AIFS/JMA) vs 925 hPa (native everywhere): cruise red per model and 5-model agreement (2m=fog variant)
+====================================================================================================
+  kyiv 950 hPa cruise red: ICON  42.8%  IFS  59.3%  AIFS  42.7%  MF  46.2%  UKMO  36.2%  GFS  40.2%  GEM  32.3%  JMA  32.6%
+      5 defaults: low agreement   9.5% | red by some but not all  50.3%
+  kyiv 925 hPa cruise red: ICON  39.3%  IFS  50.8%  AIFS  39.6%  MF  39.2%  UKMO  35.0%  GFS  36.1%  GEM  31.3%  JMA  29.5%
+      5 defaults: low agreement   6.7% | red by some but not all  39.8%
+  zap 950 hPa cruise red: ICON  33.1%  IFS  47.5%  AIFS  41.1%  MF  38.4%  UKMO  33.2%  GFS  25.0%  GEM   0.0%  JMA   0.0%
+      5 defaults: low agreement   8.1% | red by some but not all  40.0%
+  zap 925 hPa cruise red: ICON  31.3%  IFS  37.9%  AIFS  33.5%  MF  32.7%  UKMO  32.5%  GFS  27.7%  GEM   0.0%  JMA   0.0%
+      5 defaults: low agreement   5.1% | red by some but not all  30.3%
+
+## rhnorm.py (V3)
+-- kyiv: cruise red at 950 hPa (2m=fog), reported RH vs RH converted to water (IFS/AIFS/GFS: ECMWF blend; MF/JMA: ice below 0 °C — assumption)
+   ICON 42.8→42.8% (RH925 p50 in −20..0 °C: 89)
+   IFS 59.3→40.8% (RH925 p50 in −20..0 °C: 89)
+   AIFS 42.7→32.2% (RH925 p50 in −20..0 °C: 84)
+   MF 46.2→27.5% (RH925 p50 in −20..0 °C: 82)
+   UKMO 36.2→36.2% (RH925 p50 in −20..0 °C: 88)
+   GFS 40.2→27.2% (RH925 p50 in −20..0 °C: 83)
+   GEM 32.3→32.3% (RH925 p50 in −20..0 °C: 86)
+   JMA 32.6→17.5% (RH925 p50 in −20..0 °C: 76)
+-- zap: cruise red at 950 hPa (2m=fog), reported RH vs RH converted to water (IFS/AIFS/GFS: ECMWF blend; MF/JMA: ice below 0 °C — assumption)
+   ICON 33.1→33.1% (RH925 p50 in −20..0 °C: 87)
+   IFS 47.5→38.8% (RH925 p50 in −20..0 °C: 88)
+   AIFS 41.1→31.1% (RH925 p50 in −20..0 °C: 85)
+   MF 38.4→26.8% (RH925 p50 in −20..0 °C: 83)
+   UKMO 33.2→33.2% (RH925 p50 in −20..0 °C: 89)
+   GFS 25.0→19.8% (RH925 p50 in −20..0 °C: 81)
+
+## select.py (model choice)
+
+##############################################################################################################
+# reported RH
+##############################################################################################################
+
+-- kyiv: 5-model consensus  red (≥3 of 5)  52.5% | split (1–2 of 5)  23.0% | none red  24.5%
+   choice                 red hours | agrees w/ consensus | misses consensus red | red where none of 5 red | red in split hours
+   ICON alone                 44.5% |               84.7% |                22.2% |                    0.0% |              15.9%
+   IFS alone                  59.3% |               84.2% |                 8.6% |                    0.0% |              49.0%
+   AIFS alone                 42.7% |               81.7% |                26.8% |                    0.0% |              18.3%
+   MF alone                   53.2% |               88.4% |                10.4% |                    0.0% |              26.8%
+   UKMO alone                 54.9% |               82.2% |                14.7% |                    0.0% |              43.8%
+   GFS alone                  49.0% |               74.0% |                28.1% |                   12.5% |              35.5%
+   ICON+UKMO either           62.0% |               84.8% |                 5.5% |                    0.0% |              53.8%
+   ICON+UKMO both             37.4% |               82.1% |                31.5% |                    0.0% |               5.8%
+   ICON+IFS either            67.2% |               85.2% |                 0.2% |                    0.0% |              64.1%
+   ICON+IFS both              36.6% |               83.7% |                30.7% |                    0.0% |               0.8%
+   ICON+GFS either            61.9% |               82.3% |                 7.9% |                   12.5% |              45.6%
+   ICON+GFS both              31.6% |               76.4% |                42.4% |                    0.0% |               5.8%
+   UKMO+IFS either            70.6% |               81.9% |                 0.0% |                    0.0% |              78.8%
+   UKMO+IFS both              43.5% |               84.5% |                23.3% |                    0.0% |              13.9%
+   pairwise agreement on red / not red (share of hours):
+            ICON    IFS   AIFS     MF   UKMO    GFS
+   ICON     100%    69%    73%    79%    75%    70%
+   IFS       69%   100%    79%    76%    73%    72%
+   AIFS      73%    79%   100%    72%    67%    67%
+   MF        79%    76%    72%   100%    75%    74%
+   UKMO      75%    73%    67%    75%   100%    66%
+   GFS       70%    72%    67%    74%    66%   100%
+
+-- zap: 5-model consensus  red (≥3 of 5)  43.8% | split (1–2 of 5)  22.5% | none red  33.8%
+   choice                 red hours | agrees w/ consensus | misses consensus red | red where none of 5 red | red in split hours
+   ICON alone                 38.1% |               88.2% |                20.0% |                    0.0% |              13.4%
+   IFS alone                  47.5% |               85.3% |                12.6% |                    0.0% |              40.8%
+   AIFS alone                 41.1% |               85.1% |                20.1% |                    0.0% |              27.2%
+   MF alone                   52.1% |               85.8% |                 6.8% |                    0.0% |              50.1%
+   UKMO alone                 44.1% |               89.0% |                12.3% |                    0.0% |              25.2%
+   GFS alone                  33.2% |               79.5% |                35.5% |                    2.1% |              19.0%
+   ICON+UKMO either           49.5% |               90.1% |                 4.8% |                    0.0% |              34.6%
+   ICON+UKMO both             32.6% |               87.1% |                27.5% |                    0.0% |               3.9%
+   ICON+IFS either            55.5% |               87.8% |                 0.6% |                    0.0% |              53.2%
+   ICON+IFS both              30.0% |               85.8% |                31.9% |                    0.0% |               1.0%
+   ICON+GFS either            47.0% |               88.6% |                 9.3% |                    2.1% |              29.5%
+   ICON+GFS both              24.2% |               79.1% |                46.2% |                    0.0% |               2.9%
+   UKMO+IFS either            58.2% |               85.4% |                 0.2% |                    0.0% |              64.5%
+   UKMO+IFS both              33.3% |               88.9% |                24.6% |                    0.0% |               1.4%
+   pairwise agreement on red / not red (share of hours):
+            ICON    IFS   AIFS     MF   UKMO    GFS
+   ICON     100%    75%    77%    78%    83%    77%
+   IFS       75%   100%    89%    76%    75%    76%
+   AIFS      77%    89%   100%    72%    75%    73%
+   MF        78%    76%    72%   100%    80%    75%
+   UKMO      83%    75%    75%    80%   100%    77%
+   GFS       77%    76%    73%    75%    77%   100%
+
+##############################################################################################################
+# IFS/AIFS RH converted to water (documented ECMWF rule)
+##############################################################################################################
+
+-- kyiv: 5-model consensus  red (≥3 of 5)  45.0% | split (1–2 of 5)  27.4% | none red  27.6%
+   choice                 red hours | agrees w/ consensus | misses consensus red | red where none of 5 red | red in split hours
+   ICON alone                 44.5% |               87.5% |                14.5% |                    0.0% |              22.0%
+   IFS alone                  40.8% |               85.1% |                21.2% |                    0.0% |              19.5%
+   AIFS alone                 32.2% |               81.7% |                34.5% |                    0.0% |              10.0%
+   MF alone                   53.2% |               83.4% |                 9.4% |                    0.0% |              45.3%
+   UKMO alone                 54.9% |               81.0% |                10.2% |                    0.0% |              52.6%
+   GFS alone                  49.0% |               70.3% |                28.6% |                   17.1% |              44.2%
+   ICON+UKMO either           62.0% |               80.0% |                 3.3% |                    0.0% |              67.5%
+   ICON+UKMO both             37.4% |               88.4% |                21.4% |                    0.0% |               7.1%
+   ICON+IFS either            56.0% |               88.8% |                 0.3% |                    0.0% |              40.6%
+   ICON+IFS both              29.4% |               83.8% |                35.4% |                    0.0% |               0.8%
+   ICON+GFS either            61.9% |               77.8% |                 6.0% |                   17.1% |              54.1%
+   ICON+GFS both              31.6% |               80.0% |                37.1% |                    0.0% |              12.0%
+   UKMO+IFS either            64.2% |               80.8% |                 0.0% |                    0.0% |              70.1%
+   UKMO+IFS both              31.5% |               85.3% |                31.3% |                    0.0% |               2.0%
+   pairwise agreement on red / not red (share of hours):
+            ICON    IFS   AIFS     MF   UKMO    GFS
+   ICON     100%    73%    71%    79%    75%    70%
+   IFS       73%   100%    87%    72%    67%    66%
+   AIFS      71%    87%   100%    66%    66%    60%
+   MF        79%    72%    66%   100%    75%    74%
+   UKMO      75%    67%    66%    75%   100%    66%
+   GFS       70%    66%    60%    74%    66%   100%
+
+-- zap: 5-model consensus  red (≥3 of 5)  39.8% | split (1–2 of 5)  24.6% | none red  35.6%
+   choice                 red hours | agrees w/ consensus | misses consensus red | red where none of 5 red | red in split hours
+   ICON alone                 38.1% |               90.8% |                13.7% |                    0.0% |              15.1%
+   IFS alone                  38.8% |               87.6% |                16.9% |                    0.0% |              23.2%
+   AIFS alone                 31.2% |               81.6% |                33.8% |                    0.0% |              20.0%
+   MF alone                   52.1% |               83.1% |                 5.8% |                    0.0% |              59.3%
+   UKMO alone                 44.1% |               88.5% |                 9.1% |                    0.0% |              32.0%
+   GFS alone                  33.2% |               78.2% |                35.7% |                    2.3% |              27.5%
+   ICON+UKMO either           49.5% |               88.5% |                 2.3% |                    0.0% |              43.1%
+   ICON+UKMO both             32.6% |               90.9% |                20.5% |                    0.0% |               4.0%
+   ICON+IFS either            48.8% |               90.6% |                 0.6% |                    0.0% |              37.5%
+   ICON+IFS both              28.1% |               87.9% |                30.0% |                    0.0% |               0.8%
+   ICON+GFS either            47.0% |               86.5% |                 7.9% |                    2.3% |              38.8%
+   ICON+GFS both              24.2% |               82.5% |                41.5% |                    0.0% |               3.8%
+   UKMO+IFS either            53.1% |               86.6% |                 0.2% |                    0.0% |              54.2%
+   UKMO+IFS both              29.8% |               89.5% |                25.7% |                    0.0% |               0.9%
+   pairwise agreement on red / not red (share of hours):
+            ICON    IFS   AIFS     MF   UKMO    GFS
+   ICON     100%    79%    76%    78%    83%    77%
+   IFS       79%   100%    88%    73%    77%    75%
+   AIFS      76%    88%   100%    66%    74%    71%
+   MF        78%    73%    66%   100%    80%    75%
+   UKMO      83%    77%    74%    80%   100%    77%
+   GFS       77%    75%    71%    75%    77%   100%
