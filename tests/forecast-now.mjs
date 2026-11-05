@@ -8,7 +8,7 @@ const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 },
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const forecastReqs = [];
-page.on('request', r => { const u = r.url(); if (/open-meteo\.com/.test(u) && /models=/.test(u) && !/past_days/.test(u)) forecastReqs.push(u); });
+page.on('request', r => { const u = r.url(); if (/open-meteo\.com/.test(u) && /models=/.test(u) && !/past_days/.test(u) && !/geopotential_height_/.test(u)) forecastReqs.push(u); /* not the icing request */ });
 const opts = {};
 await routeAll(page, opts);
 await page.goto(BASE_URL);

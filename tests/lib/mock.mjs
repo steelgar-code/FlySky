@@ -73,6 +73,27 @@ function levelSeries(v, o, opts) {
   return lw ? o.time.map(() => lw.from) : o.wind_direction_925hPa;
 }
 
+// Icing mock: ground 179 m; pressure levels at these heights above it (1000 hPa just below ground).
+const ICING_GROUND = 179;
+const ICING_AGL = { 1000: -20, 975: 180, 950: 380, 925: 590, 900: 865, 850: 1320, 800: 1800, 700: 2840 };
+const ICING_WET = { temperature: -4, relative_humidity: 96 };
+// Default scenario, k = hours from now: both models saturated at −4 °C at 950 + 925 hPa (the 400 m
+// flight altitude) for k 0–2; only ICON for k 3–5; a layer below it (975 hPa) for both at k 6–8;
+// freezing fog at the ground at k 12; a layer above it (900 hPa, ~870 m) for both at k 15–17; UKMO's forecast ends at k 100; cold and dry otherwise.
+export function icingScenario(m, k, p) {
+  if (m === 'ukmo_seamless' && k >= 100) return null;
+  if (k >= 0 && k < 3 && (p === 950 || p === 925)) return ICING_WET;
+  if (k >= 3 && k < 6 && m === 'icon_seamless' && (p === 950 || p === 925)) return ICING_WET;
+  if (k >= 6 && k < 9 && p === 975) return ICING_WET;
+  if (k >= 15 && k < 18 && p === 900) return ICING_WET;
+  return {};
+}
+export function icingSfcScenario(m, k) {
+  if (m === 'ukmo_seamless' && k >= 100) return null;
+  if (k === 12) return { temperature_2m: -2, visibility: 400 };
+  return {};
+}
+
 export async function routeAll(page, opts = {}) {
   const wms = makeWms(opts);
   const log = { caps: 0, layerCaps: [], getmap: [], tiles: 0, legend: 0 };
@@ -116,6 +137,36 @@ export async function routeAll(page, opts = {}) {
         return route.fulfill({ json: { hourly } });
       }
       return route.fulfill({ json: { hourly: series(+lats[0], +lons[0]) } });
+    }
+    if (url.includes('api.open-meteo.com/v1/forecast') && url.includes('models=') && url.includes('geopotential_height_')) {
+      // Icing request (icing.js, forecast tab): the same time axis as the forecast mock, pressure levels
+      // at fixed heights above a 179 m ground. opts.icing(model, k, p) → { temperature, relative_humidity }
+      // overrides of level p (null: no data), opts.icingSfc(model, k) → surface overrides (null: no data),
+      // k = hours from the app's current hour; default icingScenario(). opts.icingFail = reason: an error.
+      const u = new URL(url);
+      log.icingReq = (log.icingReq || []).concat(url);
+      if (opts.icingFail) return route.fulfill({ status: 500, json: { error: true, reason: opts.icingFail } });
+      const models = u.searchParams.get('models').split(','), vars = u.searchParams.get('hourly').split(',');
+      const days = +(u.searchParams.get('forecast_days') || 8), start = Math.floor(Date.now() / 86400e3) * 86400e3;
+      const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
+      const now = Math.floor((Date.now() + 7200e3 - start) / 3600e3);   // the app's hour (UTC+2, like the forecast mock)
+      const level = opts.icing || icingScenario, sfc = opts.icingSfc || icingSfcScenario;
+      const hourly = { time };
+      models.forEach(m => vars.forEach(v => {
+        hourly[models.length > 1 ? `${v}_${m}` : v] = time.map((_, i) => {
+          const k = i - now;
+          const lm = v.match(/^(temperature|relative_humidity|geopotential_height)_(\d+)hPa$/);
+          if (lm) {
+            const p = +lm[2], o = level(m, k, p);
+            if (o === null) return null;
+            return { geopotential_height: ICING_GROUND + ICING_AGL[p], temperature: -4 - ICING_AGL[p] * 0.005, relative_humidity: 60, ...o }[lm[1]];
+          }
+          const o = sfc(m, k);
+          if (o === null) return null;
+          return { temperature_2m: -3, relative_humidity_2m: 80, weather_code: 3, visibility: 20000, precipitation: 0, ...o }[v] ?? null;
+        });
+      }));
+      return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), elevation: ICING_GROUND, utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', hourly } });
     }
     if ((url.includes('ensemble-api.open-meteo.com') || url.includes('api.open-meteo.com/v1/forecast')) && url.includes('models=')) {
       // Forecast mock: every requested model / variable, ensemble members for the ensemble API.

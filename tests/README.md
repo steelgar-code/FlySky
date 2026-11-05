@@ -34,6 +34,9 @@ Every external request is answered locally, so the suites run offline and are re
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
   forecast requests get a 429 "limit exceeded". The flight time calculator's wind request gets a
   uniform wind, `routeWind: { speed, from, ramp }` (default 6 m/s from the west; `ramp`: m/s more per hour ahead).
+  The icing request (ICON + UKMO with pressure levels) gets profiles over a 179 m ground from `icingScenario()` —
+  a layer at the flight altitude for both models for 3 h, then ICON only, a layer below, freezing fog, a layer
+  above, UKMO ending after 100 h; `icing(model, k, level)` / `icingSfc(model, k)` override it, `icingFail` fails it.
 - OSM tiles: flat dark tiles.
 
 ## Suites
@@ -53,6 +56,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-overlays.mjs` | lightning / fire stacks load only from the selected image forward; Cloud Top Height removed |
 | `hazard-alerts.mjs` | nearby-hazard alerts: movement read back for a new alert (small images, last 40 min, once), "Show" on the map alert (layer on, cell in view), time bar hidden with nothing to show / in the calculator, time pill |
 | `map-failures.mjs` | WMS exception frame, no-CORS fallback, capabilities failure, Leaflet failure, day/night hint, offline, phone layout |
+| `forecast-icing.mjs` | icing indicator in the forecast view: one ICON + UKMO request, the "Can I fly now?" row and layer line hour by hour (both models, one model, climb only, freezing fog, no signs, a layer above), the icing strip and pinned-hour details, the icing profile, planner notes, flight profile settings (climb, duration, altitude needing other levels, thresholds, reset), the indicator off / on, icing in the flight verdict (Ensemble and Models mode, no extra members), a failing request, the stored copy after a reload, Ukrainian |
 | `icing-engine.mjs` | icing engine (`icing.js`, not wired into the app yet) — Node only, no browser: request and call cost, response split per model, level rules, RH conversion, surface cues (fog, freezing rain incl. warm nose), heights (below-ground masking, missing levels, high ground), a flight's climb / cruise / descent, icing layers, two models (red if either, model beyond its forecast length), thresholds |
 | `live-eumetsat.mjs` | real EUMETView: products / overlays resolve, frames load, readout (Open-Meteo stays mocked out) |
 
