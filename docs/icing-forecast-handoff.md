@@ -1,16 +1,20 @@
 # FIXED-WING UAV ATMOSPHERIC ICING FORECASTING
-## Technical Handoff & Architecture Specification — v2.4 (FlySky integration)
+## Technical Handoff & Architecture Specification — v2.5 (FlySky integration)
 
 | Document status | Purpose | Intended use |
 |---|---|---|
-| **Design decided (D1–D17); Phase 0 API verification done (2026-11-05); stage 1 (engine `icing.js` + unit tests) implemented** | The icing screening design for FlySky: Phase 0 results (live Open-Meteo APIs, last winter's archived forecasts), v1 with two models (ICON + UKMO), flight altitude in metres above takeoff, icing-layer report, and the staged implementation. | Implementation of stages 2–5 in FlySky (`index.html`, `map.js`, `icing.js`), test planning. Phase 0 scripts and output: [`docs/icing-phase0/`](icing-phase0/); engine tests: `tests/icing-engine.mjs`. |
+| **Design decided (D1–D17); Phase 0 API verification done (2026-11-05); stage 1 (engine `icing.js` + unit tests) and stage 2 (flight altitude in metres, wind at a fixed height) implemented** | The icing screening design for FlySky: Phase 0 results (live Open-Meteo APIs, last winter's archived forecasts), v1 with two models (ICON + UKMO), flight altitude in metres above takeoff, icing-layer report, and the staged implementation. | Implementation of stages 2–5 in FlySky (`index.html`, `map.js`, `icing.js`), test planning. Phase 0 scripts and output: [`docs/icing-phase0/`](icing-phase0/); engine tests: `tests/icing-engine.mjs`. |
 
 > **Safety notice**
 > Proxy indicators and exposure estimates are not validated icing forecasts. They do not estimate ice accretion or a probability of icing, and **must not be used to authorize flight into icing conditions**. A small fixed-wing UAV should be kept out of forecast or observed icing unless the complete aircraft is designed, tested and approved for it. In FlySky the icing indicator is a separate, clearly labelled, **experimental** screening aid; by default it does not change the flight verdict. It shows where the icing layers are and how long a flight would spend in them; it never recommends flying through them (§7.7).
 
 ---
 
-## 0. What v2.4 changes
+## 0. Recent changes
+
+**v2.5 — stage 2 implemented** (§13): one **Flight altitude** setting in metres above takeoff (10 m … 1500 m, default 400 m) in the forecast view's side menu (*Flight profile*, with its height above sea level at the location), the map's wind block and the calculator; the stored wind height is carried over (§5.1). Wind arrows and calculator wind at that height: three pressure levels around it with their geopotential height, u / v interpolated, levels inside the terrain left out (arrows hidden with a note; the calculator says where the ground rises above the flight height). Wind-aloft labels corrected to heights above the ground. Same call cost as before.
+
+**v2.4:**
 
 1. **Flight altitude in metres above the takeoff point**, not a pressure level (D4). A pressure level drifts up to ~190 m away from a fixed flight altitude with the weather; each hour the engine now takes the levels just below and above the aircraft's height. ASL and height above the ground are shown alongside (§5).
 2. **v1 starts with two models, ICON + UKMO, "red if either"** (D16): same data types (975/950 hPa levels, RH over water, visibility), 2–3 % of the hours a 5-model majority flags are missed (ICON alone: 14–15 %, ECMWF IFS alone: 17–21 %), 4.8 calls per update. The engine works with any list of models; a consensus of more models is a later option (§7.6).
@@ -50,7 +54,7 @@ Unchanged since v2.1: meteorological hazard evidence is kept separate from aircr
 | D10 | Thresholds are experimental defaults, configurable under advanced settings (§7.4); they apply to RH over water. | Decided (values provisional) |
 | D11 | **RH normalised to RH over water per model** before any threshold (§4.4). Implemented in the engine; ICON and UKMO need no conversion. | Decided |
 | D12 | **Freezing-precipitation cue from the profile** (warm nose: precipitation, 2 m ≤ 0 °C, a level above 0 °C up to 700 hPa) besides codes 56/57/66/67; red in all phases including the cruise. | Decided; implemented |
-| D13 | **Below-ground masking** for icing and wind: a level less than 20 m above the ground is ignored; a flight height with no usable level within 500 m is unknown ("no level near", e.g. high ground); a route point whose ground is above the flight height is "below ground". | Decided; implemented for icing, wind in stage 2 |
+| D13 | **Below-ground masking** for icing and wind: a level less than 20 m above the ground is ignored; a flight height with no usable level within 500 m is unknown ("no level near", e.g. high ground); a route point whose ground is above the flight height is "below ground". | Decided; implemented (icing: stage 1, wind: stage 2) |
 | D14 | **Evaluation at a fixed height:** the worse of the nearest usable levels below and above it (within 500 m); "coarse" when only one side exists or a level used is more than 300 m away; the 2 m layer is never used — it feeds only the surface cues. | Decided; implemented |
 | D15 | **Route models: ICON + UKMO**; wind for the wind triangle from ICON, UKMO's where ICON has none; route icing red if either model is red. | Decided |
 | D16 | **v1 = two models, ICON + UKMO, "red if either is red"**, with the count shown ("2 of 2 models", "1 of 2"). The engine takes any list of models and a 'majority' rule; a consensus of more models comes later, once the remaining RH conventions are confirmed (V3b). | Decided (v2.4) |
@@ -200,10 +204,11 @@ The existing wind height setting (shared by wind arrows and calculator) becomes 
 - **Height above sea level** = takeoff elevation + flight altitude (forecast tab: the forecast location; calculator: point A). Shown with it: "400 m above takeoff · 569 m above sea level".
 - **Evaluation (D14):** each hour, the levels are placed by their geopotential height; the flight height takes the worse state of the levels just below and above. Humidity is never interpolated. Wind (stage 2) is interpolated linearly between the two levels (u and v components).
 - **10 m:** surface cues only (and the 10 m wind). **120 m:** wind from the 120 m height level; icing from the lowest usable pressure level (usually 975 hPa, ~180 m; "coarse" when it is the only one) and the surface cues.
-- **Wind arrows** on the map: the same number as metres above the ground at each arrow (over flat terrain the same as above takeoff); arrows where the height is below a usable level's coverage are left out (D13).
-- **Calculator:** a constant height above sea level from A; each route point shows its height above the ground; points where the ground rises to within 50 m of the flight height are flagged, points above it are "below ground" (§9).
-- **Migration** of the stored wind height: `10m` → 10 m, `120m` → 120 m, `500m` (950 hPa) → 400 m, `800m` (925 hPa) → 600 m, `1500m` (850 hPa) → 1500 m. New users start at 400 m (wind arrows then show ~400 m instead of 120 m).
-- **Labels:** today's "~500 m", "~800 m", "~1500 m" (`rtLevel_*` in `map.js`), "Wind ~500 m" (`paramWindAloftDet`) and the wind-aloft member labels "~110 m · 1000 hPa" / "~800 m · 925 hPa" (heights above sea level) overstate the height above the ground by 60–200 m; the new setting replaces the map's; the wind-aloft labels are corrected to above-ground values ("≈ 0 m", "≈ 600 m").
+- **Wind arrows** on the map: the same number as metres above the ground at each arrow (over flat terrain the same as above takeoff). Requested: the three pressure levels whose standard-atmosphere height is nearest to the height over typical ground (150 m above sea level) — wind speed, direction and geopotential height, 9 variables, still 1 call per point; e.g. 975 / 950 / 925 hPa for 400 m, 950 / 925 / 900 hPa for 600 m, 900 / 850 / 800 hPa for 1500 m. At each arrow u and v are interpolated in height between the levels below and above it; one level alone stands for the height within 250 m; levels less than 20 m above the ground are left out. Where no level is left near the height (high ground) the arrow is left out and the info line says how many (D13; implemented in stage 2).
+- **Calculator:** a constant height above sea level from A (A's ground — the elevation of A's grid cell in the response — + the flight altitude; shown under the route: "400 m above A ≈ 579 m above sea level along the route"); wind from the same three levels, interpolated at that height at each route point. Where the ground rises to within 20 m of it the result is "Below the ground", saying how far along and how high (stage 2). Per-point heights above the ground and a 50 m warning come with the icing in stage 4 (§9).
+- **Migration** of the stored wind height (map settings `wind.level`, or the calculator's older `route.level`): `10m` → 10 m, `120m` → 120 m, `500m` (950 hPa) → 400 m, `800m` and the older `925` (925 hPa) → 600 m, `1500m` (850 hPa) → 1500 m; saved at once as `flysky_flight_profile`, and the map keeps no height of its own. New users start at 400 m (wind arrows then show ~400 m instead of 120 m).
+- **Where it is set:** forecast view's side menu, section *Flight profile* (with "≈ 579 m above sea level at Kyiv (ground 179 m)" when the location's elevation is known); the map side menu's wind block ("Above the ground"); the calculator ("Flight altitude above A"). One value (`state.flightProfile.heightM`, `setFlightHeight()`).
+- **Labels** (stage 2): the map's "~500 m", "~800 m", "~1500 m" are replaced by the setting; the forecast's wind-aloft labels are corrected to heights above the ground: "Wind ~400 m" (Models), "Wind up to ~600 m" (Ensemble), members "≤ 100 m · 1000 hPa" / "~600 m · 925 hPa".
 - The forecast tab's **wind-aloft factor** (1000+925 hPa pooled in Ensemble mode, 950 hPa in Models mode) is **not changed** in this work (O1).
 
 ### 5.2 Profile parameters and defaults
@@ -219,6 +224,8 @@ The existing wind height setting (shared by wind arrows and calculator) becomes 
 | Icing thresholds (advanced, "experimental") | §7.4 | — | engine |
 
 Example: climb to 400 m at 2 m/s ≈ 3.3 min; at 5 m/s ≈ 1.3 min.
+
+Stage 2 shows only the flight altitude; climb, descent, duration, the verdict option and the thresholds join the *Flight profile* section in stage 3, when the icing indicator uses them.
 
 ### 5.3 Vertical handling (implemented in `icing.js`)
 
@@ -255,9 +262,9 @@ Ensemble models count every member. Verified with the `X-RateLimit-Cost` respons
 | Ensemble forecast (ensemble API) | ≈ 120 calls/update (4 default ensembles) | unchanged (no icing here, D7) | 0 extra |
 | Models-mode forecast | 3 calls/update | unchanged | 0 extra |
 | **Icing request** (forecast API, ICON + UKMO, 1 location; `requestParams()`) | — | T, RH, height at 1000/975/950/925/900/850 hPa (18) + T 700 hPa + 2 m T, 2 m RH, weather code, visibility, precipitation (5) = 24 variables × 2 models; more levels for flights above ~1 km or high ground (up to 800 / 700 hPa) | **4.8** (up to ≈ 5.8) per update, cached like the forecast (1 h) |
-| **Route request** (forecast API, ≤ 16 points) | `best_match`, wind at one level: 16 calls for 16 points | ICON + UKMO, three levels around the flight height × (wind speed, direction, T, RH, height) = 30 variables → **3 per point** (≤ 48 for a new 16-point route; points cached 30 min) | +2 per point |
+| **Route request** (forecast API, ≤ 16 points) | stage 2: `best_match`, three levels × (wind speed, direction, height) = 9 variables → 1 per point: 16 calls for 16 points (as before) | stage 4: ICON + UKMO, three levels around the flight height × (wind speed, direction, T, RH, height) = 30 variables → **3 per point** (≤ 48 for a new 16-point route; points cached 30 min) | +2 per point |
 | Column at A (and B for one-way) | — | reuse forecast icing data if A is in the forecast location's 0.1° cell and the hours are covered; else one icing request (4.8) | only when needed |
-| Wind-arrow grid | `best_match`, 2 variables, up to 220 points per view: up to ≈ 220 calls per refresh | three levels × (speed, direction, height) = 9 variables → still 1 per point (stage 2) | 0 extra |
+| Wind-arrow grid | `best_match`, up to 220 points per view: up to ≈ 220 calls per refresh | three levels × (speed, direction, height) = 9 variables → still 1 per point (stage 2, implemented) | 0 extra |
 | Map readout (crosshair) | 6 vars × models | unchanged (no icing in v1) | 0 |
 
 ---
@@ -403,7 +410,7 @@ Rules of thumb shown in the details (meteorology, not data from the engine):
 ### 9.2 Data
 
 - Route request: `models=icon_seamless,ukmo_seamless`; for each of the three standard levels nearest the flight height above sea level (e.g. 975 / 950 / 925 hPa for 569 m): wind speed, direction, T, RH, height — 30 variables → ≈ 3 calls per point.
-- Wind for the wind triangle: interpolated between the levels around the flight height (u, v), from ICON; UKMO's where ICON has none.
+- Wind for the wind triangle: interpolated between the levels around the flight height (u, v) — in stage 2 from `best_match` (ICON-based), from stage 4 from ICON, UKMO's where ICON has none.
 - Icing per point: red if either model is red; "1 of 2 models" shown when only one is.
 - Each point's height above the ground is shown; within 50 m of the ground flagged; below the ground: unknown ("below ground").
 - Climb/descent column at A (and B for one-way): forecast-tab data when A is in the forecast location's cell and the hours are covered; otherwise one icing request (4.8 calls).
@@ -463,8 +470,10 @@ Notes for re-running: Open-Meteo's daily limit is per IP and shared by the forec
 
 **Cross-check on real data:** `docs/icing-phase0/engine_check.mjs` — the engine on last winter's ICON / UKMO hours reproduces the Python analysis within the expected 3–5 points (§7.5) and prints its output for the saved 8-day forecasts (`engine_check.txt`: e.g. a sub-zero layer at ~200–650 m over Kyiv on 9–11 November 2026, both models; unknown at the Carpathian point — no level near 2425 m).
 
-**Browser tests (Playwright, mocked Open-Meteo), stages 2–4:**
-- settings: flight altitude in metres, defaults (400 m, 2/2 m/s, 2 h), migration of the stored wind height, one setting shared by arrows/calculator/icing, ASL and AGL shown; wind arrows interpolated and masked below ground;
+**Browser tests, stage 2 (implemented; `tests/map-route.mjs`, `map-layers.mjs`, `map-settings.mjs`; the mock answers any wind height with per-level wind, standard level heights and a configurable ground elevation):** new users at 400 m; migration of '925', '~500 m' and the calculator's '~1500 m', saved, no height left in the map settings; forecast side menu shows the setting with its height above sea level, and a change there reaches the map; request variables for 10 m / 400 m / 600 m / 1500 m; interpolation (halfway between two levels, 400 m above a 179 m ground), one level within 250 m, inside the terrain; arrows left out over high ground with the note; calculator and side menu set the same height; the calculator's "400 m above A ≈ 579 m above sea level" line; "Below the ground" where the route reaches higher ground; the selector fits the card.
+
+**Browser tests (Playwright, mocked Open-Meteo), stages 3–4:**
+- settings: climb, descent, duration, verdict option, thresholds (defaults 2/2 m/s, 2 h);
 - forecast tab: icing request (ICON + UKMO, call count in the mock log), Icing row, "2 of 2 / 1 of 2", climb-only note, layer line, strip, chart, planner "below the layer", verdict option off/on (Models and Ensemble mode), model count falling through the week;
 - calculator: route request with three levels × two models, icing on part of the outbound leg, return different, outbound only, A outside the forecast cell (extra request), point below ground / near the ground.
 
@@ -480,8 +489,8 @@ Notes for re-running: Open-Meteo's daily limit is per IP and shared by the forec
 |---|---|---|---|
 | 0 | Phase 0 API verification (§11) | `docs/icing-phase0/` | done |
 | 1 | **Engine:** request builder and cost, response split, profiles (heights, masking, RH conversion), evidence, surface cues, fixed-height evaluation, climb/descent bands, Mode A flights, icing layers, model combination, route points; unit tests; cross-check on Phase 0 data. Not loaded by the app yet. | `icing.js`, `tests/icing-engine.mjs`, `docs/icing-phase0/engine_check.mjs` | **done** |
-| 2 | **Settings and wind:** "Flight profile" section (flight altitude in m above takeoff, climb, descent, duration, verdict option, thresholds); migration of the stored wind height; wind arrows and calculator wind at a fixed height (levels around it, interpolated, masked below ground — D13); ASL / AGL labels; corrected wind-aloft labels | `index.html`, `map.js` | next |
-| 3 | **Forecast tab:** load `icing.js` on demand (`?v=`, `sw.js`); icing request (ICON + UKMO) + cache with the forecast; Icing row, layer line, strip, details, height-time chart, planner ("below the layer"), verdict option (incl. Ensemble mode) | `index.html` | |
+| 2 | **Settings and wind:** flight altitude in m above takeoff, shared by the forecast side menu (*Flight profile*), the map's wind block and the calculator; migration of the stored wind height; wind arrows and calculator wind at a fixed height (three levels, interpolated, masked below ground — D13; arrows left out with a note, "Below the ground" in the calculator); ASL shown; corrected wind-aloft labels; READMEs | `index.html`, `map.js`, `sw.js`, tests | **done** |
+| 3 | **Forecast tab:** *Flight profile* gets climb, descent, duration, the verdict option and the thresholds; load `icing.js` on demand (`?v=`, `sw.js`); icing request (ICON + UKMO) + cache with the forecast; Icing row, layer line, strip, details, height-time chart, planner ("below the layer"), verdict option (incl. Ensemble mode) | `index.html` | next |
 | 4 | **Calculator:** route request (three levels × ICON + UKMO), constant height above sea level, per-point height above the ground, coloured segments, panel lines, return leg, column at A/B | `map.js` | |
 | 5 | **Options:** consensus of more models (after V3b, O11), ECMWF IFS after ICON's forecast ends (O10), icing marks on the wind grid (O4), satellite cross-check (O5), terrain-relative levels (O7), real call costs (O8) | — | |
 
@@ -506,6 +515,10 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 ---
 
 ## 15. Changes
+
+### From v2.4 to v2.5
+1. Stage 2 implemented: the shared flight altitude (forecast *Flight profile*, map wind block, calculator) with migration; wind arrows and calculator wind at a fixed height from three pressure levels (chosen around the height over 150 m ground, interpolated, one level within 250 m, levels inside the terrain left out); arrows left out over high ground with a note; "Below the ground" in the calculator; height above sea level shown; wind-aloft labels corrected.
+2. §5.1 / §5.2 / §6.2 / §9.2 / §12 / §13 updated with what was built; the other *Flight profile* settings move to stage 3.
 
 ### From v2.3 to v2.4
 1. Flight altitude in metres above takeoff instead of a pressure level; levels placed by their geopotential height each hour; ASL / AGL shown; constant height above sea level on the route; migration of the stored wind height (D3, D4, §5).
@@ -539,4 +552,4 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 - WMO 4677 present-weather code table (subset emitted by Open-Meteo: 0–3, 45, 48, 51–57, 61–67, 71–77, 80–82, 85–86, 95, 96, 97, 99).
 - FAA Aviation Weather Handbook / AWC icing guidance (US reference only).
 
-*END OF TECHNICAL HANDOFF DOCUMENT v2.4 — FLYSKY INTEGRATION*
+*END OF TECHNICAL HANDOFF DOCUMENT v2.5 — FLYSKY INTEGRATION*

@@ -252,7 +252,9 @@
             mapOvImages: '{n} images · {from} – {to}',
             mapOvImage: 'Image: {time}',
             mapOv_wind: 'Forecast wind',
-            mapWindKind: 'Model forecast (Open-Meteo) for the hour of the image. Arrows point where the wind blows; colour follows your flight thresholds (wind aloft limits above 120 m). The flight time calculator uses the same height.',
+            mapWindKind: 'Model forecast (Open-Meteo) for the hour of the image, at the flight altitude above the ground at each arrow (one setting with the flight time calculator and the forecast view’s flight profile). Above 120 m the wind is interpolated between the model levels around that height. Arrows point where the wind blows; colour follows your flight thresholds (wind aloft limits above 120 m).',
+            mapWindHeight: 'Above the ground',
+            mapWindHidden: 'Arrows left out: {n} — no model level near this height above the ground there (high ground).',
             mapWindAt: 'Wind for {time}',
             mapWindErr: 'Wind forecast unavailable ({msg})',
             mapBase_osmDark: 'Dark',
@@ -428,15 +430,13 @@
             rtClear: "Clear the points",
             rtClose: "Close",
             rtAirspeed: "Airspeed",
-            rtWindAt: "Wind at",
+            rtHeight: "Flight altitude above A",
+            rtHeightInfo: "{h} m above A ≈ {asl} m above sea level along the route.",
+            rtGroundHead: "Below the ground",
+            rtGround: "About {km} km along, the ground (≈ {elev} m above sea level) is higher than the flight height ({asl} m above sea level, {h} m above A). Choose a higher flight altitude.",
             rtDepart: "Departure",
             rtNow: "now",
             rtIn: "in {n} h",
-            rtLevel_10m: "10 m",
-            rtLevel_120m: "120 m",
-            rtLevel_500m: "~500 m",
-            rtLevel_800m: "~800 m",
-            rtLevel_1500m: "~1500 m",
             rtStartHere: "Start A here (at the crosshair)",
             rtModeAim: "Aim",
             rtModeAimTip: "Aim: B is the crosshair. Pan the map to measure; zooming keeps B in place.",
@@ -531,7 +531,9 @@
             mapOvImages: '{n} знімків · {from} – {to}',
             mapOvImage: 'Знімок: {time}',
             mapOv_wind: 'Прогноз вітру',
-            mapWindKind: 'Прогноз моделі (Open-Meteo) на годину знімка. Стрілки показують, куди дме вітер; колір — за вашими порогами польоту (вище 120 м — пороги вітру на висоті). Калькулятор часу польоту використовує ту саму висоту.',
+            mapWindKind: 'Прогноз моделі (Open-Meteo) на годину знімка, на висоті польоту над землею біля кожної стрілки (одне налаштування з калькулятором часу польоту й профілем польоту в прогнозі). Вище 120 м вітер інтерполюється між рівнями моделі навколо цієї висоти. Стрілки показують, куди дме вітер; колір — за вашими порогами польоту (вище 120 м — пороги вітру на висоті).',
+            mapWindHeight: 'Над землею',
+            mapWindHidden: 'Не показано стрілок: {n} — там немає рівня моделі поблизу цієї висоти над землею (висока місцевість).',
             mapWindAt: 'Вітер на {time}',
             mapWindErr: 'Прогноз вітру недоступний ({msg})',
             mapBase_osmDark: 'Темна',
@@ -707,15 +709,13 @@
             rtClear: "Очистити точки",
             rtClose: "Закрити",
             rtAirspeed: "Повітряна швидкість",
-            rtWindAt: "Вітер на",
+            rtHeight: "Висота польоту над A",
+            rtHeightInfo: "{h} м над A ≈ {asl} м над рівнем моря на всьому маршруті.",
+            rtGroundHead: "Нижче рельєфу",
+            rtGround: "Приблизно через {km} км земля (≈ {elev} м над рівнем моря) вища за висоту польоту ({asl} м над рівнем моря, {h} м над A). Виберіть більшу висоту польоту.",
             rtDepart: "Виліт",
             rtNow: "зараз",
             rtIn: "через {n} год",
-            rtLevel_10m: "10 м",
-            rtLevel_120m: "120 м",
-            rtLevel_500m: "~500 м",
-            rtLevel_800m: "~800 м",
-            rtLevel_1500m: "~1500 м",
             rtStartHere: "Старт A тут (під прицілом)",
             rtModeAim: "Приціл",
             rtModeAimTip: "Приціл: B — під прицілом. Рухайте карту, щоб виміряти; масштабування не зсуває B.",
@@ -810,7 +810,9 @@
             mapOvImages: '{n} imagens · {from} – {to}',
             mapOvImage: 'Imagem: {time}',
             mapOv_wind: 'Vento previsto',
-            mapWindKind: 'Previsão de modelo (Open-Meteo) para a hora da imagem. As setas apontam para onde o vento sopra; a cor segue seus limites de voo (acima de 120 m, os limites de vento em altitude). A calculadora de tempo de voo usa a mesma altura.',
+            mapWindKind: 'Previsão de modelo (Open-Meteo) para a hora da imagem, na altitude de voo acima do solo em cada seta (um só ajuste com a calculadora de tempo de voo e o perfil de voo da previsão). Acima de 120 m o vento é interpolado entre os níveis do modelo em torno dessa altura. As setas apontam para onde o vento sopra; a cor segue seus limites de voo (acima de 120 m, os limites de vento em altitude).',
+            mapWindHeight: 'Acima do solo',
+            mapWindHidden: 'Setas omitidas: {n} — não há nível do modelo perto desta altura acima do solo ali (terreno alto).',
             mapWindAt: 'Vento para {time}',
             mapWindErr: 'Previsão de vento indisponível ({msg})',
             mapBase_osmDark: 'Escuro',
@@ -986,15 +988,13 @@
             rtClear: "Limpar os pontos",
             rtClose: "Fechar",
             rtAirspeed: "Velocidade do ar",
-            rtWindAt: "Vento a",
+            rtHeight: "Altitude de voo acima de A",
+            rtHeightInfo: "{h} m acima de A ≈ {asl} m acima do nível do mar em toda a rota.",
+            rtGroundHead: "Abaixo do terreno",
+            rtGround: "A cerca de {km} km do início, o terreno (≈ {elev} m acima do nível do mar) é mais alto que a altura de voo ({asl} m acima do nível do mar, {h} m acima de A). Escolha uma altitude de voo maior.",
             rtDepart: "Partida",
             rtNow: "agora",
             rtIn: "em {n} h",
-            rtLevel_10m: "10 m",
-            rtLevel_120m: "120 m",
-            rtLevel_500m: "~500 m",
-            rtLevel_800m: "~800 m",
-            rtLevel_1500m: "~1500 m",
             rtStartHere: "Partida A aqui (na mira)",
             rtModeAim: "Mira",
             rtModeAimTip: "Mira: B é a mira. Mova o mapa para medir; o zoom mantém B no lugar.",
@@ -1219,13 +1219,10 @@
     // Lightning and fire marks are small, so they start fully visible; the
     // imagery and precipitation start at 40%.
     const OV_DEFAULT_OPACITY = { precip: 0.4, lightning: 0.9, fire: 0.9 };
-    // Wind heights (Open-Meteo variable suffix), shared by the wind arrows
-    // and the flight time calculator: one setting for both.
-    const WIND_LEVELS = { '10m': '10m', '120m': '120m', '500m': '950hPa', '800m': '925hPa', '1500m': '850hPa' };
     const defaults = {
         product: null, productAt: 0, sources: {}, opacity: 0.4,
         overlays: { precip: { on: false, opacity: 0.4 }, lightning: { on: false, opacity: 0.9 }, fire: { on: false, opacity: 0.9 } },
-        wind: { on: true, level: '120m' },
+        wind: { on: true },
         // The basemaps already show place names and borders; wind arrows on;
         // times in local time.
         basemap: 'osmDark', labels: false, borders: false, rings: true, favs: true, hazardMin: false, windowH: 6, utc: false, speed: 1,
@@ -1233,7 +1230,8 @@
         // Side menu: which cards are open, which layers show their settings.
         sections: { product: false, layers: true, map: false, region: false, time: false }, ovOpen: {},
         // Flight time calculator: airspeed m/s, departure in hours from now,
-        // mode aim / tap (the points are not kept; the wind height is S.wind's).
+        // mode aim / tap (the points are not kept; the height is the shared
+        // flight altitude, state.flightProfile).
         route: { on: false, airspeed: 22, depart: 0, mode: 'aim' }
     };
     const stored = loadFromStorage(MAP_CONFIG.settingsKey, {}) || {};
@@ -1260,10 +1258,10 @@
     if (!MAP_CONFIG.windows.includes(S.windowH)) S.windowH = 6;
     if (!MAP_CONFIG.speeds.includes(S.speed)) S.speed = 1;
     if (!MAP_CONFIG.basemaps[S.basemap] && S.basemap !== 'none') S.basemap = defaults.basemap;
-    // Earlier versions: the arrows had 10 m / '925', the calculator its own height.
-    if (S.wind.level === '925') S.wind.level = '800m';
-    if (!WIND_LEVELS[S.wind.level]) S.wind.level = WIND_LEVELS[S.route.level] ? S.route.level : defaults.wind.level;
-    delete S.route.level;
+    // Earlier versions kept a wind height here (S.wind.level, before that
+    // S.route.level): now the shared flight altitude (index.html carries it
+    // over into state.flightProfile).
+    delete S.wind.level; delete S.route.level;
     let savedRegions = loadFromStorage(MAP_CONFIG.regionsKey, []);
     if (!Array.isArray(savedRegions)) savedRegions = [];
     const save = () => saveToStorage(MAP_CONFIG.settingsKey, S);
@@ -2240,11 +2238,89 @@
         });
     }
 
+    // ---- Wind at the flight altitude
+    // The shared flight altitude, metres above the takeoff point (index.html:
+    // state.flightProfile, setFlightHeight). 10 m and 120 m come from the
+    // models' height levels; higher up from the three pressure levels around
+    // that height (wind and geopotential height), interpolated at each point.
+    // Levels inside the terrain are left out (Open-Meteo extrapolates values
+    // there), so over high ground a height may have no wind at all.
+    const STD_LEVEL_HEIGHT = { 1000: 110, 975: 320, 950: 540, 925: 760, 900: 990, 850: 1460, 800: 1950 };
+    const TYPICAL_GROUND = 150;   // m above sea level (lowland Ukraine): for choosing the levels
+    const LEVEL_REACH = 250;      // one level alone stands for a height this close to it
+    const MIN_AGL = 20;           // a level lower than this above the ground is inside the terrain
+
+    function flightHeight() {
+        const m = state.flightProfile && state.flightProfile.heightM;
+        return FLIGHT_HEIGHTS.includes(m) ? m : DEFAULT_FLIGHT_HEIGHT;
+    }
+
+    // Pressure levels asked for a height: the three whose standard-atmosphere
+    // height is nearest to it over typical ground (none at 10 / 120 m).
+    function windLevelsFor(heightM) {
+        if (heightM <= 120) return [];
+        const z = heightM + TYPICAL_GROUND;
+        return Object.keys(STD_LEVEL_HEIGHT).map(Number)
+            .sort((a, b) => Math.abs(STD_LEVEL_HEIGHT[a] - z) - Math.abs(STD_LEVEL_HEIGHT[b] - z))
+            .slice(0, 3).sort((a, b) => b - a);
+    }
+
+    // Hourly variables for a height. Open-Meteo counts variables, but up to
+    // 10 per point cost the same as 2.
+    function windVars(heightM) {
+        if (heightM <= 120) return [`wind_speed_${heightM}m`, `wind_direction_${heightM}m`];
+        return windLevelsFor(heightM).flatMap(p => [`wind_speed_${p}hPa`, `wind_direction_${p}hPa`, `geopotential_height_${p}hPa`]);
+    }
+
+    // Speed and the direction it blows from → also the vector it blows
+    // towards (east, north), and back.
+    function windVec(speed, from) {
+        const to = (from + 180) * Math.PI / 180;
+        return { speed, dir: from, u: speed * Math.sin(to), v: speed * Math.cos(to) };
+    }
+    function windFromUV(u, v, levels) {
+        return { speed: Math.hypot(u, v), dir: (Math.atan2(u, v) * 180 / Math.PI + 540) % 360, u, v, levels };
+    }
+
+    // Wind at hour i of a point's hourly data (Open-Meteo, windVars()) for a
+    // height above the ground there (heightM) — or, for the calculator, at a
+    // fixed height above sea level (zAsl). Pressure levels: u and v
+    // interpolated in height between the levels below and above it, or the
+    // nearer one alone within LEVEL_REACH. → { speed, dir, u, v, levels } |
+    // { below: true } (the height is inside the terrain) | null (no data).
+    function windAt(hr, i, heightM, elev, zAsl) {
+        if (!hr || i < 0) return null;
+        if (heightM <= 120) {
+            const s = (hr[`wind_speed_${heightM}m`] || [])[i], d = (hr[`wind_direction_${heightM}m`] || [])[i];
+            return Number.isFinite(s) && Number.isFinite(d) ? windVec(s, d) : null;
+        }
+        const ground = Number.isFinite(elev) ? elev : null;
+        const target = Number.isFinite(zAsl) ? zAsl : (ground ?? TYPICAL_GROUND) + heightM;
+        if (ground !== null && target - ground < MIN_AGL) return { below: true };
+        const lv = [];
+        windLevelsFor(heightM).forEach(p => {
+            const z = (hr[`geopotential_height_${p}hPa`] || [])[i], s = (hr[`wind_speed_${p}hPa`] || [])[i], d = (hr[`wind_direction_${p}hPa`] || [])[i];
+            if (![z, s, d].every(Number.isFinite) || (ground !== null && z - ground < MIN_AGL)) return;
+            lv.push({ p, z, ...windVec(s, d) });
+        });
+        let lo = null, hi = null;
+        lv.forEach(l => {
+            if (l.z <= target) { if (!lo || l.z > lo.z) lo = l; }
+            else if (!hi || l.z < hi.z) hi = l;
+        });
+        if (lo && hi) {
+            const f = (target - lo.z) / (hi.z - lo.z);
+            return windFromUV(lo.u + (hi.u - lo.u) * f, lo.v + (hi.v - lo.v) * f, [lo.p, hi.p]);
+        }
+        const one = [lo, hi].find(l => l && Math.abs(l.z - target) <= LEVEL_REACH);
+        return one ? windFromUV(one.u, one.v, [one.p]) : null;
+    }
+
     // ---- Forecast wind arrows (Open-Meteo, one request for the grid)
     // forecastHour: a later hour picked in the forecast view; the arrows
     // then show that hour (with the latest image) until another image is
     // picked.
-    const W = { cache: new Map(), group: null, seq: 0, hour: null, error: '', loading: false, timer: null, forecastHour: null };
+    const W = { cache: new Map(), group: null, seq: 0, hour: null, error: '', loading: false, timer: null, forecastHour: null, hidden: 0 };
 
     function windShown() {
         return S.wind.on || W.forecastHour !== null;
@@ -2290,14 +2366,14 @@
     }
 
     // Two days ahead normally; up to a week for a forecast hour. Only the
-    // level shown: Open-Meteo counts every variable at every point.
-    async function fetchWind(pts, hour, lvl) {
+    // height shown: Open-Meteo counts every variable at every point.
+    async function fetchWind(pts, hour, heightM) {
         const days = Math.min(7, Math.max(2, Math.ceil((hour - Date.now()) / 864e5) + 1));
         for (let i = 0; i < pts.length; i += 100) {
             const chunk = pts.slice(i, i + 100);
             const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
                 latitude: chunk.map(p => p.lat).join(','), longitude: chunk.map(p => p.lon).join(','),
-                hourly: `wind_speed_${lvl},wind_direction_${lvl}`,
+                hourly: windVars(heightM).join(','),
                 past_days: 1, forecast_days: days, timezone: 'GMT', wind_speed_unit: 'ms'
             }, []);
             const res = await fetch(url);
@@ -2306,20 +2382,18 @@
             const list = Array.isArray(body) ? body : [body];
             chunk.forEach((p, k) => {
                 const hr = list[k] && list[k].hourly;
-                if (hr) W.cache.set(`${lvl}|${p.key}`, { at: Date.now(), hourly: hr, until: Date.parse(hr.time[hr.time.length - 1] + 'Z') });
+                if (hr) W.cache.set(`${heightM}|${p.key}`, { at: Date.now(), hourly: hr, elev: list[k].elevation, until: Date.parse(hr.time[hr.time.length - 1] + 'Z') });
             });
         }
     }
 
-    // The wind height, from the side menu or the calculator: arrows and
-    // calculator follow it together.
-    function setWindLevel(level) {
-        if (!WIND_LEVELS[level]) return;
-        S.wind.level = level;
-        save();
+    // The flight altitude changed (side menu here or in the forecast view, or
+    // the calculator): arrows and calculator follow it together.
+    function onFlightHeight() {
+        if (!R.built) return;
         renderPanel();
         const sel = document.querySelector('#mapRoute [data-route-level]');
-        if (sel) sel.value = level;
+        if (sel) sel.value = String(flightHeight());
         W.hour = null;
         updateWind();
         if (S.route.on) loadRouteWind();
@@ -2329,38 +2403,41 @@
         if (!R.map) return;
         if (!W.group) W.group = L.layerGroup().addTo(R.map);
         const id = ++W.seq;
-        if (!windShown()) { W.group.clearLayers(); W.hour = null; renderWindInfo(); return; }
+        if (!windShown()) { W.group.clearLayers(); W.hour = null; W.hidden = 0; renderWindInfo(); return; }
         const hour = windHour();
         const pts = windGrid();
         // Forget points not refreshed for 30 min (they'd be fetched again
         // anyway), and never keep more than 1500.
         W.cache.forEach((c, k) => { if (Date.now() - c.at > 30 * 60e3) W.cache.delete(k); });
         for (const k of W.cache.keys()) { if (W.cache.size <= 1500) break; W.cache.delete(k); }
-        const lvl = WIND_LEVELS[S.wind.level];
-        const missing = pts.filter(p => { const c = W.cache.get(`${lvl}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
+        const H = flightHeight();
+        const missing = pts.filter(p => { const c = W.cache.get(`${H}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
         W.error = '';
         if (missing.length) {
             W.loading = true; renderWindInfo();
-            try { await fetchWind(missing, hour, lvl); } catch (err) { W.error = err instanceof TypeError ? t('mapErrNetwork') : err.message; }
+            try { await fetchWind(missing, hour, H); } catch (err) { W.error = err instanceof TypeError ? t('mapErrNetwork') : err.message; }
             W.loading = false;
         }
         if (id !== W.seq) return;
         W.hour = hour;
+        W.hidden = 0;
         W.group.clearLayers();
         const key = new Date(hour).toISOString().slice(0, 13);
         const R_ = state.flightRules || {};
         const toUnit = WIND_TO_MS[state.windUnit] || 1;
+        // Up to 120 m by the wind limits, higher by the wind-aloft limits.
+        const [good, bad] = H <= 120 ? [R_.windGood, R_.windBad] : [R_.aloftGood ?? R_.windGood, R_.aloftBad ?? R_.windBad];
         pts.forEach(p => {
-            const c = W.cache.get(`${lvl}|${p.key}`);
+            const c = W.cache.get(`${H}|${p.key}`);
             if (!c) return;
             const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
-            const ms = i < 0 ? null : (c.hourly[`wind_speed_${lvl}`] || [])[i], dir = i < 0 ? null : (c.hourly[`wind_direction_${lvl}`] || [])[i];
-            if (!Number.isFinite(ms) || !Number.isFinite(dir)) return;
-            // Up to 120 m by the wind limits, higher by the wind-aloft limits.
-            const [good, bad] = lvl === '10m' || lvl === '120m' ? [R_.windGood, R_.windBad] : [R_.aloftGood ?? R_.windGood, R_.aloftBad ?? R_.windBad];
+            // The height above the ground at each arrow.
+            const w = windAt(c.hourly, i, H, c.elev);
+            if (!w || w.below) { if (i >= 0) W.hidden++; return; }
+            const ms = w.speed;
             const color = ms >= bad ? FLIGHT_STATUS.bad.color : ms >= good ? FLIGHT_STATUS.marginal.color : FLIGHT_STATUS.good.color;
             const shown = ms / toUnit;
-            const html = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${(dir + 180) % 360}deg)"><path d="M12 2 L17.5 11 H13.6 V22 H10.4 V11 H6.5 Z" fill="${color}" stroke="#020617" stroke-width="1.2" stroke-linejoin="round"/></svg><span>${shown < 10 ? shown.toFixed(1) : Math.round(shown)}</span>`;
+            const html = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${Math.round((w.dir + 180) % 360)}deg)"><path d="M12 2 L17.5 11 H13.6 V22 H10.4 V11 H6.5 Z" fill="${color}" stroke="#020617" stroke-width="1.2" stroke-linejoin="round"/></svg><span>${shown < 10 ? shown.toFixed(1) : Math.round(shown)}</span>`;
             L.marker(p.at || [p.lat, p.lon], { pane: 'wind', interactive: false, keyboard: false, icon: L.divIcon({ className: 'fs-wind', html, iconSize: [40, 36], iconAnchor: p.at ? [-14, 46] : [20, 12] }) }).addTo(W.group);
         });
         renderWindInfo();
@@ -2372,7 +2449,8 @@
         if (!S.wind.on) { el.textContent = ''; return; }
         el.innerHTML = W.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('mapProbeLoading'))}`
             : W.error ? `<span class="text-rose-300">${h(t('mapWindErr', { msg: W.error }))}</span>`
-            : W.hour ? h(`${t('mapWindAt', { time: fmtTime(W.hour) })} · ${UNIT_LABELS.wind[state.windUnit]}`) : '';
+            : W.hour ? h(`${t('mapWindAt', { time: fmtTime(W.hour) })} · ${UNIT_LABELS.wind[state.windUnit]}`)
+                + (W.hidden ? `<br><span class="text-amber-300">${h(t('mapWindHidden', { n: W.hidden }))}</span>` : '') : '';
     }
 
     // Boundary lines from the same service, drawn as transparent WMS tiles
@@ -2615,10 +2693,14 @@
                 </div>` : ''}
             </div>`;
         }).join('');
+        // The shared flight altitude (also in the forecast view's side menu and
+        // the calculator): above the ground at each arrow.
+        const H = flightHeight();
         const windBlock = `<div class="${S.wind.on ? 'rounded-lg bg-slate-950/40 -mx-1.5 px-1.5 py-1' : 'py-1'}">
             ${switchRow('data-map-wind', S.wind.on, 'fa-wind', t('mapOv_wind'))}
             ${S.wind.on ? `<div class="mt-1.5 space-y-1.5" title="${h(t('mapWindKind'))}">
-                <div class="fs-seg-full">${seg('windlevel', Object.keys(WIND_LEVELS).map(k => [k, h(t('rtLevel_' + k))]), S.wind.level)}</div>
+                <label class="pl-[3.6rem] flex items-center gap-2 text-[11px] text-slate-400"><span class="min-w-0">${h(t('mapWindHeight'))}</span>
+                    <select data-map-windheight class="unit-select ml-auto !py-0.5 !text-[11px]" aria-label="${h(t('mapWindHeight'))}">${FLIGHT_HEIGHTS.map(m => `<option value="${m}" ${m === H ? 'selected' : ''}>${h(t('flightHeightOption', { m }))}</option>`).join('')}</select></label>
                 <p id="mapWindInfo" class="pl-[3.6rem] text-[10.5px] text-slate-400"></p>
             </div>` : ''}
         </div>`;
@@ -2632,7 +2714,7 @@
         const regions = regionOptions();
         const on = OVERLAYS.filter(o => S.overlays[o.id].on && (R.ovLayers[o.id] || []).length);
         const layersSummary = on.map(o => `<i class="fa-solid ${o.icon} text-cyan-300 ml-1.5" title="${h(t('mapOv_' + o.id))}"></i>`).join('')
-            + (S.wind.on ? `<i class="fa-solid fa-wind text-cyan-300 ml-1.5"></i> <span class="font-mono">${h(t('rtLevel_' + S.wind.level))}</span>` : '')
+            + (S.wind.on ? `<i class="fa-solid fa-wind text-cyan-300 ml-1.5"></i> <span class="font-mono">${h(t('flightHeightOption', { m: H }))}</span>` : '')
             + (hazardEnabled() ? `<i class="fa-solid fa-triangle-exclamation text-amber-300 ml-1.5" title="${h(t('mapHazardAlerts'))}"></i>` : '')
             || h(t('mapNothingOn'));
         const baseName = S.basemap === 'none' ? t('mapBase_none') : t('mapBase_' + S.basemap);
@@ -2945,8 +3027,6 @@
                 play(false); renderAllMapUi(); reloadFrames();
             } else if ((el = q('[data-map-src]'))) {
                 S.sources[el.dataset.mapSrc] = el.dataset.value; save(); renderAllMapUi(); reloadFrames();
-            } else if ((el = q('[data-map-windlevel]'))) {
-                setWindLevel(el.dataset.mapWindlevel);
             } else if ((el = q('[data-map-basemap]'))) setBasemap(el.dataset.mapBasemap);
             else if ((el = q('[data-map-window]'))) { S.windowH = Number(el.dataset.mapWindow); save(); renderPanel(); reloadFrames(); }
             else if ((el = q('[data-map-utc]'))) { S.utc = el.dataset.mapUtc === '1'; save(); renderPanel(); renderTimeLabel(); renderProgress(); }
@@ -3008,8 +3088,8 @@
                 setHazardEnabled(el.checked); renderPanel(); renderStatus();
             } else if (el.matches('[data-map-region]')) {
                 selectRegion(el.value);
-            } else if (el.matches('[data-route-level]')) {
-                setWindLevel(el.value);
+            } else if (el.matches('[data-route-level]') || el.matches('[data-map-windheight]')) {
+                setFlightHeight(Number(el.value));
             } else if (el.matches('[data-route-depart]')) {
                 S.route.depart = Number(el.value); save(); renderRouteResult();
             } else if (el.matches('[data-map-speed]')) {
@@ -3809,13 +3889,13 @@
     }
 
     // Forecast wind for the grid cells along the route (one request for the
-    // missing ones).
+    // missing ones), at the flight altitude (windVars()).
     async function loadRouteWind() {
         const line = routeLine();
         if (!S.route.on || line.length < 2 || lineLength(line) < 50) { renderRouteResult(); return; }
-        const lvl = WIND_LEVELS[S.wind.level];
+        const H = flightHeight();
         const cells = [...new Map(routeSamples(line).map(p => [p.key, p])).values()];
-        const missing = cells.filter(p => { const c = RT.wind.get(`${lvl}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3; });
+        const missing = cells.filter(p => { const c = RT.wind.get(`${H}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3; });
         const id = ++RT.seq;
         RT.error = '';
         if (missing.length) {
@@ -3824,13 +3904,13 @@
             try {
                 const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
                     latitude: missing.map(p => p.key.split(',')[0]).join(','), longitude: missing.map(p => p.key.split(',')[1]).join(','),
-                    hourly: `wind_speed_${lvl},wind_direction_${lvl}`, forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
+                    hourly: windVars(H).join(','), forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
                 }, []);
                 const res = await fetch(url);
                 const body = await res.json();
                 if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
                 const list = Array.isArray(body) ? body : [body];
-                missing.forEach((p, k) => { if (list[k] && list[k].hourly) RT.wind.set(`${lvl}|${p.key}`, { at: Date.now(), hourly: list[k].hourly }); });
+                missing.forEach((p, k) => { if (list[k] && list[k].hourly) RT.wind.set(`${H}|${p.key}`, { at: Date.now(), hourly: list[k].hourly, elev: list[k].elevation }); });
                 if (RT.wind.size > 400) [...RT.wind.keys()].slice(0, RT.wind.size - 400).forEach(k => RT.wind.delete(k));
             } catch (err) {
                 if (id === RT.seq) RT.error = err instanceof TypeError ? t('mapErrNetwork') : err.message;
@@ -3840,29 +3920,41 @@
         if (id === RT.seq) renderRouteResult();
     }
 
+    // The calculator flies a constant height above sea level: A's ground plus
+    // the flight altitude (null at 10 m / 120 m — those follow the ground —,
+    // and until A's ground height is known).
+    function routeAsl(pts, H) {
+        if (H <= 120 || !pts.length) return null;
+        const c = RT.wind.get(`${H}|${pts[0].key}`);
+        return c && Number.isFinite(c.elev) ? c.elev + H : null;
+    }
+
     // Wind at a sample point for time `ms`, as the vector it blows towards
-    // (east, north; m/s), or null.
-    function windVector(p, ms, lvl) {
-        const c = RT.wind.get(`${lvl}|${p.key}`);
+    // (east, north; m/s); { below, elev } where the flight height is inside
+    // the terrain; null without data. fl: { H, zAsl }.
+    function windVector(p, ms, fl) {
+        const c = RT.wind.get(`${fl.H}|${p.key}`);
         if (!c) return null;
         const key = new Date(Math.round(ms / 3600e3) * 3600e3).toISOString().slice(0, 13);
         const i = c.hourly.time.findIndex(x => x.slice(0, 13) === key);
-        const sp = i < 0 ? null : (c.hourly[`wind_speed_${lvl}`] || [])[i], dir = i < 0 ? null : (c.hourly[`wind_direction_${lvl}`] || [])[i];
-        if (!Number.isFinite(sp) || !Number.isFinite(dir)) return null;
-        const to = toRad(dir + 180);
-        return { u: sp * Math.sin(to), v: sp * Math.cos(to) };
+        const w = windAt(c.hourly, i, fl.H, c.elev, fl.zAsl === null ? undefined : fl.zAsl);
+        if (w && w.below) return { below: true, elev: c.elev };
+        return w ? { u: w.u, v: w.v } : null;
     }
 
     // One way over the sample points, leaving at t0: { ms, dist, gs, along
     // (+ tailwind / − headwind, distance-weighted), cross (largest) },
-    // { blocked } when the wind is too strong, { missing } without wind.
-    function flyLeg(pts, V, t0, lvl) {
+    // { blocked } when the wind is too strong, { ground } where the ground
+    // rises into the flight height, { missing } without wind.
+    function flyLeg(pts, V, t0, fl) {
         let t = t0, dist = 0, alongSum = 0, cross = 0;
         for (let i = 0; i < pts.length - 1; i++) {
             const p = pts[i], q = pts[i + 1];
             const d = distM(p.ll, q.ll);
             if (d < 1) continue;
-            const w1 = windVector(p, t, lvl), w2 = windVector(q, t, lvl);
+            const w1 = windVector(p, t, fl), w2 = windVector(q, t, fl);
+            const low = [[w1, 0], [w2, d]].find(([w]) => w && w.below);
+            if (low) return { ground: true, km: (dist + low[1]) / 1000, elev: low[0].elev };
             if (!w1 || !w2) return { missing: true };
             const u = (w1.u + w2.u) / 2, v = (w1.v + w2.v) / 2;
             const W = Math.hypot(u, v);
@@ -4092,8 +4184,8 @@
             </div>
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 pt-0.5">
                 <div class="inline-flex p-0.5 rounded-lg bg-slate-950 border border-slate-700" role="group">${modeBtn('aim', 'fa-crosshairs', 'rtModeAim')}${modeBtn('tap', 'fa-hand-pointer', 'rtModeTap')}</div>
-                <label class="ml-auto flex items-center gap-1 text-slate-400" title="${h(t('rtWindAt'))}"><i class="fa-solid fa-wind"></i>
-                    <select data-route-level class="${sel}" aria-label="${h(t('rtWindAt'))}">${Object.keys(WIND_LEVELS).map(k => `<option value="${k}" ${k === S.wind.level ? 'selected' : ''}>${h(t('rtLevel_' + k))}</option>`).join('')}</select></label>
+                <label class="ml-auto flex items-center gap-1 text-slate-400" title="${h(t('rtHeight'))}"><i class="fa-solid fa-plane-up"></i>
+                    <select data-route-level class="${sel}" aria-label="${h(t('rtHeight'))}">${FLIGHT_HEIGHTS.map(m => `<option value="${m}" ${m === flightHeight() ? 'selected' : ''}>${h(t('flightHeightOption', { m }))}</option>`).join('')}</select></label>
                 <label class="flex items-center gap-1 text-slate-400" title="${h(t('rtDepart'))}"><i class="fa-regular fa-clock"></i>
                     <select data-route-depart class="${sel}" aria-label="${h(t('rtDepart'))}">${ROUTE_DEPART.map(n => `<option value="${n}" ${n === S.route.depart ? 'selected' : ''}>${h(n ? t('rtIn', { n }) : t('rtNow'))}</option>`).join('')}</select></label>
             </div>
@@ -4149,27 +4241,33 @@
             msg = h(t(RT.follow ? 'rtHintPan' : 'rtHintTap'));
         } else {
             const pts = routeSamples(line);
-            const lvl = WIND_LEVELS[S.wind.level];
+            const H = flightHeight();
+            const fl = { H, zAsl: routeAsl(pts, H) };
             const t0 = Date.now() + S.route.depart * 3600e3;
-            const out = flyLeg(pts, V, t0, lvl);
+            const out = flyLeg(pts, V, t0, fl);
             const km = `${num1(dist / 1000)} km`;
             if (out.missing) {
                 const still = fmtDuration(dist / V * 1000);
                 headHtml = `<span class="text-base font-semibold">≈ ${h(still)}</span> <span class="text-slate-400">${h(t('rtStill'))}</span>`;
                 msg = RT.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400"></i> ${h(t('rtReading'))}` : `<span class="text-amber-300">${h(t('rtNoWind', { msg: RT.error || t('mapProbeNoData') }))}</span>`;
                 tag = `<b>≈ ${h(still)}</b><span>${h(km)}</span>`;
+            } else if (out.ground) {
+                headHtml = `<span class="font-semibold text-rose-300">${h(t('rtGroundHead'))}</span>`;
+                msg = `<span class="text-rose-300">${h(t('rtGround', { km: Math.max(1, Math.round(out.km)), elev: Math.round(out.elev), asl: Math.round(fl.zAsl), h: H }))}</span>`;
+                tag = `<b class="bad">${h(t('rtGroundHead'))}</b><span>${h(km)}</span>`;
             } else if (out.blocked) {
                 headHtml = `<span class="font-semibold text-rose-300">${h(t('rtNoHeadway'))}</span>`;
                 msg = `<span class="text-rose-300">${h(blockedText(out, V))}</span>`;
                 tag = `<b class="bad">${h(t('rtNoHeadway'))}</b><span>${h(km)}</span>`;
             } else {
                 const eta = t0 + out.ms;
-                const back = flyLeg(pts.slice().reverse(), V, eta, lvl);
-                const backOk = !back.missing && !back.blocked;
+                const back = flyLeg(pts.slice().reverse(), V, eta, fl);
+                const backOk = !back.missing && !back.blocked && !back.ground;
                 const backTitle = backOk ? t('rtBack', { time: fmtDuration(back.ms), eta: fmtClock(eta + back.ms) }) : t(back.blocked ? 'rtBackBlocked' : 'rtBackNoWind');
                 headHtml = `<span class="text-base font-semibold">${h(fmtDuration(out.ms))}</span> <span class="text-slate-300">· ${h(t('rtEta', { time: fmtClock(eta) }))}</span>`
                     + ` <span class="text-slate-400" title="${h(backTitle)}">· ${h(t('rtBackShort', { time: backOk ? fmtDuration(back.ms) : '—' }))}</span>`;
                 tag = `<b><i class="fa-solid fa-stopwatch"></i>${h(fmtDuration(out.ms))}</b><span>${h(km)} · ${h(num1(out.gs))} m/s</span>`;
+                if (fl.zAsl !== null) msg = h(t('rtHeightInfo', { h: H, asl: Math.round(fl.zAsl) }));
             }
         }
         head.innerHTML = headHtml;
@@ -4328,7 +4426,7 @@
         trimCache();
     });
 
-    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, replayHazard, focusHazard, showHour, renderDrawer: () => renderPanel(),
+    window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, replayHazard, focusHazard, showHour, onFlightHeight, renderDrawer: () => renderPanel(),
         // exposed for tests / diagnostics
-        _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, W, RT, MGRS, cache } };
+        _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, W, RT, MGRS, cache, windAt, windVars, windLevelsFor, flightHeight } };
 })();

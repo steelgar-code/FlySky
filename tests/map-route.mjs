@@ -17,8 +17,8 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
     await page.goto(BASE_URL);
     await page.evaluate(k => { localStorage.setItem('flysky_last_location', JSON.stringify(k)); localStorage.setItem('flysky_view', JSON.stringify('map')); }, KYIV);
     await page.reload(); await page.waitForTimeout(3000);
-    const d = await page.evaluate(() => { const { S, R } = FlySkyMap._internals; return { labels: S.labels, borders: S.borders, wind: S.wind.on, level: S.wind.level, utc: S.utc, max: R.map.getMaxZoom() }; });
-    ok('new users: place names and borders off, wind on at 120 m, local time', !d.labels && !d.borders && d.wind && d.level === '120m' && !d.utc, d);
+    const d = await page.evaluate(() => { const { S, R } = FlySkyMap._internals; return { labels: S.labels, borders: S.borders, wind: S.wind.on, height: state.flightProfile.heightM, utc: S.utc, max: R.map.getMaxZoom() }; });
+    ok('new users: place names and borders off, wind on at the 400 m flight altitude, local time', !d.labels && !d.borders && d.wind && d.height === 400 && !d.utc, d);
     ok('map zooms in to 18', d.max === 18, d.max);
     // Deep zoom: the satellite image stays at its own resolution (zoom 8 image).
     await page.evaluate(() => FlySkyMap._internals.R.map.setZoom(16, { animate: false }));
@@ -28,15 +28,28 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
     await ctx.close();
 }
 
-// ---- earlier versions' wind height ('925' for the arrows) carries over
+// ---- earlier versions' wind height (a pressure level) carries over as the flight altitude;
+// the flight altitude is one setting in the forecast and the map side menus
 {
     const ctx = await b.newContext(ctxOpts);
     const page = await ctx.newPage();
     await routeAll(page, {});
     await page.goto(BASE_URL);
-    await page.evaluate(k => { localStorage.setItem('flysky_last_location', JSON.stringify(k)); localStorage.setItem('flysky_view', JSON.stringify('map')); localStorage.setItem('flysky_map_settings', JSON.stringify({ wind: { on: true, level: '925' }, route: { level: '1500m' } })); }, KYIV);
-    await page.reload(); await page.waitForTimeout(2500);
-    ok("earlier '925' wind height → ~800 m for arrows and calculator", await page.evaluate(() => { const { S } = FlySkyMap._internals; return S.wind.level === '800m' && !('level' in S.route); }));
+    const cases = [[{ wind: { on: true, level: '925' }, route: { level: '1500m' } }, 600, "earlier '925' (925 hPa)"], [{ wind: { on: true, level: '500m' } }, 400, "'~500 m' (950 hPa)"], [{ route: { level: '1500m' } }, 1500, "the calculator's '~1500 m'"]];
+    for (const [old, want, label] of cases) {
+        await page.evaluate(([k, o]) => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify(k)); localStorage.setItem('flysky_view', JSON.stringify('map')); localStorage.setItem('flysky_map_settings', JSON.stringify(o)); }, [{ ...KYIV, elevation: 179 }, old]);
+        await page.reload(); await page.waitForTimeout(2500);
+        ok(`${label} → flight altitude ${want} m, saved; the map keeps no height of its own`, await page.evaluate(w => { const { S } = FlySkyMap._internals; return state.flightProfile.heightM === w && JSON.parse(localStorage.getItem('flysky_flight_profile')).heightM === w && !('level' in S.wind) && !('level' in S.route); }, want));
+    }
+    // Forecast side menu: the same setting, and its height above sea level here.
+    await page.click('#viewSwitch [data-view="forecast"]'); await page.waitForTimeout(800);
+    await page.click('#btnSettings'); await page.waitForTimeout(400);
+    ok('forecast side menu: flight altitude 1500 m, ≈ 1679 m above sea level at Kyiv', await page.inputValue('#flightHeightSelect') === '1500' && /≈ 1679 m above sea level at Kyiv \(ground 179 m\)/.test(await page.locator('#flightHeightNote').innerText()), await page.locator('#flightHeightNote').innerText());
+    await page.selectOption('#flightHeightSelect', '1000'); await page.waitForTimeout(300);
+    await page.click('#btnSettingsClose'); await page.waitForTimeout(300);
+    await page.click('#viewSwitch [data-view="map"]'); await page.waitForTimeout(1500);
+    await page.click('#btnSettings'); await page.waitForTimeout(400);
+    ok('…changed there, the map side menu follows', await page.inputValue('#drawerMap [data-map-windheight]') === '1000' && await page.evaluate(() => JSON.parse(localStorage.getItem('flysky_flight_profile')).heightM === 1000));
     await ctx.close();
 }
 
@@ -108,19 +121,20 @@ ok('airspeed 18 m/s → ground speed 24, longer flight', /24\.0 m\/s/.test(await
 ok('airspeed shown in m/s and km/h', await page.locator('#mapRouteSpeed').innerText() === '18 m/s' && await page.locator('#mapRouteKmh').innerText() === '65 km/h');
 
 // another height: one request for it
-await page.selectOption('[data-route-level]', '800m'); await page.waitForTimeout(1000);
-ok('wind height ~800 m asks 925 hPa', (log.routeReq || []).at(-1) === 'wind_speed_925hPa,wind_direction_925hPa', log.routeReq);
-ok('one wind height: the calculator sets the map wind height (saved)', await I(() => FlySkyMap._internals.S.wind.level === '800m' && JSON.parse(localStorage.getItem('flysky_map_settings')).wind.level === '800m'));
+await page.selectOption('[data-route-level]', '600'); await page.waitForTimeout(1000);
+ok('flight altitude 600 m asks wind and height at 950 / 925 / 900 hPa', (log.routeReq || []).at(-1) === 'wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa', log.routeReq);
+ok('one flight altitude: the calculator sets it for the whole app (saved)', await I(() => state.flightProfile.heightM === 600 && JSON.parse(localStorage.getItem('flysky_flight_profile')).heightM === 600));
 // Arrows on from the side menu: they ask that height, and the menu shows it.
 await page.click('#mapPanelBtn'); await page.waitForTimeout(300);
 await page.click('#drawerMap label:has([data-map-wind])'); await page.waitForTimeout(1200);
-ok('wind arrows at the calculator height', (log.windVars || []).length > 0 && log.windVars.every(r => r === 'wind_speed_925hPa,wind_direction_925hPa') && await I(() => document.querySelectorAll('.fs-wind').length > 0) && await page.getAttribute('#drawerMap [data-map-windlevel="800m"]', 'class') === 'active', log.windVars);
+ok('wind arrows at the calculator height', (log.windVars || []).length > 0 && log.windVars.every(r => r === 'wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa') && await I(() => document.querySelectorAll('.fs-wind').length > 0) && await page.inputValue('#drawerMap [data-map-windheight]') === '600', log.windVars);
 // …and the side menu sets the calculator's height.
-await page.click('#drawerMap [data-map-windlevel="500m"]'); await page.waitForTimeout(1000);
-ok('side menu height → calculator and arrows', await page.inputValue('[data-route-level]') === '500m' && (log.routeReq || []).includes('wind_speed_950hPa,wind_direction_950hPa') && log.windVars.at(-1) === 'wind_speed_950hPa,wind_direction_950hPa');
+await page.selectOption('#drawerMap [data-map-windheight]', '400'); await page.waitForTimeout(1000);
+ok('side menu height → calculator and arrows', await page.inputValue('[data-route-level]') === '400' && (log.routeReq || []).includes('wind_speed_975hPa,wind_direction_975hPa,geopotential_height_975hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa') && log.windVars.at(-1) === 'wind_speed_975hPa,wind_direction_975hPa,geopotential_height_975hPa,wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa');
+ok('calculator: a constant height above sea level from A', await msg() === '400 m above A ≈ 579 m above sea level along the route.', await msg());
 await page.click('#drawerMap label:has([data-map-wind])'); await page.waitForTimeout(300);
 await page.click('#btnSettingsClose'); await page.waitForTimeout(300);
-await page.selectOption('[data-route-level]', '120m'); await page.waitForTimeout(800);
+await page.selectOption('[data-route-level]', '120'); await page.waitForTimeout(800);
 
 // Tap mode: B pinned, map free
 const bAim = await bPos();
@@ -157,17 +171,23 @@ const t1 = minutes(await head());
 await page.click('[data-route-swap]'); await page.waitForTimeout(1500);
 ok('swap → A east, the crosshair (B) at the old A, slower', near(await center(), [50.45, 30.52], 0.005) && await I(() => Math.abs(FlySkyMap._internals.RT.a.lng - 31.083) < 0.005) && minutes(await head()) > t1, { h: await head(), t1, c: await center(), a: await I(() => FlySkyMap._internals.RT.a) });
 
+// higher ground west of 30.8° E than the flight height (A in the east at 179 m + 300 m)
+opts.routeElevation = (la, lo) => (lo < 30.8 ? 900 : 179);
+await page.selectOption('[data-route-level]', '300'); await page.waitForTimeout(1000);
+ok('ground higher than the flight height: says where and how high', /Below the ground/.test(await head()) && /Below the ground/.test(await tagText()) && /^About \d+ km along, the ground \(≈ 900 m above sea level\) is higher than the flight height \(479 m above sea level, 300 m above A\)\. Choose a higher flight altitude\.$/.test(await msg()), { h: await head(), m: await msg() });
+opts.routeElevation = null;
+
 // a crosswind stronger than the airspeed
 opts.routeWind = { speed: 25, from: 0 };
-await page.selectOption('[data-route-level]', '1500m'); await page.waitForTimeout(1000);
+await page.selectOption('[data-route-level]', '1500'); await page.waitForTimeout(1000);
 ok('too strong a crosswind: no headway, where and why', /No headway/.test(await head()) && /No headway/.test(await tagText()) && /Can't hold the course: at the start, at \d\d:\d\d, the forecast crosswind there is 25\.0 m\/s, more than the 18 m\/s airspeed/.test(await msg()), { h: await head(), t: await tagText(), m: await msg() });
 // a headwind that strengthens over the hours of the flight: stalls part way
 opts.routeWind = { speed: 10, from: 270, ramp: 6 };
-await page.selectOption('[data-route-level]', '10m');   // a height not read yet in this test
+await page.selectOption('[data-route-level]', '10');   // a height not read yet in this test
 await page.waitForFunction(() => /headway|course/.test(document.getElementById('mapRouteMsg').innerText), null, { timeout: 5000 }).catch(() => {});
 ok('headwind growing during the flight: stalls part way, says where, when and the wind', /Can't make headway: about [1-3]\d km along, at \d\d:\d\d \(after (\d+ h )?\d+ min of flying\), the forecast wind there is 1\d\.\d m\/s \(1\d\.\d m\/s against you\)/.test(await msg()), { m: await msg(), h: await head(), req: (log.routeReq || []).slice(-2) });
 opts.routeWind = null;
-await page.selectOption('[data-route-level]', '120m'); await page.waitForTimeout(800);
+await page.selectOption('[data-route-level]', '120'); await page.waitForTimeout(800);
 
 // drag the pinned B (Tap mode)
 await page.click('[data-route-mode="tap"]'); await page.waitForTimeout(300);

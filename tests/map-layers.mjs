@@ -6,7 +6,8 @@ const mobile = process.argv.includes('--mobile');
 const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
-const { log } = await routeAll(page, {});
+const mopts = {};
+const { log } = await routeAll(page, mopts);
 await page.goto(BASE_URL);
 await page.evaluate(() => {
   localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' }));
@@ -100,15 +101,39 @@ await page.locator('#drawerMap label:has([data-map-wind])').click(); await page.
 const arrows = await I(() => document.querySelectorAll('.fs-wind').length);
 ok('wind arrows drawn from one grid request', arrows > 10 && log.windReq === 1, { arrows, req: log.windReq, pts: log.windPts });
 const rot10 = await I(() => document.querySelector('.fs-wind svg').style.transform);
-await page.click('#drawerMap [data-map-windlevel="800m"]'); await page.waitForTimeout(800);
-const rot925 = await I(() => document.querySelector('.fs-wind svg').style.transform);
-// Only the level shown is requested (Open-Meteo counts every variable):
-// the first switch asks once for the other level, later switches are cached.
-ok('level switch: one request for that level, arrows turn', log.windReq === 2 && rot10 === 'rotate(45deg)' && rot925 === 'rotate(90deg)', { rot10, rot925, req: log.windReq });
-await page.click('#drawerMap [data-map-windlevel="10m"]'); await page.waitForTimeout(600);
+ok("earlier '10m' wind height → flight altitude 10 m", await I(() => state.flightProfile.heightM === 10 && !('level' in FlySkyMap._internals.S.wind)) && rot10 === 'rotate(45deg)', rot10);
+await page.selectOption('#drawerMap [data-map-windheight]', '600'); await page.waitForTimeout(800);
+const rot600 = await I(() => document.querySelector('.fs-wind svg').style.transform);
+// Only the height shown is requested (Open-Meteo counts every variable): the
+// first switch asks once for the levels around 600 m, later switches are cached.
+ok('height switch: one request for the levels around it, arrows turn', log.windReq === 2 && rot600 === 'rotate(90deg)' && log.windVars.at(-1) === 'wind_speed_950hPa,wind_direction_950hPa,geopotential_height_950hPa,wind_speed_925hPa,wind_direction_925hPa,geopotential_height_925hPa,wind_speed_900hPa,wind_direction_900hPa,geopotential_height_900hPa', { rot600, req: log.windReq, vars: log.windVars.at(-1) });
+await page.selectOption('#drawerMap [data-map-windheight]', '10'); await page.waitForTimeout(600);
 const rotBack = await I(() => document.querySelector('.fs-wind svg').style.transform);
-await page.click('#drawerMap [data-map-windlevel="800m"]'); await page.waitForTimeout(600);
+await page.selectOption('#drawerMap [data-map-windheight]', '600'); await page.waitForTimeout(600);
 ok('switching back and forth: no more requests', log.windReq === 2 && rotBack === 'rotate(45deg)', { rotBack, req: log.windReq });
+// Wind between the levels: u / v interpolated in height; levels inside the terrain left out.
+const wi = await I(() => {
+    const { windAt, windVars } = FlySkyMap._internals;
+    const hr = { time: ['t'], wind_speed_975hPa: [5], wind_direction_975hPa: [180], geopotential_height_975hPa: [320], wind_speed_950hPa: [10], wind_direction_950hPa: [270], geopotential_height_950hPa: [540],
+        wind_speed_925hPa: [20], wind_direction_925hPa: [270], geopotential_height_925hPa: [760] };
+    const no925 = { ...hr, wind_speed_925hPa: [null] };
+    const r = w => w && (w.below ? 'below' : `${w.speed.toFixed(1)}@${Math.round(w.dir)}`);
+    return { mid: r(windAt(hr, 0, 400, 179, 650)), agl: r(windAt(hr, 0, 400, 179)), below: r(windAt(hr, 0, 400, 700, 650)), high: r(windAt(hr, 0, 400, 2000)),
+        one: r(windAt(no925, 0, 400, 179, 700)), far: r(windAt(no925, 0, 400, 179, 900)), v10: windVars(10).join(), v400: windVars(400).join(), v1500: windVars(1500).filter(v => v.startsWith('wind_speed')).join() };
+});
+ok('wind at 650 m above sea level: halfway between 950 (540 m) and 925 hPa (760 m)', wi.mid === '15.0@270', wi);
+ok('wind 400 m above the ground at 179 m: between 950 and 925 hPa', wi.agl === '11.8@270', wi);
+ok('flight height inside the terrain: below', wi.below === 'below' && wi.high === null, wi);
+ok('one level within 250 m stands for the height, not farther', wi.one === '10.0@270' && wi.far === null, wi);
+ok('variables: 10 m from the height level, 400 m from 975 / 950 / 925 hPa, 1500 m from 900 / 850 / 800 hPa', wi.v10 === 'wind_speed_10m,wind_direction_10m' && /^wind_speed_975hPa,.*925hPa$/.test(wi.v400) && wi.v1500 === 'wind_speed_900hPa,wind_speed_850hPa,wind_speed_800hPa', wi);
+// High ground west of 30° E: no level near 800 m above it, those arrows are left out and said so.
+const all600 = await I(() => document.querySelectorAll('.fs-wind').length);
+mopts.windElevation = (la, lo) => (lo < 30 ? 2000 : 179);
+await page.selectOption('#drawerMap [data-map-windheight]', '800'); await page.waitForTimeout(1200);
+const high = await I(() => ({ n: document.querySelectorAll('.fs-wind').length, info: document.getElementById('mapWindInfo').innerText, hidden: FlySkyMap._internals.W.hidden }));
+ok('high ground: arrows left out there, with a note', high.hidden > 0 && high.n > 0 && high.n + high.hidden >= all600 - 2 && /Arrows left out: \d+ — no model level near this height above the ground there/.test(high.info), { high, all600 });
+mopts.windElevation = null;
+await page.selectOption('#drawerMap [data-map-windheight]', '600'); await page.waitForTimeout(600);
 const colors = await I(() => [...new Set([...document.querySelectorAll('.fs-wind path')].map(p => p.getAttribute('fill')))]);
 ok('arrow colours follow flight thresholds', colors.length >= 2, colors);
 ok('wind info line', /Wind for/.test(await page.locator('#mapWindInfo').innerText()));

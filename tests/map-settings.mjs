@@ -34,8 +34,8 @@ ok('precipitation on: its settings show', await page.isVisible('#drawerMap [data
 await page.click('[data-map-ovopen="precip"]'); await page.waitForTimeout(200);
 ok('sliders button folds them (image time still shown)', !(await page.isVisible('#drawerMap [data-map-opacity="precip"]')) && await page.isVisible('#mapOvInfo_precip'));
 ok('"Layers" summary shows what is on', await I(() => !!document.querySelector('[data-map-section="layers"] .fa-cloud-showers-heavy')));
-// Wind heights fit inside the card
-const fit = await I(() => { const c = document.querySelector('[data-map-section="layers"]').closest('section').getBoundingClientRect(); return [...document.querySelectorAll('[data-map-windlevel]')].every(b => { const r = b.getBoundingClientRect(); return r.left >= c.left && r.right <= c.right; }); });
-ok('wind heights fit the card', fit);
+// The wind height (flight altitude) selector fits inside the card
+const fit = await I(() => { const c = document.querySelector('[data-map-section="layers"]').closest('section').getBoundingClientRect(); const els = [...document.querySelectorAll('[data-map-windheight]')]; return els.length === 1 && els.every(b => { const r = b.getBoundingClientRect(); return r.left >= c.left && r.right <= c.right; }); });
+ok('wind height fits the card', fit);
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await b.close();

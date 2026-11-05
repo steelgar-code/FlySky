@@ -434,6 +434,19 @@
                 <p id="modelCost" class="text-[11px] text-slate-500"></p>
             </section>
             <section class="space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-plane-up text-teal-400"></i><span data-i18n="flightProfileTitle">Flight profile</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="flightProfileDesc">Height above the takeoff point. The map's wind arrows and the flight time calculator use it.</p>
+                </div>
+                <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
+                    <span data-i18n="flightHeightLabel">Flight altitude</span>
+                    <select id="flightHeightSelect" class="unit-select"></select>
+                </label>
+                <p id="flightHeightNote" class="text-[11px] text-slate-500 empty:hidden"></p>
+            </section>
+            <section class="space-y-3">
                 <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider" data-i18n="unitsTitle">Units</h3>
                 <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
                     <span data-i18n="windUnitLabel">Wind</span>
@@ -625,16 +638,18 @@
             // Not every model provides it — those simply add no members.
             { key: 'visibility', unit: 'distance', icon: 'fa-eye', color: '251, 146, 60', titleKey: 'paramVisibility', beginAtZero: true, scale: 0.001 },
             // Wind above the surface layer, where the drone actually flies:
-            // ensemble pools the 1000 hPa (~110 m) and 925 hPa (~800 m) levels,
-            // models mode uses 950 hPa (~500 m).
+            // ensemble pools the 1000 hPa and 925 hPa levels, models mode uses
+            // 950 hPa. Heights above the ground over lowland Ukraine: 1000 hPa
+            // ≈ 0–100 m (often below the ground), 925 hPa ≈ 600 m, 950 hPa
+            // ≈ 400 m (docs/icing-forecast-handoff.md §4.1).
             { key: 'wind_aloft', unit: 'wind', icon: 'fa-arrow-up-wide-short', color: '244, 114, 182', beginAtZero: true,
               titleKey: { ensemble: 'paramWindAloftEns', deterministic: 'paramWindAloftDet' }, statTitleKey: 'statWindAloftTitle',
               note: { ensemble: '1000/925 hPa', deterministic: '950 hPa' },
               vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] },
               // With Members on, each level's member lines get their own color.
               levels: {
-                  wind_speed_1000hPa: { color: '163, 230, 53', label: '~110 m · 1000 hPa' },
-                  wind_speed_925hPa: { color: '96, 165, 250', label: '~800 m · 925 hPa' }
+                  wind_speed_1000hPa: { color: '163, 230, 53', label: '≤ 100 m · 1000 hPa' },
+                  wind_speed_925hPa: { color: '96, 165, 250', label: '~600 m · 925 hPa' }
               } }
         ];
 
@@ -856,6 +871,11 @@
                 chartMoveDown: "Move down",
                 chartDrag: "Drag to reorder",
                 closeLabel: "Close",
+                flightProfileTitle: "Flight profile",
+                flightProfileDesc: "Height above the takeoff point. The map's wind arrows and the flight time calculator use it.",
+                flightHeightLabel: "Flight altitude",
+                flightHeightOption: "{m} m",
+                flightHeightAsl: "≈ {asl} m above sea level at {place} (ground {elev} m).",
                 thresholdsTitle: "Flight thresholds",
                 thresholdsDesc: "Suitable (green) below the first value, not suitable (red) from the second; in between is uncertain (yellow). The wind limits are for the 10 m wind and gusts; wind aloft has limits of its own. Visibility is the other way round: suitable above the first value, not suitable below the second.",
                 plannerSettingsTitle: "Flight Window Planner",
@@ -926,8 +946,8 @@
                 windowWeek: "1 week",
                 modelsCount: "{count} models",
                 paramLowClouds: "Low Cloud Cover",
-                paramWindAloftEns: "Wind 110–800 m",
-                paramWindAloftDet: "Wind ~500 m",
+                paramWindAloftEns: "Wind up to ~600 m",
+                paramWindAloftDet: "Wind ~400 m",
                 statWindAloftTitle: "Peak Wind Aloft",
                 legendMinMaxEnsemble: "Min – max (all members)",
                 legendMinMaxModels: "Min – max (all models)",
@@ -1098,6 +1118,11 @@
                 chartMoveDown: "Перемістити вниз",
                 chartDrag: "Перетягніть, щоб змінити порядок",
                 closeLabel: "Закрити",
+                flightProfileTitle: "Профіль польоту",
+                flightProfileDesc: "Висота над точкою зльоту. Її використовують стрілки вітру на карті й калькулятор часу польоту.",
+                flightHeightLabel: "Висота польоту",
+                flightHeightOption: "{m} м",
+                flightHeightAsl: "≈ {asl} м над рівнем моря ({place}: земля {elev} м).",
                 thresholdsTitle: "Пороги для польоту",
                 thresholdsDesc: "Придатно (зелений) нижче першого значення, непридатно (червоний) від другого; між ними — невизначено (жовтий). Пороги вітру — для вітру й поривів на 10 м; для вітру на висоті — окремі пороги. Для видимості навпаки: придатно понад перше значення, непридатно нижче другого.",
                 plannerSettingsTitle: "Планувальник польотних вікон",
@@ -1168,8 +1193,8 @@
                 windowWeek: "1 тиждень",
                 modelsCount: "{count} моделей",
                 paramLowClouds: "Низька хмарність",
-                paramWindAloftEns: "Вітер 110–800 м",
-                paramWindAloftDet: "Вітер ~500 м",
+                paramWindAloftEns: "Вітер до ~600 м",
+                paramWindAloftDet: "Вітер ~400 м",
                 statWindAloftTitle: "Макс. вітер на висоті",
                 legendMinMaxEnsemble: "Мін – макс (усі члени)",
                 legendMinMaxModels: "Мін – макс (усі моделі)",
@@ -1340,6 +1365,11 @@
                 chartMoveDown: "Mover para baixo",
                 chartDrag: "Arraste para reordenar",
                 closeLabel: "Fechar",
+                flightProfileTitle: "Perfil de voo",
+                flightProfileDesc: "Altura acima do ponto de decolagem. As setas de vento do mapa e a calculadora de tempo de voo a usam.",
+                flightHeightLabel: "Altitude de voo",
+                flightHeightOption: "{m} m",
+                flightHeightAsl: "≈ {asl} m acima do nível do mar em {place} (solo {elev} m).",
                 thresholdsTitle: "Limites de voo",
                 thresholdsDesc: "Adequado (verde) abaixo do primeiro valor, inadequado (vermelho) a partir do segundo; entre eles é incerto (amarelo). Os limites de vento valem para o vento e as rajadas a 10 m; o vento em altitude tem limites próprios. A visibilidade é o inverso: adequado acima do primeiro valor, inadequado abaixo do segundo.",
                 plannerSettingsTitle: "Planejador de janelas de voo",
@@ -1410,8 +1440,8 @@
                 windowWeek: "1 semana",
                 modelsCount: "{count} modelos",
                 paramLowClouds: "Nuvens baixas",
-                paramWindAloftEns: "Vento 110–800 m",
-                paramWindAloftDet: "Vento ~500 m",
+                paramWindAloftEns: "Vento até ~600 m",
+                paramWindAloftDet: "Vento ~400 m",
                 statWindAloftTitle: "Vento máximo em altitude",
                 legendMinMaxEnsemble: "Mín – máx (todos os membros)",
                 legendMinMaxModels: "Mín – máx (todos os modelos)",
@@ -1540,6 +1570,32 @@
                 Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude);
         }
 
+        // ================= Flight profile =================
+        // One flight altitude, in metres above the takeoff point, shared by the
+        // map's wind arrows (above the ground at each arrow), the flight time
+        // calculator (a constant height above sea level from A) and, next, the
+        // icing indicator (docs/icing-forecast-handoff.md, D4). Wind at 10 m
+        // and 120 m comes from the models' height levels; higher up it is
+        // interpolated between the pressure levels around that height.
+        const FLIGHT_HEIGHTS = [10, 120, 200, 300, 400, 500, 600, 800, 1000, 1500];
+        const DEFAULT_FLIGHT_HEIGHT = 400;
+        const FLIGHT_PROFILE_KEY = 'flysky_flight_profile';
+        // Earlier versions kept a wind height (a pressure level) in the map
+        // settings: 950 hPa ("~500 m") is ≈ 400 m above the ground over lowland
+        // Ukraine, 925 hPa ("~800 m", or '925' before that) ≈ 600 m.
+        const LEGACY_WIND_HEIGHTS = { '10m': 10, '120m': 120, '500m': 400, '800m': 600, '925': 600, '1500m': 1500 };
+
+        function loadFlightProfile() {
+            const saved = loadFromStorage(FLIGHT_PROFILE_KEY, null);
+            if (saved && FLIGHT_HEIGHTS.includes(saved.heightM)) return { heightM: saved.heightM };
+            const map = loadFromStorage('flysky_map_settings', null) || {};
+            const old = (map.wind && map.wind.level) || (map.route && map.route.level);
+            const profile = { heightM: LEGACY_WIND_HEIGHTS[old] || DEFAULT_FLIGHT_HEIGHT };
+            // Saved right away: the map drops its own wind height once it loads.
+            if (old) saveToStorage(FLIGHT_PROFILE_KEY, profile);
+            return profile;
+        }
+
         // ================= Application State =================
         let state = {
             location: loadFromStorage('flysky_last_location', null),
@@ -1558,6 +1614,8 @@
             flightSplit: loadFromStorage('flysky_flight_split', false) === true,
             flightRules: sanitizeFlightRules(loadFromStorage('flysky_flight_rules', null)),
             minSlotHours: loadFromStorage('flysky_min_slot_hours', DEFAULT_MIN_SLOT),
+            // { heightM }: see "Flight profile" above.
+            flightProfile: loadFlightProfile(),
             // Which wind the flight rules judge: 'surface' = 10 m wind + gusts,
             // 'aloft' = the wind-aloft chart's values for the current mode.
 
@@ -1616,6 +1674,7 @@
             saveToStorage('flysky_planner_open', state.plannerOpen);
             saveToStorage('flysky_flight_rules', state.flightRules);
             saveToStorage('flysky_min_slot_hours', state.minSlotHours);
+            saveToStorage(FLIGHT_PROFILE_KEY, state.flightProfile);
 
             saveToStorage('flysky_chart_order', state.chartOrder);
         }
@@ -3417,6 +3476,28 @@
                 </div>`).join('');
             document.getElementById('minSlotSelect').innerHTML = MIN_SLOT_OPTIONS.map(h =>
                 `<option value="${h}" ${h === state.minSlotHours ? 'selected' : ''}>${escapeHtml(t('windowHours', { n: h }))}</option>`).join('');
+            renderFlightProfile();
+        }
+
+        // Flight profile in the side menu: the height, and what it is above sea
+        // level at the forecast location (when its elevation is known).
+        function renderFlightProfile() {
+            const sel = document.getElementById('flightHeightSelect');
+            const H = state.flightProfile.heightM;
+            sel.innerHTML = FLIGHT_HEIGHTS.map(m => `<option value="${m}" ${m === H ? 'selected' : ''}>${escapeHtml(t('flightHeightOption', { m }))}</option>`).join('');
+            const loc = state.location;
+            document.getElementById('flightHeightNote').textContent = loc && Number.isFinite(loc.elevation)
+                ? t('flightHeightAsl', { asl: Math.round(loc.elevation + H), place: loc.name, elev: Math.round(loc.elevation) }) : '';
+        }
+
+        // Sets the shared flight altitude (also from the map's side menu and the
+        // flight time calculator).
+        function setFlightHeight(m) {
+            if (!FLIGHT_HEIGHTS.includes(m) || m === state.flightProfile.heightM) return;
+            state.flightProfile = { ...state.flightProfile, heightM: m };
+            saveToStorage(FLIGHT_PROFILE_KEY, state.flightProfile);
+            renderFlightProfile();
+            if (window.FlySkyMap) window.FlySkyMap.onFlightHeight();
         }
 
         function setSettingsDrawer(open) {
@@ -3479,6 +3560,7 @@
                 state.flightRules = next;
                 applyFlightSettings();
             });
+            document.getElementById('flightHeightSelect').addEventListener('change', e => setFlightHeight(Number(e.target.value)));
             document.getElementById('minSlotSelect').addEventListener('change', e => {
                 state.minSlotHours = Number(e.target.value);
                 applyFlightSettings();
@@ -4547,7 +4629,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=20';
+        const MAP_JS = 'map.js?v=21';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 

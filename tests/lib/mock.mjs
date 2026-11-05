@@ -60,6 +60,19 @@ export function makeWms(opts = {}) {
 
 const exc = msg => `<?xml version="1.0" encoding="UTF-8"?><ServiceExceptionReport version="1.3.0" xmlns="http://www.opengis.net/ogc"><ServiceException code="InvalidDimensionValue">${msg}</ServiceException></ServiceExceptionReport>`;
 
+// Standard-atmosphere height (m above sea level) of the pressure levels the app asks.
+const STD_HEIGHT = { 1000: 110, 975: 320, 950: 540, 925: 760, 900: 990, 850: 1460, 800: 1950 };
+// A wind-arrow grid column the base series doesn't have: wind at another
+// height (like 925 hPa unless opts.levelWind names it) or a level's height.
+function levelSeries(v, o, opts) {
+  const m = v.match(/^(wind_speed|wind_direction|geopotential_height)_(.+)$/);
+  if (!m) return o.time.map(() => null);
+  if (m[1] === 'geopotential_height') return o.time.map(() => STD_HEIGHT[parseInt(m[2], 10)] ?? null);
+  const lw = opts.levelWind && opts.levelWind[m[2]];
+  if (m[1] === 'wind_speed') return lw ? o.time.map(() => lw.speed) : o.wind_speed_925hPa;
+  return lw ? o.time.map(() => lw.from) : o.wind_direction_925hPa;
+}
+
 export async function routeAll(page, opts = {}) {
   const wms = makeWms(opts);
   const log = { caps: 0, layerCaps: [], getmap: [], tiles: 0, legend: 0 };
@@ -81,14 +94,17 @@ export async function routeAll(page, opts = {}) {
         for (let i = 0; i < 72; i++) { time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16)); c.push(85); v.push(400); pr.push(0.2);
           ws.push(+(3 + Math.abs(lat - 48) * 1.5).toFixed(1)); wd.push(225); wg.push(9.5); ws9.push(+(8 + Math.abs(lon - 30)).toFixed(1)); wd9.push(270); }
         return { time, cloud_cover_low: c, visibility: v, precipitation: pr, wind_speed_10m: ws, wind_direction_10m: wd, wind_gusts_10m: wg, wind_speed_925hPa: ws9, wind_direction_925hPa: wd9 }; };
-      if (lats.length > 1 || url.includes('925hPa')) {
+      // Wind-arrow grid (no models: best_match); the crosshair readout names its models.
+      if (lats.length > 1 || !u.searchParams.get('models')) {
         log.windReq = (log.windReq || 0) + 1; log.windPts = (log.windPts || 0) + lats.length;
         if (opts.windFail) return route.fulfill({ status: 500, json: { error: true, reason: 'boom' } });
-        // Any other wind height asked: like 925 hPa.
+        // 10 m as in the series; any other height like 925 hPa unless
+        // opts.levelWind = { '950hPa': { speed, from }, … }; pressure levels at
+        // their standard height; the ground at opts.windElevation(lat, lon) or 179 m.
         const asked = (u.searchParams.get('hourly') || '').split(',');
         log.windVars = (log.windVars || []).concat(u.searchParams.get('hourly'));
-        const withLevels = (la, lo) => { const o = series(la, lo); asked.forEach(v => { if (!o[v] && /^wind_(speed|direction)_/.test(v)) o[v] = o[v.startsWith('wind_speed') ? 'wind_speed_925hPa' : 'wind_direction_925hPa']; }); return o; };
-        const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: withLevels(+la, +lons[i]) }));
+        const withLevels = (la, lo) => { const o = series(la, lo); asked.forEach(v => { if (!o[v]) o[v] = levelSeries(v, o, opts); }); return o; };
+        const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], elevation: opts.windElevation ? opts.windElevation(+la, +lons[i]) : 179, hourly: withLevels(+la, +lons[i]) }));
         return route.fulfill({ json: list.length === 1 ? list[0] : list });
       }
       log.model = (log.model || 0) + 1; log.modelUrls = (log.modelUrls || []).concat(url);
@@ -137,12 +153,18 @@ export async function routeAll(page, opts = {}) {
       // opts.routeWind = { speed (m/s), from (deg), ramp (m/s more per hour ahead) } — default 6 m/s from the west.
       const u = new URL(url);
       const lats = u.searchParams.get('latitude').split(','), lons = u.searchParams.get('longitude').split(',');
-      const [sv, dv] = u.searchParams.get('hourly').split(',');
+      // Every wind variable asked gets opts.routeWind; pressure levels sit at their
+      // standard height; the ground at opts.routeElevation(lat, lon) or 179 m.
+      const asked = u.searchParams.get('hourly').split(',');
       const w = opts.routeWind || { speed: 6, from: 270 };
       log.routeReq = (log.routeReq || []).concat(u.searchParams.get('hourly'));
       const start = Math.floor(Date.now() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < 48; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
-      const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], hourly: { time, [sv]: time.map(x => w.speed + (w.ramp || 0) * Math.max(0, (Date.parse(x + 'Z') - Date.now()) / 3600e3)), [dv]: time.map(() => w.from) } }));
+      const one = v => v.startsWith('wind_speed_') ? time.map(x => w.speed + (w.ramp || 0) * Math.max(0, (Date.parse(x + 'Z') - Date.now()) / 3600e3))
+        : v.startsWith('wind_direction_') ? time.map(() => w.from)
+        : v.startsWith('geopotential_height_') ? time.map(() => STD_HEIGHT[parseInt(v.slice(20), 10)] ?? null) : time.map(() => null);
+      const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], elevation: opts.routeElevation ? opts.routeElevation(+la, +lons[i]) : 179,
+        hourly: Object.fromEntries([['time', time], ...asked.map(v => [v, one(v)])]) }));
       return route.fulfill({ json: list.length === 1 ? list[0] : list });
     }
     if (url.includes('open-meteo.com')) return route.fulfill({ status: 503, json: { error: true, reason: 'offline in test' } });
