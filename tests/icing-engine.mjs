@@ -35,13 +35,16 @@ function makeBody({ hours = 6, models = TWO, elevation = ELEV, agl = AGL, level 
                 put(`relative_humidity_${p}hPa`, m, i, v.rh);
             });
             const s = sfc(m, i);
-            const v = s === null ? { t2: null, rh2: null, code: null, vis: null, precip: null }
-                : { t2: -3, rh2: 80, code: 3, vis: 20000, precip: 0, ...s };
+            const v = s === null ? { t2: null, rh2: null, code: null, vis: null, precip: null, ps: null, rain: null, low: null }
+                : { t2: -3, rh2: 80, code: 3, vis: 20000, precip: 0, ps: null, rain: null, low: null, ...s };
             put('temperature_2m', m, i, v.t2);
             put('relative_humidity_2m', m, i, v.rh2);
             put('weather_code', m, i, v.code);
             put('visibility', m, i, v.vis);
             put('precipitation', m, i, v.precip);
+            put('surface_pressure', m, i, v.ps);
+            put('rain', m, i, v.rain);
+            put('cloud_cover_low', m, i, v.low);
         }
     });
     return { latitude: 50.45, longitude: 30.52, elevation, hourly };
@@ -55,13 +58,14 @@ const h0 = (body, opts) => run(body, opts).hours[0];
     const p = I.requestParams({ latitude: 50.45, longitude: 30.52, elevation: ELEV });
     const vars = p.hourly.split(',');
     ok('request: ICON + UKMO by default', p.models === 'icon_seamless,ukmo_seamless', p.models);
-    ok('request: levels 1000–850 hPa with T, RH and height, plus T at 700 hPa', ['1000', '975', '950', '925', '900', '850'].every(l => vars.includes(`geopotential_height_${l}hPa`) && vars.includes(`relative_humidity_${l}hPa`)) && vars.includes('temperature_700hPa') && !vars.includes('geopotential_height_800hPa'));
-    ok('request: surface variables', ['temperature_2m', 'relative_humidity_2m', 'weather_code', 'visibility', 'precipitation'].every(v => vars.includes(v)));
-    ok('request: 24 variables × 2 models = 4.8 calls', near(I.requestCost(p), 4.8), I.requestCost(p));
+    ok('request: levels 1000–850 hPa with T and RH (no heights: they come from the surface pressure), plus T at 700 hPa', ['1000', '975', '950', '925', '900', '850'].every(l => vars.includes(`temperature_${l}hPa`) && vars.includes(`relative_humidity_${l}hPa`)) && !vars.some(v => v.startsWith('geopotential_height')) && vars.includes('temperature_700hPa') && !vars.includes('temperature_800hPa'));
+    ok('request: surface variables incl. surface pressure, rain and low cloud', ['surface_pressure', 'temperature_2m', 'relative_humidity_2m', 'weather_code', 'visibility', 'precipitation', 'rain', 'cloud_cover_low'].every(v => vars.includes(v)));
+    ok('request: 21 variables × 2 models = 4.2 calls', near(I.requestCost(p), 4.2), I.requestCost(p));
     const high = I.requestParams({ latitude: 0, longitude: 0, heightM: 1500, elevation: ELEV }).hourly.split(',');
-    ok('request: 1500 m above takeoff asks up to 800 hPa', high.includes('geopotential_height_800hPa'));
+    ok('request: 1500 m above takeoff asks up to 800 hPa', high.includes('relative_humidity_800hPa'));
     const mtn = I.requestParams({ latitude: 0, longitude: 0, elevation: 2025 }).hourly.split(',');
-    ok('request: high ground asks up to 700 hPa in full, once', mtn.includes('relative_humidity_700hPa') && mtn.filter(v => v === 'temperature_700hPa').length === 1);
+    ok('request: high ground asks 800 and 700 hPa only (levels inside the terrain left out), 700 hPa once', mtn.includes('relative_humidity_700hPa') && mtn.filter(v => v === 'temperature_700hPa').length === 1 && !mtn.includes('temperature_850hPa') && !mtn.includes('temperature_1000hPa'), mtn.filter(v => v.endsWith('hPa')));
+    ok('request: 400 m ground leaves 1000 hPa out', !I.requestParams({ latitude: 0, longitude: 0, elevation: 400 }).hourly.includes('temperature_1000hPa'));
     ok('request: same timezone as the forecast (auto)', p.timezone === 'auto' && p.forecast_days === 8);
     ok('cost: 16 locations × 2 variables = 16 (Phase 0)', I.requestCost({ latitude: Array(16).fill(50).join(','), hourly: 'a,b', forecast_days: 2 }) === 16);
     ok('cost: 1 location × 15 variables = 1.5 (Phase 0)', near(I.requestCost({ latitude: 50, hourly: Array(15).fill('x').join(','), forecast_days: 8 }), 1.5));
@@ -81,7 +85,9 @@ const h0 = (body, opts) => run(body, opts).hours[0];
     ok('level: −4 °C, 96 % → red', I.levelState(-4, 96) === 'red');
     ok('level: −5 °C, 85 % → marginal', I.levelState(-5, 85) === 'marginal');
     ok('level: +0.5 °C, 95 % → marginal (temperature margin)', I.levelState(0.5, 95) === 'marginal');
-    ok('level: −25 °C, 95 % → marginal (mostly glaciated)', I.levelState(-25, 95) === 'marginal');
+    ok('level: −25 °C, 95 % → red (well above ice saturation)', I.levelState(-25, 95) === 'red');
+    ok('level: −35 °C, 95 % → none', I.levelState(-35, 95) === 'none');
+    ok('level: +1.5 °C, 95 % → marginal, +2.5 °C → none', I.levelState(1.5, 95) === 'marginal' && I.levelState(2.5, 95) === 'none');
     ok('level: −5 °C, 70 % → none', I.levelState(-5, 70) === 'none');
     ok('level: +3 °C, 99 % → none', I.levelState(3, 99) === 'none');
     ok('level: missing RH → unknown', I.levelState(-5, null) === 'unknown');
@@ -219,6 +225,52 @@ const h0 = (body, opts) => run(body, opts).hours[0];
     ok('10 m flight without cues: none, fully known', lowOk.state === 'none' && !lowOk.partlyUnknown, lowOk);
     const strict = run(makeBody({ level: (m, i, p) => (p === 950 ? { t: -4, rh: 92 } : {}) }), { thresholds: { rhRed: 95 } }).hours[0];
     ok('thresholds: RH 92 % is marginal with rhRed 95', strict.models.icon_seamless.flight.cruise.state === 'marginal');
+}
+
+
+// ---- v2: heights from the surface pressure, cues, strong signal
+{
+    // No geopotential height: 950 hPa above a 995 hPa surface at −5 °C, dry: 29.27 m/K × 268.15 K × ln(995/950).
+    const body = makeBody({ level: (m, i, p) => ({ z: null, t: -5, rh: 0 }), sfc: () => ({ ps: 995, t2: -5, rh2: 0 }) });
+    const prof = I.profileAt(I.splitModels(body.hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless');
+    const l950 = prof.levels.find(l => l.p === 950), l1000 = prof.levels.find(l => l.p === 1000);
+    const want = 287.05 / 9.80665 * 268.15 * Math.log(995 / 950);
+    ok('heights from the surface pressure (hypsometric)', near(l950.agl, want, 0.5) && near(l950.z, ELEV + want, 0.5), { got: l950.agl, want });
+    ok('a level at a higher pressure than the surface: below the ground, not used', l1000.agl < 0 && !l1000.valid);
+    const mixed = I.profileAt(I.splitModels(makeBody().hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless');
+    ok('geopotential height used when it is there', mixed.levels.find(l => l.p === 950).agl === AGL[950]);
+}
+{
+    // Freezing drizzle from supercooled stratus: drizzle, −2 °C at 2 m, a red layer at 975 + 950 hPa (−4 °C), dry above, nothing above 0 °C.
+    const drz = { t2: -2, precip: 0.3 };
+    const layer = (m, i, p) => (p === 975 || p === 950 ? WET : {});
+    const h = h0(makeBody({ level: layer, sfc: () => drz }));
+    const f = h.models.icon_seamless.flight;
+    ok('freezing drizzle from stratus (no warm nose): red in every phase, source drizzle', f.cues.start.freezingPrecip && f.cues.start.freezingPrecip.source === 'drizzle' && f.cruise.state === 'red' && h.strong === 'freezingPrecip', f.cues.start);
+    const cold = h0(makeBody({ level: (m, i, p) => (p === 975 || p === 950 ? { t: -15, rh: 96 } : p === 925 ? { t: -16 } : {}), sfc: () => drz })).models.icon_seamless.flight;
+    ok('stratus top colder than −12 °C: no drizzle cue', !cold.cues.start.freezingPrecip);
+    const dry = h0(makeBody({ level: layer, sfc: () => ({ t2: -2, precip: 0 }) })).models.icon_seamless.flight;
+    ok('no precipitation: no drizzle cue', !dry.cues.start.freezingPrecip);
+    const moistAbove = h0(makeBody({ level: (m, i, p) => (p === 975 || p === 950 ? WET : p === 925 ? { rh: 85 } : {}), sfc: () => drz })).models.icon_seamless.flight;
+    ok('moist air above the layer (not a capped deck): no drizzle cue', !moistAbove.cues.start.freezingPrecip);
+}
+{
+    const rainy = h0(makeBody({ sfc: () => ({ t2: -1, precip: 0.4, rain: 0.4 }) }));
+    ok('ICON rain at −1 °C: freezing rain / drizzle (own rain–snow split)', rainy.models.icon_seamless.flight.cues.start.freezingPrecip && rainy.models.icon_seamless.flight.cues.start.freezingPrecip.source === 'rain');
+    ok('UKMO rain at −1 °C: no cue (its split follows the 2 m temperature)', !rainy.models.ukmo_seamless.flight.cues.start.freezingPrecip);
+}
+{
+    const thin = h0(makeBody({ sfc: () => ({ t2: -2, low: 95 }) }));
+    const f = thin.models.icon_seamless.flight;
+    ok('much low cloud, all sub-zero, no red level: marginal (thin layer between levels)', f.state === 'marginal' && f.cues.start.thinLayer && f.cues.start.thinLayer.pct === 95, f.state);
+    const warmLayer = h0(makeBody({ level: (m, i, p) => (p === 900 ? { t: 2 } : {}), sfc: () => ({ t2: -2, low: 95 }) })).models.icon_seamless.flight;
+    ok('a level above 0 °C within 2 km: no thin-layer cue', !warmLayer.cues.start.thinLayer);
+}
+{
+    const both = h0(makeBody({ level: (m, i, p) => (p === 950 || p === 925 ? WET : {}) }));
+    const one = h0(makeBody({ level: (m, i, p) => (m === 'icon_seamless' && (p === 950 || p === 925) ? WET : {}) }));
+    const climb = h0(makeBody({ level: (m, i, p) => (p === 975 ? WET : {}) }));
+    ok('strong signal: cruise red in 2 of 2 models; not for one model or climb only', both.strong === 'cruise' && one.strong === null && climb.strong === null, [both.strong, one.strong, climb.strong]);
 }
 
 // ---- Browser global

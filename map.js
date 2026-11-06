@@ -2320,6 +2320,9 @@
     // forecastHour: a later hour picked in the forecast view; the arrows
     // then show that hour (with the latest image) until another image is
     // picked.
+    // Wind is read again after 2 h (best_match follows ICON, which runs every
+    // 3 h): panning back to an area costs nothing (Open-Meteo counts 1 call per point).
+    const WIND_MAX_AGE_MS = 2 * 3600e3;
     const W = { cache: new Map(), group: null, seq: 0, hour: null, error: '', loading: false, timer: null, forecastHour: null, hidden: 0 };
 
     function windShown() {
@@ -2376,7 +2379,7 @@
                 hourly: windVars(heightM).join(','),
                 past_days: 1, forecast_days: days, timezone: 'GMT', wind_speed_unit: 'ms'
             }, []);
-            const res = await fetch(url);
+            const res = await omFetch(url, { cost: chunk.length, deferrable: true });
             const body = await res.json();
             if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
             const list = Array.isArray(body) ? body : [body];
@@ -2408,10 +2411,10 @@
         const pts = windGrid();
         // Forget points not refreshed for 30 min (they'd be fetched again
         // anyway), and never keep more than 1500.
-        W.cache.forEach((c, k) => { if (Date.now() - c.at > 30 * 60e3) W.cache.delete(k); });
+        W.cache.forEach((c, k) => { if (Date.now() - c.at > WIND_MAX_AGE_MS) W.cache.delete(k); });
         for (const k of W.cache.keys()) { if (W.cache.size <= 1500) break; W.cache.delete(k); }
         const H = flightHeight();
-        const missing = pts.filter(p => { const c = W.cache.get(`${H}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3 || !(c.until >= hour); });
+        const missing = pts.filter(p => { const c = W.cache.get(`${H}|${p.key}`); return !c || Date.now() - c.at > WIND_MAX_AGE_MS || !(c.until >= hour); });
         W.error = '';
         if (missing.length) {
             W.loading = true; renderWindInfo();
@@ -3213,7 +3216,7 @@
     }
 
     // The models of the forecast's Models mode at a point (hourly, UTC), in
-    // one request, cached 15 min: { ids, per: { id: hourly }, merged } where
+    // one request, cached 1 h: { ids, per: { id: hourly }, merged } where
     // `merged` holds the median across the models (wind direction: the
     // average direction).
     const MODEL_VARS = ['cloud_cover_low', 'visibility', 'precipitation', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'];
@@ -3234,13 +3237,13 @@
         const lat = (Math.round(ll.lat * 20) / 20).toFixed(2), lon = (Math.round(ll.lng * 20) / 20).toFixed(2);
         const key = `${lat},${lon},${state.precipUnit},${state.windUnit},${ids.join('+')}`;
         const hit = P.model.get(key);
-        if (hit && Date.now() - hit.at < 15 * 60e3) return hit.data;
+        if (hit && Date.now() - hit.at < 60 * 60e3) return hit.data;
         const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
             latitude: lat, longitude: lon, hourly: MODEL_VARS.join(','), models: ids.length ? ids.join(',') : undefined,
             past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined,
             wind_speed_unit: state.windUnit && state.windUnit !== 'ms' ? state.windUnit : undefined
         }, []);
-        const res = await fetch(url, { signal });
+        const res = await omFetch(url, { cost: Math.max(1, MODEL_VARS.length * Math.max(1, ids.length) / 10), deferrable: true, signal });
         const body = await res.json();
         if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
         const data = splitModels(body.hourly, ids);
@@ -3895,7 +3898,7 @@
         if (!S.route.on || line.length < 2 || lineLength(line) < 50) { renderRouteResult(); return; }
         const H = flightHeight();
         const cells = [...new Map(routeSamples(line).map(p => [p.key, p])).values()];
-        const missing = cells.filter(p => { const c = RT.wind.get(`${H}|${p.key}`); return !c || Date.now() - c.at > 30 * 60e3; });
+        const missing = cells.filter(p => { const c = RT.wind.get(`${H}|${p.key}`); return !c || Date.now() - c.at > WIND_MAX_AGE_MS; });
         const id = ++RT.seq;
         RT.error = '';
         if (missing.length) {
@@ -3906,7 +3909,7 @@
                     latitude: missing.map(p => p.key.split(',')[0]).join(','), longitude: missing.map(p => p.key.split(',')[1]).join(','),
                     hourly: windVars(H).join(','), forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
                 }, []);
-                const res = await fetch(url);
+                const res = await omFetch(url, { cost: missing.length, deferrable: true });
                 const body = await res.json();
                 if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
                 const list = Array.isArray(body) ? body : [body];

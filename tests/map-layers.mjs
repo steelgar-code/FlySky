@@ -111,6 +111,15 @@ await page.selectOption('#drawerMap [data-map-windheight]', '10'); await page.wa
 const rotBack = await I(() => document.querySelector('.fs-wind svg').style.transform);
 await page.selectOption('#drawerMap [data-map-windheight]', '600'); await page.waitForTimeout(600);
 ok('switching back and forth: no more requests', log.windReq === 2 && rotBack === 'rotate(45deg)', { rotBack, req: log.windReq });
+// Open-Meteo use near the hourly free limit: map requests held back (with the reason), the forecast not.
+await I(() => omRecord(4300));
+await page.selectOption('#drawerMap [data-map-windheight]', '1500'); await page.waitForTimeout(800);
+const paused = await I(() => document.getElementById('mapWindInfo').innerText);
+ok('near the hourly limit: wind arrows paused, no request, the reason said', log.windReq === 2 && /paused to stay under Open-Meteo's free limit \([\d,]+ of 5,000 calls in the last hour\)/.test(paused), { paused, req: log.windReq });
+const pace = await I(() => { omLog.length = 0; omRecord(500); const r = { full: omWaitMs(20), room: omWaitMs(5) }; omLog.length = 0; omRecord(500, 'e'); r.ens = omWaitMs(20); r.total = omUsed(60e3); omLog.length = 0; return r; });
+ok('a nearly full minute: map requests wait for room (up to a minute), small ones go', pace.full > 50e3 && pace.full <= 60.5e3 && pace.room === 0, pace);
+ok('the ensemble API counts apart: its calls do not hold map requests back (but show in the total)', pace.ens === 0 && pace.total === 500, pace);
+await page.selectOption('#drawerMap [data-map-windheight]', '600'); await page.waitForTimeout(800);
 // Wind between the levels: u / v interpolated in height; levels inside the terrain left out.
 const wi = await I(() => {
     const { windAt, windVars } = FlySkyMap._internals;

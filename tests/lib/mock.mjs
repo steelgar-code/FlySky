@@ -79,7 +79,7 @@ const ICING_AGL = { 1000: -20, 975: 180, 950: 380, 925: 590, 900: 865, 850: 1320
 const ICING_WET = { temperature: -4, relative_humidity: 96 };
 // Default scenario, k = hours from now: both models saturated at −4 °C at 950 + 925 hPa (the 400 m
 // flight altitude) for k 0–2; only ICON for k 3–5; a layer below it (975 hPa) for both at k 6–8;
-// freezing fog at the ground at k 12; a layer above it (900 hPa, ~870 m) for both at k 15–17; UKMO's forecast ends at k 100; cold and dry otherwise.
+// freezing fog at the ground at k 12; a layer above it (900 hPa, ~800 m) for both at k 15–17; UKMO's forecast ends at k 100; cold and dry otherwise.
 export function icingScenario(m, k, p) {
   if (m === 'ukmo_seamless' && k >= 100) return null;
   if (k >= 0 && k < 3 && (p === 950 || p === 925)) return ICING_WET;
@@ -138,9 +138,10 @@ export async function routeAll(page, opts = {}) {
       }
       return route.fulfill({ json: { hourly: series(+lats[0], +lons[0]) } });
     }
-    if (url.includes('api.open-meteo.com/v1/forecast') && url.includes('models=') && url.includes('geopotential_height_')) {
-      // Icing request (icing.js, forecast tab): the same time axis as the forecast mock, pressure levels
-      // at fixed heights above a 179 m ground. opts.icing(model, k, p) → { temperature, relative_humidity }
+    if (url.includes('api.open-meteo.com/v1/forecast') && url.includes('models=') && url.includes('surface_pressure')) {
+      // Icing request (icing.js, forecast tab): the same time axis as the forecast mock; surface pressure
+      // 997 hPa over a 179 m ground (the app works out the level heights from it: ~180 m at 975 hPa,
+      // ~380 m at 950, ~590 m at 925); geopotential heights only if asked. opts.icing(model, k, p) → { temperature, relative_humidity }
       // overrides of level p (null: no data), opts.icingSfc(model, k) → surface overrides (null: no data),
       // k = hours from the app's current hour; default icingScenario(). opts.icingFail = reason: an error.
       const u = new URL(url);
@@ -163,7 +164,7 @@ export async function routeAll(page, opts = {}) {
           }
           const o = sfc(m, k);
           if (o === null) return null;
-          return { temperature_2m: -3, relative_humidity_2m: 80, weather_code: 3, visibility: 20000, precipitation: 0, ...o }[v] ?? null;
+          return { surface_pressure: 997, temperature_2m: -3, relative_humidity_2m: 80, weather_code: 3, visibility: 20000, precipitation: 0, rain: 0, cloud_cover_low: 20, ...o }[v] ?? null;
         });
       }));
       return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), elevation: ICING_GROUND, utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', hourly } });

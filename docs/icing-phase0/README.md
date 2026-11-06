@@ -9,6 +9,7 @@ Not part of the app (nothing here is loaded by it). [`results.txt`](results.txt)
 | `live.py` | V1 levels / variables / forecast length, V2 `best_match` and multi-location format, V5 heights and below-ground values, V6 hourly steps, V9 costs, V10 ICON component | `api.open-meteo.com` | ≈ 160 |
 | `winter.py` | Dec 2025 – Feb 2026 at Kyiv and Zaporizhzhia, 8 models: V3 RH conventions, V4 weather codes, flag rates | `historical-forecast-api.open-meteo.com` | ≈ 280 |
 | `ensemble.py` | V7 pressure-level temperature / humidity in the ensembles | `ensemble-api.open-meteo.com` | ≈ 160 |
+| `rain.py` | the models' rain / snow split below 0 °C at 2 m (ICON has rain there, UKMO's split follows the 2 m temperature) — the v2.7 ICON rain cue | `historical-forecast-api.open-meteo.com` | ≈ 15 |
 | `analyze.py` | tables for V1–V6, V9, V10, flag rates, 950 vs 925 hPa | — (saved data) | 0 |
 | `rhnorm.py` | V3: red hours with RH converted to RH over water | — | 0 |
 | `select.py` | one or two models instead of the 5-model consensus (§7.6) | — | 0 |
@@ -17,7 +18,7 @@ Not part of the app (nothing here is loaded by it). [`results.txt`](results.txt)
 
 ```sh
 cd docs/icing-phase0
-python3 live.py && python3 winter.py && python3 ensemble.py
+python3 live.py && python3 winter.py && python3 ensemble.py && python3 rain.py
 python3 analyze.py; python3 rhnorm.py; python3 select.py; python3 layers.py
 node engine_check.mjs
 ```

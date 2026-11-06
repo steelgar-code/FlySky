@@ -1,9 +1,9 @@
 # FIXED-WING UAV ATMOSPHERIC ICING FORECASTING
-## Technical Handoff & Architecture Specification — v2.6 (FlySky integration)
+## Technical Handoff & Architecture Specification — v2.7 (FlySky integration)
 
 | Document status | Purpose | Intended use |
 |---|---|---|
-| **Design decided (D1–D17); Phase 0 API verification done (2026-11-05); stages 1–3 implemented: engine `icing.js`, flight altitude in metres with wind at a fixed height, the icing indicator in the forecast view** | The icing screening design for FlySky: Phase 0 results (live Open-Meteo APIs, last winter's archived forecasts), v1 with two models (ICON + UKMO), flight altitude in metres above takeoff, icing-layer report, and the staged implementation. | Implementation of stages 2–5 in FlySky (`index.html`, `map.js`, `icing.js`), test planning. Phase 0 scripts and output: [`docs/icing-phase0/`](icing-phase0/); engine tests: `tests/icing-engine.mjs`. |
+| **Design decided (D1–D17); Phase 0 API verification done (2026-11-05); stages 1–3 implemented: engine `icing.js`, flight altitude in metres with wind at a fixed height, the icing indicator in the forecast view; stage 3.1: design-review patch and Open-Meteo call budget** | The icing screening design for FlySky: Phase 0 results (live Open-Meteo APIs, last winter's archived forecasts), v1 with two models (ICON + UKMO), flight altitude in metres above takeoff, icing-layer report, and the staged implementation. | Implementation of stages 2–5 in FlySky (`index.html`, `map.js`, `icing.js`), test planning. Phase 0 scripts and output: [`docs/icing-phase0/`](icing-phase0/); engine tests: `tests/icing-engine.mjs`. |
 
 > **Safety notice**
 > Proxy indicators and exposure estimates are not validated icing forecasts. They do not estimate ice accretion or a probability of icing, and **must not be used to authorize flight into icing conditions**. A small fixed-wing UAV should be kept out of forecast or observed icing unless the complete aircraft is designed, tested and approved for it. In FlySky the icing indicator is a separate, clearly labelled, **experimental** screening aid; by default it does not change the flight verdict. It shows where the icing layers are and how long a flight would spend in them; it never recommends flying through them (§7.7).
@@ -11,6 +11,14 @@
 ---
 
 ## 0. Recent changes
+
+**v2.7 — stage 3.1: design-review patch and call budget** (§5.3, §6, §7, §8.2, §12):
+
+1. **Engine v2** (`icing.js` `VERSION` 2): potential icing from −30 °C (was −20 °C) and marginal up to +2 °C (was +1 °C); new cues — **freezing drizzle from supercooled stratus** without a melting layer, **ICON's own rain** at a sub-zero 2 m temperature, and a **thin-layer guard** (much low cloud, all sub-zero, no level red → marginal); **level heights from the surface pressure** (hypsometric equation) instead of asking each level's height, and levels certainly inside the terrain not asked: **4.2 calls** per update instead of 4.8 (§5.3, §7.3, §7.4).
+2. **"Icing risk" flag** next to the flight verdict when both models show potential icing at the flight altitude, or either shows freezing rain or drizzle; while icing is not in the verdict a line under it says so (§7.2, §8.2).
+3. **Planner:** "stay below" only when the hours around the slot are clear and dry in both models and the layer is at least 150 m above the flight altitude; icing signs the hour before or after a slot count (§8.2).
+4. **Wording and colours:** "≈" minutes, what icing does to a small UAV, the platform assumed (no ice protection, unheated pitot, fixed-wing climb); neutral grey (not green) for "no signs", hatched for no data, striped where only one model has data, faded beyond 3 days (§8.2).
+5. **Call budget** (§6.3): every Open-Meteo answer's cost logged for 24 h and shown in the side menu; map requests paced and held back near the free limits; forecast, icing and map answers reused longer.
 
 **v2.6 — stage 3 implemented** (§8.2, §10, §12, §13): the icing indicator in the forecast view. *Flight profile* gets climb and descent rates, flight duration, an **on / off switch for the indicator** (on by default; off saves its ≈ 5 calls per update), "Include icing in the flight verdict" and the experimental RH thresholds. `icing.js` loads on demand; one ICON + UKMO request (≈ 4.8 calls), read again after an hour, the last answers kept by altitude (no new request when switching back), the latest stored for offline use; a failure is shown in the Icing row and never holds up the forecast. In the "Can I fly now?" card an *Icing* row follows the selected hour (state, where and how many of the two models, the layer line); a thin icing strip under the flight bar, the models' climb / cruise / descent minutes for a pinned hour; a collapsible *Icing profile*; planner notes; the verdict option in both modes (the members take the icing models' shares, no extra models).
 
@@ -48,7 +56,7 @@ Unchanged since v2.1: meteorological hazard evidence is kept separate from aircr
 | D2 | Icing exposed **only during climb or descent** is shown **red**, with a clear note ("climb only: ~3 min through 150–300 m above ground"). Happens in up to ~1 in 5 winter hours for some models. | Decided |
 | D3 | Defaults: flight altitude **400 m above takeoff** (≈ the 950 hPa level over lowland Ukraine), climb **2 m/s**, descent **2 m/s**, flight duration **2 h**. | Decided (v2.4) |
 | D4 | **One altitude setting** ("Flight altitude", metres above takeoff) for wind arrows, calculator wind and icing. Each hour the levels are placed by their geopotential height and the flight height is evaluated between the two around it (D14); the app shows the height above sea level and above the ground with it. | Decided (v2.4) |
-| D5 | Forecast-tab icing uses a **separate request** with the **icing models** (v1: ICON + UKMO), not the Models-mode selection: T, RH, height at 1000–850 hPa (more for high flights / high ground), T at 700 hPa, 2 m T and RH, weather code, visibility, precipitation = 24 variables × 2 models = **4.8 calls**; same `timezone` as the forecast request. | Decided (v2.4) |
+| D5 | Forecast-tab icing uses a **separate request** with the **icing models** (v1: ICON + UKMO), not the Models-mode selection: T, RH, height at 1000–850 hPa (more for high flights / high ground), T at 700 hPa, 2 m T and RH, weather code, visibility, precipitation = 24 variables × 2 models = **4.8 calls**; same `timezone` as the forecast request. v2.7: level heights from the surface pressure, plus rain and low cloud — 21 variables, **4.2 calls** (§6.2). | Decided (v2.4) |
 | D6 | Route icing data come with the **route request** (same samples, same timing). With three levels around the flight height for two models it costs ≈ **3 calls per route point** (≤ 48 for a new 16-point route; today 16). The climb/descent column at A reuses the forecast-tab data when A is in the forecast location's area, otherwise one small request. | Decided (v2.4) |
 | D7 | Icing comes from **deterministic models only**, also in Ensemble mode: ensemble pressure-level T/RH exists only for ECMWF IFS 0.25°, AIFS, the GFS ensemble and WeatherNext 2, only at 1000 / 925 hPa below ~1 km, not for FlySky's default ECMWF ensemble (IFS Europe) or ICON-EU EPS, and ~200 members would cost far more. | Decided |
 | D8 | Vertical velocity is **not used** in v1. | Decided |
@@ -82,7 +90,7 @@ Unchanged since v2.1: meteorological hazard evidence is kept separate from aircr
 - Sub-grid resolution, interpolation of humidity between levels, audit logs / machine-readable export, single exposure index.
 
 **Simplifications**
-- Heights: the flight altitude is metres above the takeoff point; with the takeoff elevation (the API response's `elevation`, Open-Meteo's 90 m terrain model) it is a height above sea level. Level heights come from their geopotential height.
+- Heights: the flight altitude is metres above the takeoff point; with the takeoff elevation (the API response's `elevation`, Open-Meteo's 90 m terrain model) it is a height above sea level. Level heights come from the surface pressure (hypsometric equation, v2.7; geopotential height before).
 - One cruise altitude per flight/route (no per-leg altitude profile); the route is flown at a constant height above sea level (§9).
 - Turns, loiter patterns and alternate routes are not modelled; the calculator's round trip is outbound + return along the same line.
 
@@ -93,7 +101,7 @@ Unchanged since v2.1: meteorological hazard evidence is kept separate from aircr
 ```text
 [ Settings: Flight profile ]  flight altitude (m above takeoff) · climb · descent · duration · (airspeed in calculator)
             │
-            ├── Forecast tab ──► icing request: ICON + UKMO, 1 location, ≈ 4.8 calls   (icing.js requestParams)
+            ├── Forecast tab ──► icing request: ICON + UKMO, 1 location, ≈ 4.2 calls   (icing.js requestParams)
             │
             └── Calculator ────► route request: ICON + UKMO, 3 levels around the flight height, ≈ 3 calls / point
                                  + column at A (reuse forecast data or 1 small request)
@@ -204,7 +212,7 @@ The existing wind height setting (shared by wind arrows and calculator) becomes 
 - **Unit and datum:** metres **above the takeoff point** — the number a pilot sets in the ground control station (most small-UAV autopilots hold barometric altitude relative to home).
 - **Options:** 10 m, 120 m, 200 m, 300 m, **400 m (default)**, 500 m, 600 m, 800 m, 1000 m, 1500 m.
 - **Height above sea level** = takeoff elevation + flight altitude (forecast tab: the forecast location; calculator: point A). Shown with it: "400 m above takeoff · 569 m above sea level".
-- **Evaluation (D14):** each hour, the levels are placed by their geopotential height; the flight height takes the worse state of the levels just below and above. Humidity is never interpolated. Wind (stage 2) is interpolated linearly between the two levels (u and v components).
+- **Evaluation (D14):** each hour, the levels are placed by their height (v2.7: worked out from the surface pressure, §5.3); the flight height takes the worse state of the levels just below and above. Humidity is never interpolated. Wind (stage 2) is interpolated linearly between the two levels (u and v components).
 - **10 m:** surface cues only (and the 10 m wind). **120 m:** wind from the 120 m height level; icing from the lowest usable pressure level (usually 975 hPa, ~180 m; "coarse" when it is the only one) and the surface cues.
 - **Wind arrows** on the map: the same number as metres above the ground at each arrow (over flat terrain the same as above takeoff). Requested: the three pressure levels whose standard-atmosphere height is nearest to the height over typical ground (150 m above sea level) — wind speed, direction and geopotential height, 9 variables, still 1 call per point; e.g. 975 / 950 / 925 hPa for 400 m, 950 / 925 / 900 hPa for 600 m, 900 / 850 / 800 hPa for 1500 m. At each arrow u and v are interpolated in height between the levels below and above it; one level alone stands for the height within 250 m; levels less than 20 m above the ground are left out. Where no level is left near the height (high ground) the arrow is left out and the info line says how many (D13; implemented in stage 2).
 - **Calculator:** a constant height above sea level from A (A's ground — the elevation of A's grid cell in the response — + the flight altitude; shown under the route: "400 m above A ≈ 579 m above sea level along the route"); wind from the same three levels, interpolated at that height at each route point. Where the ground rises to within 20 m of it the result is "Below the ground", saying how far along and how high (stage 2). Per-point heights above the ground and a 50 m warning come with the icing in stage 4 (§9).
@@ -231,7 +239,8 @@ Stage 2 shows only the flight altitude; climb, descent, duration, the verdict op
 
 ### 5.3 Vertical handling (implemented in `icing.js`)
 
-- Height of a level above sea level = `geopotential_height_XhPa`; above the ground = that − `elevation`.
+- **Level heights (v2.7):** from the surface pressure, with the hypsometric equation layer by layer from the ground up (virtual temperature from each level's T and RH); a level at a higher pressure than the surface is below the ground. On the Phase 0 data this is within ±2 m (ICON) and ±9 m (UKMO) of Open-Meteo's geopotential height in the lowlands and ≤ 87 m at 700 hPa over the mountains, and puts the same levels below ground in 98–100 % of hours. `geopotential_height_XhPa` is used when a response has it (the Phase 0 files). Above the ground = height − `elevation`.
+- **Levels requested:** up to 500 m above the flight height and at least up to 850 hPa, plus the next level when none is 300 m above it; levels whose standard-atmosphere height is more than 250 m below the ground are not asked (Open-Meteo counts every variable).
 - Levels less than **20 m** above the ground are inside the terrain (Open-Meteo extrapolates values there) and are ignored.
 - **At a fixed height (D14):** the nearest usable levels below and above, each within **500 m**; the worse of their states (exactly on a level: that level). **Coarse** when only one side exists or a level used is more than **300 m** away. Nothing within 500 m → unknown, reason "no level near".
 - **Climb / descent bands:** the ascent from the ground to the flight height is split at every usable level; each band takes the worse of the levels around it (the band from the ground to the lowest level takes that level). Minutes per band = thickness / climb or descent rate.
@@ -263,11 +272,34 @@ Ensemble models count every member. Verified with the `X-RateLimit-Cost` respons
 |---|---|---|---|
 | Ensemble forecast (ensemble API) | ≈ 120 calls/update (4 default ensembles) | unchanged (no icing here, D7) | 0 extra |
 | Models-mode forecast | 3 calls/update | unchanged | 0 extra |
-| **Icing request** (forecast API, ICON + UKMO, 1 location; `requestParams()`; stage 3, implemented — only while the indicator is on) | — | T, RH, height at 1000/975/950/925/900/850 hPa (18) + T 700 hPa + 2 m T, 2 m RH, weather code, visibility, precipitation (5) = 24 variables × 2 models; more levels for flights above ~1 km or high ground (up to 800 / 700 hPa) | **4.8** (up to ≈ 5.8) per update, cached like the forecast (1 h) |
-| **Route request** (forecast API, ≤ 16 points) | stage 2: `best_match`, three levels × (wind speed, direction, height) = 9 variables → 1 per point: 16 calls for 16 points (as before) | stage 4: ICON + UKMO, three levels around the flight height × (wind speed, direction, T, RH, height) = 30 variables → **3 per point** (≤ 48 for a new 16-point route; points cached 30 min) | +2 per point |
-| Column at A (and B for one-way) | — | reuse forecast icing data if A is in the forecast location's 0.1° cell and the hours are covered; else one icing request (4.8) | only when needed |
-| Wind-arrow grid | `best_match`, up to 220 points per view: up to ≈ 220 calls per refresh | three levels × (speed, direction, height) = 9 variables → still 1 per point (stage 2, implemented) | 0 extra |
-| Map readout (crosshair) | 6 vars × models | unchanged (no icing in v1) | 0 |
+| **Icing request** (forecast API, ICON + UKMO, 1 location; `requestParams()`; stage 3, implemented — only while the indicator is on) | — | v2.7: T, RH at 1000/975/950/925/900/850 hPa (12) + T 700 hPa + surface pressure, 2 m T, 2 m RH, weather code, visibility, precipitation, rain, low cloud (8) = 21 variables × 2 models (no level heights: §5.3); more levels for flights above ~1 km (up to 800 / 700 hPa), fewer over high ground | **4.2** (up to 4.8) per update; read again after 3 h, 12 h when every temperature in the answer is above +3 °C |
+| **Route request** (forecast API, ≤ 16 points) | stage 2: `best_match`, three levels × (wind speed, direction, height) = 9 variables → 1 per point: 16 calls for 16 points (as before) | stage 4 plan (v2.7): wind as now + icing for ICON + UKMO at **every second point**: three levels × (T, RH) + surface pressure = 7 variables × 2 models → 1.4 per icing point; **≈ 27 calls** for a new 16-point route instead of 48; points read again after 2 h | +0.7 per point |
+| Column at A (and B for one-way) | — | reuse forecast icing data if A is in the forecast location's 0.1° cell and the hours are covered; else one icing request (4.2) | only when needed |
+| Wind-arrow grid | `best_match`, up to 220 points per view: up to ≈ 220 calls per refresh | three levels × (speed, direction, height) = 9 variables → still 1 per point (stage 2, implemented); v2.7: read again after 2 h (was 30 min), held back near the limits (§6.3) | 0 extra |
+| Map readout (crosshair) | 6 vars × models | unchanged (no icing in v1); v2.7: read again after 1 h (was 15 min) | 0 |
+
+### 6.3 Staying within the free limits (v2.7)
+
+Open-Meteo's free limits are per connection (IP): 600 calls a minute, 5,000 an hour, 10,000 a day; the forecast, historical-forecast, previous-runs and single-runs hosts share the daily count, the ensemble host counts separately (§11). What FlySky asks:
+
+| Action | Calls |
+|---|---|
+| Forecast for a location, Ensemble mode (4 default ensembles) | ≈ 120–145 |
+| … Models mode | ≈ 3 |
+| Icing indicator | ≈ 4.2 |
+| Wind arrows, one new map view | up to ≈ 220 |
+| Map readout (crosshair) | ≈ 1–3 |
+| Route wind, 16 points | 16 (stage 4 with icing ≈ 27) |
+
+One location checked every 3 hours all day in Ensemble mode with the icing indicator is ≈ 8 × 135 ≈ 1,100 calls a day. Within one browser only the wind arrows come near the hourly limit (≈ 20 new map views). The practical risk is a shared connection (an office, a mobile carrier's NAT, a cloud IP): other users count against the same limit, and FlySky cannot see them.
+
+What FlySky does:
+
+- **Reuse:** forecast after 3 h in Ensemble mode (was 2 h; the ensembles run every 6–12 h) and 2 h in Models mode (was 1 h); icing after 3 h (was 1 h), 12 h when every temperature in the answer is above +3 °C (summer); wind arrows and route wind after 2 h (was 30 min; `best_match` follows ICON's 3-hourly runs); map readout after 1 h (was 15 min). *Refresh* always asks again. Icing answers are kept per location and altitude, wind per point and height.
+- **Fewer variables:** icing level heights from the surface pressure (−0.6 calls per update), levels inside the terrain not asked; wind arrows ask only the height shown; the indicator off asks no icing data.
+- **Usage log:** each request's estimated cost is logged when it is sent (so requests in parallel see each other) and replaced by the answer's `X-RateLimit-Cost` (0 for a 429 or a network failure), for 24 h in `localStorage` (`flysky_om_usage`), per API — the ensemble API counts apart; the side menu shows the total: "This browser's Open-Meteo use: N calls in the last hour, M in the last 24 h" next to the free limits.
+- **Guard (`omFetch`, map requests only):** wind arrows, route wind and the map readout (all on the forecast API, so only its calls count) wait while the last minute holds more than 85 % of the minute's limit, and are refused with the reason ("paused to stay under Open-Meteo's free limit (4,300 of 5,000 calls in the last hour)") above 85 % of the hour's or 90 % of the day's limit. The forecast and icing requests always go: they are what the pilot opened the app for; Open-Meteo's own 429 answer is shown as before.
+- **Stage 4:** route icing at every second point (≈ 27 instead of 48 calls per new route, above).
 
 ---
 
@@ -285,16 +317,19 @@ Magnus: γ = ln(RH/100) + 17.625·T / (243.04 + T), T_d = 243.04·γ / (17.625 �
 | `red` — freezing fog / low stratus (cue) | sub-zero fog at the ground (D9) | red |
 | `red` — freezing precipitation (cue) | warm nose with precipitation, or code 56/57/66/67 (D12) | red |
 | `marginal` | near a threshold (§7.4) | yellow |
-| `none` — no icing indication from available proxies | **not** "no icing" / "safe" | green, text "No icing signs in the forecast data" |
-| `unknown` | data missing, levels inside the terrain or none near the flight height, model beyond its forecast length | grey |
+| `none` — no icing indication from available proxies | **not** "no icing" / "safe" | neutral grey (v2.7; green read as "safe"), text "No icing signs in the forecast data" |
+| `unknown` | data missing, levels inside the terrain or none near the flight height, model beyond its forecast length | dark grey, hatched |
 
 **Two models (v1, D16):** an hour is red if either model is red, otherwise the worse of the two. The count is shown instead of a confidence level: "2 of 2 models", "1 of 2 models" (red from one model), "1 of 1" after UKMO's forecast ends (~6.5 days), unknown after ICON's (~7 days). Models without data are left out and counted as such. The engine's 'majority' rule (red at ≥ 60 % of models) is for a later consensus of more models.
+
+**Strong signal (v2.7, `strongSignal()`):** freezing precipitation in either model (any phase of the flight), or both models red in the cruise. It raises the "Icing risk" flag next to the flight verdict (§8.2) even while icing is not part of the verdict. Last winter: 42 % of departure hours at Kyiv (34 % from both models red in the cruise), 37 % at Zaporizhzhia (33 %).
 
 ### 7.3 Cues
 
 - **Pressure-level evidence:** temperature and RH over water (D11) at each usable level (§5.3).
 - **Freezing fog / low stratus (D9):** code 48 (ICON); or 2 m temperature ≤ 0 °C with visibility < 1000 m or 2 m RH ≥ 97 %. Red for the climb and descent (and a 10 m flight); deep fog / low stratus also shows in the levels.
-- **Freezing precipitation (D12):** precipitation ≥ 0.1 mm/h with 2 m temperature ≤ 0 °C and a level above 0 °C up to 700 hPa (warm nose); or code 56/57/66/67. Red in every phase of a flight, including the cruise (the aircraft is under the warm layer); source shown ("profile", "ICON code").
+- **Freezing precipitation (D12):** in this order — code 56/57/66/67; (v2.7) ICON's own `rain` ≥ 0.1 mm/h at a 2 m temperature ≤ 0 °C (ICON splits rain and snow in its microphysics and has rain below 0 °C; UKMO's split follows the 2 m temperature, so its `rain` adds nothing); precipitation ≥ 0.1 mm/h with 2 m ≤ 0 °C under a level above 0 °C up to 700 hPa (warm nose); or (v2.7) **freezing drizzle from supercooled stratus** — the same precipitation without a warm nose, from a red layer whose top is warmer than −12 °C, with dry (RH < 80 %) or warmer air above it and sub-zero air below (most freezing drizzle forms this way, without a melting layer, and models rarely code it). Red in every phase of a flight, including the cruise; source shown ("ICON code", "ICON rain", "profile", "freezing drizzle from low stratus"). Last winter (model × departure / landing hours), Kyiv: code 60, ICON rain 70, warm nose 162, drizzle 32; Zaporizhzhia: 58 / 36 / 54 / 4.
+- **Thin layer (v2.7):** 2 m ≤ 0 °C, low cloud ≥ 80 %, every level up to 2 km above the ground ≤ 0 °C and no level red → marginal: a thin deck may sit between two levels (2–7 % of last winter's hours with ≥ 80 % low cloud had no level at RH ≥ 90 %). Over high ground with no level near the flight height it makes an otherwise unknown hour marginal.
 - **Not used:** pressure-level cloud cover, vertical velocity (D8), freezing-level height.
 
 ### 7.4 Experimental thresholds (configurable, unvalidated)
@@ -303,11 +338,11 @@ RH is RH over water.
 
 | State | Default rule (`DEFAULT_THRESHOLDS`) |
 |---|---|
-| Potential icing environment | −20 °C ≤ T ≤ 0 °C and RH ≥ 90 % |
-| Marginal | −20 °C ≤ T ≤ +1 °C and 80 % ≤ RH < 90 %; or 0 °C < T ≤ +1 °C and RH ≥ 90 %; or −30 °C ≤ T < −20 °C and RH ≥ 90 % |
+| Potential icing environment | −30 °C ≤ T ≤ 0 °C and RH ≥ 90 % |
+| Marginal | −30 °C ≤ T ≤ +2 °C and 80 % ≤ RH < 90 %; or 0 °C < T ≤ +2 °C and RH ≥ 90 % |
 | No indication | otherwise, with T and RH available |
 
-Labelled "experimental". Air saturated over ice has RH over water of ≈ 91 % at −10 °C and ≈ 82 % at −20 °C: an ice-saturated cloud at −10 °C is red, at −20 °C marginal — conservative by design. Tuning (O6) can use the winter harness in `docs/icing-phase0/`.
+Labelled "experimental". v2.7 (design review): potential icing down to −30 °C (was −20 °C, with −30…−20 °C marginal) — RH over water ≥ 90 % there is far above ice saturation, where supercooled water is rarer but still found; marginal up to +2 °C (was +1 °C) — model temperatures in inversions are often 1–2 K off. Last winter this moved red by < 0.5 points and marginal by +2 to +5 points (§7.5). Air saturated over ice has RH over water of ≈ 91 % at −10 °C, ≈ 82 % at −20 °C and ≈ 75 % at −30 °C: an ice-saturated cloud at −10 °C is red, at −20 °C marginal — conservative by design. Tuning (O6) can use the winter harness in `docs/icing-phase0/`.
 
 ### 7.5 How often it is red in winter
 
@@ -315,10 +350,13 @@ Last winter (Dec 2025 – Feb 2026, 2,160 hours) at Kyiv / Zaporizhzhia:
 
 | Measure | Kyiv | Zaporizhzhia |
 |---|---|---|
-| **v1 engine** (`engine_check.mjs`): ICON + UKMO, 400 m above takeoff, one instant — red if either | 67 % | 52 % |
+| **Engine** (`engine_check.mjs`, v2.7 rules): ICON + UKMO, 400 m above takeoff, one instant — red if either | 67 % | 52 % |
 | … of which "1 of 2 models" | 25 % | 17 % |
-| … 2-hour flights: departure hours red, ICON / UKMO | 56 / 69 % | 47 / 54 % |
+| … 2-hour flights: departure hours red, ICON / UKMO | 56 / 70 % | 47 / 54 % |
 | … red only in climb or descent, ICON / UKMO (2-hour flights) | 5 / 18 % | 6 / 6 % |
+| … 2-hour flights, red if either: v2.6 rules → v2.7 rules | 74.5 → 74.7 % | 59.1 → 59.1 % |
+| … marginal (neither model red): v2.6 → v2.7 | 10.7 → 12.9 % | 16.0 → 21.0 % |
+| … "Icing risk" flag (strong signal, §7.2) | 42 % | 37 % |
 | v2.2 rules, 950 hPa, 5 default models: ≥ 60 % of them red | 52–59 % | 44–48 % |
 
 - Ukrainian winters have extensive sub-zero low cloud; **red is common** whatever the tuning. The UI must stay useful when red: the layer line (§7.7), and the next hours with the layer above the flight altitude or without icing signs.
@@ -349,7 +387,7 @@ Any two models agree on red vs not red in only 60–88 % of winter hours (typica
 Why ICON + UKMO for v1 (D16):
 - One model turns the split hours (a quarter of winter) into a confident-looking red or green and misses 6–35 % of the hours a majority flags; ICON + UKMO "either" misses 2–3 %.
 - Same data types: both have 975 / 950 / 900 hPa, report RH over water and give visibility — no RH conversion and no "coarse" levels in the 0–1 km range where the UAV flies. ECMWF IFS (excellent in general) has no level between the ground and ~600 m on Open-Meteo, no visibility and no codes; ICON + IFS would bring back conversion and coarse levels.
-- Independent model families (DWD, Met Office); 4.8 calls per update.
+- Independent model families (DWD, Met Office); 4.8 calls per update (4.2 from v2.7).
 - Costs: red more often than one model (+5 to +12 points); only a "2 of 2 / 1 of 2" signal instead of a graded confidence; unknown after ICON's ~7 days (the last day of the 1-week window).
 - Agreement with the consensus is not skill: which models are best for supercooled low cloud over Ukraine needs observations (O9). A consensus of more models, or ECMWF IFS as a long-range filler after day 7, can be added later (O10, O11).
 
@@ -384,7 +422,7 @@ Rules of thumb shown in the details (meteorology, not data from the engine):
 
 ### 8.1 Exposure for departure hour h (`flight()`)
 
-1. **Climb** at hour h: ground → flight altitude through the bands of §5.3; minutes per band at the climb rate; freezing fog at the ground makes it red.
+1. **Climb** at hour h: ground → flight altitude through the bands of §5.3; minutes per band at the climb rate; freezing fog at the ground makes it red, the thin-layer cue (§7.3) at least marginal.
 2. **Cruise** from h for the flight duration at a fixed height above sea level: one slot per hour (h, h+1, …; the last one partial), each the state at that height (D14); freezing precipitation in that hour makes a slot red.
 3. **Descent** at the hour the flight ends (h + duration, rounded): flight altitude → ground; fog at the ground makes it red.
 4. Per model: the flight's state is the worst of all phases (D2: "climb only" when the cruise is known and not red). Hours beyond a model's data are unknown; a flight running past the data is "partly unknown".
@@ -392,10 +430,11 @@ Rules of thumb shown in the details (meteorology, not data from the engine):
 
 ### 8.2 UI (stage 3, implemented)
 
-- **"Can I fly now?" card:** an *Icing* row under the factor tiles (not a verdict tile; with D1's option on, icing also shows in "Limited by"), following the hour scrubber: the state, why and where, how many of the two models, e.g. "Potential icing at 400 m (−4.0 °C, RH 96 %) · 2 of 2 models", "… · DWD ICON only", "Potential icing on the climb or descent only — ~6 min through 0–380 m", "Potential icing: freezing fog at the ground", "No icing signs in the forecast data … · 2 of 2 models"; under it the layer line: "layer ~380–590 m (−4.0 °C) · no signs below ~180 m · dry or warmer above ~870 m" (the layers of the model the row describes, named when the models differ). Loading, errors and a stored copy older than an hour are said in the row.
-- **Flight conditions:** a thin icing strip under the confidence strip (red potential icing, yellow marginal, green no signs, grey no data) with its legend; it pins hours like the flight bar. A hovered hour adds the icing line; a pinned hour adds each model's climb / cruise / descent minutes in icing with the heights and values, cues, the layer line, and what the indicator is not.
+- **"Can I fly now?" card:** an *Icing* row under the factor tiles (not a verdict tile; with D1's option on, icing also shows in "Limited by"), following the hour scrubber: the state, why and where, how many of the two models, e.g. "Potential icing at 400 m (−4.0 °C, RH 96 %) · 2 of 2 models", "… · DWD ICON only", "Potential icing on the climb or descent only — ≈ 6 min in the layer (0–380 m); propeller thrust and airspeed readings can be lost within 1–3 min", "Potential icing: freezing fog at the ground", "No icing signs in the forecast data … · 2 of 2 models"; under it the layer line: "layer ~380–590 m (−4.0 °C) · no signs below ~180 m · dry or warmer above ~810 m" (the layers of the model the row describes, named when the models differ). v2.7: "only DWD ICON forecasts this hour" where one model has no data, "beyond 3 days: less reliable" after 72 h; "no signs" in neutral grey. Loading, errors and a stored copy past its reuse time are said in the row.
+- **"Icing risk" flag (v2.7):** a red badge next to the verdict (and in a pinned hour's details) when the strong signal of §7.2 holds, sized so it never changes the card's height; while D1's option is off a line above the *Icing* row (under the hour scrubber, so the scrubber never moves under the finger) says "Icing: both models show potential icing at the flight altitude. The verdict above does not count it — an unprotected UAV should stay out." (or the same for freezing rain or drizzle). It keeps a green or yellow verdict from reading as a go.
+- **Flight conditions:** a thin icing strip under the confidence strip (red potential icing, yellow marginal, grey no signs, hatched no data; v2.7: striped where only one model has data, faded beyond 3 days) with its legend; it pins hours like the flight bar. A hovered hour adds the icing line; a pinned hour adds each model's climb / cruise / descent minutes in icing ("≈ 1.9 min in potential icing (180–400 m)") with the heights and values, cues, the layer line, and what the indicator is not and what it assumes: no ice protection, an unheated pitot tube, a fixed-wing climb (not a VTOL hover); ice picked up stays on.
 - **Icing profile** (collapsible, remembered): one row per model level at its median height above the ground here over the window, one cell per hour coloured by the worse of the two models, a dashed line at the flight altitude, a cell's values per model on hover / tap; aligned with the flight bar's day / night band and axis. (No 0 °C line in v1.)
-- **Planner:** a flyable slot with icing signs gets "Icing signs 10:00–13:00"; otherwise a layer at least 150 m above the flight altitude gets "Icing layer from ~870 m above — stay below it". With D1's option on, red hours are not flyable anyway.
+- **Planner:** a flyable slot with icing signs in it or in the hour before or after (a late or early take-off) gets "Icing signs 10:00–13:00". Otherwise (v2.7) "Icing layer above — no signs up to ~590 m; stay below" only when every hour from the one before the slot to the one after has both models' data, no precipitation, no icing signs on the flight, clear air at least 150 m above the flight altitude, and a layer above it in the slot; "~590 m" is the lowest clear height over those hours. With D1's option on, red hours are not flyable anyway.
 - **Option on (D1):** an icing check per hour (red → not suitable, marginal → uncertain), an *Icing* bar in the breakdown with the icing details, "Limited by icing", the planner's causes. Confidence: every member (Ensemble) or model (Models mode) takes the icing factor as the two icing models see it (their shares); the icing models are never added as members or models.
 
 ---
@@ -411,11 +450,11 @@ Rules of thumb shown in the details (meteorology, not data from the engine):
 
 ### 9.2 Data
 
-- Route request: `models=icon_seamless,ukmo_seamless`; for each of the three standard levels nearest the flight height above sea level (e.g. 975 / 950 / 925 hPa for 569 m): wind speed, direction, T, RH, height — 30 variables → ≈ 3 calls per point.
-- Wind for the wind triangle: interpolated between the levels around the flight height (u, v) — in stage 2 from `best_match` (ICON-based), from stage 4 from ICON, UKMO's where ICON has none.
+- Route requests (v2.7 plan, §6.3): wind as in stage 2 (`best_match`, three levels × speed, direction, height → 1 call per point); icing for `models=icon_seamless,ukmo_seamless` at every second point (and A, B): T and RH at the three levels around the flight height above sea level (e.g. 975 / 950 / 925 hPa for 569 m) plus surface pressure (heights, §5.3) — 7 variables × 2 models ≈ 1.4 calls per icing point; ≈ 27 calls for a new 16-point route instead of 48. A point between two icing points takes the worse of the two.
+- Wind for the wind triangle: interpolated between the levels around the flight height (u, v) from `best_match` (ICON-based).
 - Icing per point: red if either model is red; "1 of 2 models" shown when only one is.
 - Each point's height above the ground is shown; within 50 m of the ground flagged; below the ground: unknown ("below ground").
-- Climb/descent column at A (and B for one-way): forecast-tab data when A is in the forecast location's cell and the hours are covered; otherwise one icing request (4.8 calls).
+- Climb/descent column at A (and B for one-way): forecast-tab data when A is in the forecast location's cell and the hours are covered; otherwise one icing request (4.2 calls).
 - The multi-model, multi-location response is an array with one object per location; columns are suffixed by model; `splitModels()` splits them.
 
 ### 9.3 UI
@@ -428,7 +467,7 @@ Rules of thumb shown in the details (meteorology, not data from the engine):
 
 ## 10. Settings summary
 
-Forecast view's side menu, section **Flight profile** (stage 3): flight altitude (m above takeoff, §5.1, with its height above sea level at the location), climb rate and descent rate (0.5–10 m/s, default 2), flight duration (15 min – 6 h, default 2 h), **Icing indicator (experimental)** on / off (default on), **Include icing in the flight verdict** (default off; greyed while the indicator is off), and, folded, **Icing thresholds (experimental)**: RH over water for potential icing (default 90 %) and for marginal (80 %), both 50–100 % with marginal below; the temperature limits (−20 … 0 °C, margins +1 / −30 °C) are fixed in v1. *Reset to defaults* resets the thresholds. Stored as `flysky_flight_profile`. The map side menu and the calculator edit the flight altitude only. Icing models (ICON + UKMO), RH conversion and the "either" rule are not settings.
+Forecast view's side menu, section **Flight profile** (stage 3): flight altitude (m above takeoff, §5.1, with its height above sea level at the location), climb rate and descent rate (0.5–10 m/s, default 2), flight duration (15 min – 6 h, default 2 h), **Icing indicator (experimental)** on / off (default on), **Include icing in the flight verdict** (default off; greyed while the indicator is off), and, folded, **Icing thresholds (experimental)**: RH over water for potential icing (default 90 %) and for marginal (80 %), both 50–100 % with marginal below; the temperature limits (−30 … 0 °C, marginal up to +2 °C; v2.7) are fixed in v1. *Reset to defaults* resets the thresholds. Stored as `flysky_flight_profile`. The map side menu and the calculator edit the flight altitude only. Icing models (ICON + UKMO), RH conversion and the "either" rule are not settings.
 
 ---
 
@@ -459,7 +498,7 @@ Notes for re-running: Open-Meteo's daily limit is per IP and shared by the forec
 
 ## 12. Validation and tests
 
-**Engine unit tests (stage 1, implemented):** `tests/icing-engine.mjs`, Node only (`node run.mjs icing-engine`), 72 checks with synthetic Open-Meteo responses:
+**Engine unit tests (stage 1, implemented; v2.7: 87 checks):** `tests/icing-engine.mjs`, Node only (`node run.mjs icing-engine`), with synthetic Open-Meteo responses:
 - request: models, levels for 400 m / 1500 m / high ground, T at 700 hPa, timezone, call cost (Phase 0 values);
 - response split per model (two models, one model);
 - level rules (red, marginal margins, none, unknown), RH conversion (ECMWF blend, ice), dew point;
@@ -468,13 +507,16 @@ Notes for re-running: Open-Meteo's daily limit is per IP and shared by the forec
 - level below ground masked; model without 975/950 hPa (925 hPa, coarse, never 2 m); same reported RH, ECMWF marginal vs ICON red; high ground (no level near; no "clear" over a 1 km gap); route point below ground; route point in a layer;
 - two models disagreeing (red if either; majority rule); model beyond its forecast length; no data at all;
 - time: layer during the descent only, 60 min of cruise in it, after it; flight running past the data; 30 min flight; 10 m flight with / without fog; thresholds override;
-- browser global `window.FlySkyIcing`.
+- browser global `window.FlySkyIcing`;
+- v2.7: request without level heights, with surface pressure, rain and low cloud (21 variables at Kyiv, 4.2 calls), levels inside the terrain not asked; heights from the surface pressure (hypsometric check); the −30 °C / +2 °C edges; freezing drizzle from stratus (and not with moist air above or a colder top); ICON rain at −1 °C (UKMO not); the thin-layer guard; the strong signal (both models in the cruise, freezing precipitation from one).
 
 **Cross-check on real data:** `docs/icing-phase0/engine_check.mjs` — the engine on last winter's ICON / UKMO hours reproduces the Python analysis within the expected 3–5 points (§7.5) and prints its output for the saved 8-day forecasts (`engine_check.txt`: e.g. a sub-zero layer at ~200–650 m over Kyiv on 9–11 November 2026, both models; unknown at the Carpathian point — no level near 2425 m).
 
 **Browser tests, stage 2 (implemented; `tests/map-route.mjs`, `map-layers.mjs`, `map-settings.mjs`; the mock answers any wind height with per-level wind, standard level heights and a configurable ground elevation):** new users at 400 m; migration of '925', '~500 m' and the calculator's '~1500 m', saved, no height left in the map settings; forecast side menu shows the setting with its height above sea level, and a change there reaches the map; request variables for 10 m / 400 m / 600 m / 1500 m; interpolation (halfway between two levels, 400 m above a 179 m ground), one level within 250 m, inside the terrain; arrows left out over high ground with the note; calculator and side menu set the same height; the calculator's "400 m above A ≈ 579 m above sea level" line; "Below the ground" where the route reaches higher ground; the selector fits the card.
 
 **Browser tests, stage 3 (implemented; `tests/forecast-icing.mjs`, 41 checks; the mock's icing scenario gives known profiles hour by hour):** one ICON + UKMO request with the expected variables and timezone, none on a window switch; the Icing row and layer line for both models, one model, climb only, freezing fog, no signs and a layer above; row colour; the icing strip, its legend, the hovered and pinned hour (per-model minutes and values); the icing profile (rows, flight line, cells, values); planner notes; climb rate and duration evaluated again without a request; 300 m without, 1500 m with a new request, back to 400 m from the earlier answer; thresholds, refusal and reset; the indicator off (no row, strip, profile or request) and on; the verdict option in Ensemble and Models mode (status, cause, breakdown bar, confidence, member / model count unchanged, one of two models → 50 %); Ukrainian; a failing request (said, forecast unaffected); the stored copy after a reload without a request.
+
+**Browser tests, stage 3.1 (v2.7; `tests/forecast-icing.mjs` 51 checks, `map-layers.mjs`; the mock now answers the surface pressure and works the heights out like the models):** the request without heights; the new wording and grey for "no signs"; the "Icing risk" flag (both models; not for one; with and without the verdict option; freezing drizzle from one model outranks a red cruise); the planner's neighbouring hours and "stay below" rule; faded hours beyond 3 days and striped one-model hours in the 1-week window; the side menu's usage line; map wind arrows paused near the hourly limit with the reason, and the minute pacing.
 
 **Browser tests (Playwright, mocked Open-Meteo), stage 4:**
 - calculator: route request with three levels × two models, icing on part of the outbound leg, return different, outbound only, A outside the forecast cell (extra request), point below ground / near the ground.
@@ -493,8 +535,9 @@ Notes for re-running: Open-Meteo's daily limit is per IP and shared by the forec
 | 1 | **Engine:** request builder and cost, response split, profiles (heights, masking, RH conversion), evidence, surface cues, fixed-height evaluation, climb/descent bands, Mode A flights, icing layers, model combination, route points; unit tests; cross-check on Phase 0 data. Not loaded by the app yet. | `icing.js`, `tests/icing-engine.mjs`, `docs/icing-phase0/engine_check.mjs` | **done** |
 | 2 | **Settings and wind:** flight altitude in m above takeoff, shared by the forecast side menu (*Flight profile*), the map's wind block and the calculator; migration of the stored wind height; wind arrows and calculator wind at a fixed height (three levels, interpolated, masked below ground — D13; arrows left out with a note, "Below the ground" in the calculator); ASL shown; corrected wind-aloft labels; READMEs | `index.html`, `map.js`, `sw.js`, tests | **done** |
 | 3 | **Forecast tab:** *Flight profile* gets climb, descent, duration, the indicator switch, the verdict option and the thresholds; `icing.js` on demand (`?v=`, precached in `sw.js`); icing request (ICON + UKMO), kept by altitude and stored for offline use; Icing row, layer line, strip, pinned-hour details, icing profile, planner notes, verdict option (Ensemble and Models mode); READMEs | `index.html`, `sw.js`, tests | **done** |
-| 4 | **Calculator** (next): route request (three levels × ICON + UKMO), constant height above sea level, per-point height above the ground, coloured segments, panel lines, return leg, column at A/B | `map.js` | |
-| 5 | **Options:** consensus of more models (after V3b, O11), ECMWF IFS after ICON's forecast ends (O10), icing marks on the wind grid (O4), satellite cross-check (O5), terrain-relative levels (O7), real call costs (O8) | — | |
+| 3.1 | **Design-review patch and call budget (v2.7):** engine v2 (thresholds, drizzle / ICON rain / thin-layer cues, heights from the surface pressure, levels inside the terrain not asked, strong signal); "Icing risk" flag; planner rules; wording, grey / hatched / striped / faded strip; usage log, side-menu line and guard for map requests (`omFetch`); longer reuse of forecast, icing, wind and readout answers | `icing.js`, `index.html`, `map.js`, `sw.js`, tests | **done** |
+| 4 | **Calculator** (next): wind as now, icing at every second point (ICON + UKMO, T / RH at three levels + surface pressure, §9.2), constant height above sea level, per-point height above the ground, coloured segments, panel lines, return leg, column at A/B | `map.js` | |
+| 5 | **Options:** consensus of more models (after V3b, O11), ECMWF IFS after ICON's forecast ends (O10), icing marks on the wind grid (O4), satellite cross-check (O5), terrain-relative levels (O7) | — | |
 
 READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-worker cache bumped for changed scripts.
 
@@ -509,14 +552,20 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 - **O5** Satellite supercooled-cloud cross-check for the current hour (Cloud Type / Cloud Phase RGB).
 - **O6** Threshold tuning with operator feedback; the winter harness in `docs/icing-phase0/` gives the red-hour rates for any rule change.
 - **O7** High ground: 750 / 775 / 825 hPa (V11) to close the 800–700 hPa gap.
-- **O8** Use `X-RateLimit-Cost` / `-Remaining` for FlySky's request budget instead of estimates.
+- ~~**O8** Use `X-RateLimit-Cost` for FlySky's request budget~~ → v2.7 (§6.3): costs logged from the header, map requests held back. Open: `X-RateLimit-Remaining` to see other users of a shared connection.
 - **O9** Verify the models' icing states against observations (which models are best; how much they diverge at days 3–7 — the previous-runs API can give lead-time series).
 - **O10** ECMWF IFS as a long-range filler after ICON's ~7 days (coarse; RH converted).
 - **O11** Consensus of more models (Models-mode selection, 'majority' rule) once V3b is done.
+- **O12** Check the drizzle and thin-layer cues against observed freezing drizzle / low stratus (station reports with codes 56/57, satellite) — both are heuristics from the design review, tuned only on the winter red-hour rates.
 
 ---
 
 ## 15. Changes
+
+### From v2.6 to v2.7
+1. Stage 3.1 (design review): engine v2 — red from −30 °C, marginal to +2 °C; freezing drizzle from stratus, ICON rain and thin-layer cues; level heights from the surface pressure; levels inside the terrain not requested; the strong signal (§5.3, §7.2–7.5).
+2. Forecast view: "Icing risk" flag and its line; planner neighbours and the "stay below" rule; wording (≈, effects, platform assumed); grey / hatched / striped / faded (§8.2).
+3. Call budget (§6.2, §6.3): icing 4.8 → 4.2 calls; reuse times longer (forecast 3 h / 2 h, icing 3 h / 12 h, wind 2 h, readout 1 h); usage log and side-menu line; guard for map requests; stage 4 route plan ≈ 27 instead of 48 calls (§9.2). O8 closed, O12 added; tests (§12); `engine_check.txt` re-run with v2.
 
 ### From v2.5 to v2.6
 1. Stage 3 implemented (§8.2, §10, §12, §13). Additions to the design: an on / off switch for the indicator (on by default); only the RH thresholds are settings, the temperature limits stay fixed; icing answers kept by key (location + variables) so switching altitudes back needs no request; the latest answer stored in `localStorage` for offline use; planner notes for icing signs in a slot and for a layer above to stay below; the icing profile without a 0 °C line.
@@ -557,4 +606,4 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 - WMO 4677 present-weather code table (subset emitted by Open-Meteo: 0–3, 45, 48, 51–57, 61–67, 71–77, 80–82, 85–86, 95, 96, 97, 99).
 - FAA Aviation Weather Handbook / AWC icing guidance (US reference only).
 
-*END OF TECHNICAL HANDOFF DOCUMENT v2.6 — FLYSKY INTEGRATION*
+*END OF TECHNICAL HANDOFF DOCUMENT v2.7 — FLYSKY INTEGRATION*

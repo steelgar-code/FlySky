@@ -458,6 +458,7 @@
                 </div>
                 <div id="modelChips" class="flex flex-wrap gap-2"></div>
                 <p id="modelCost" class="text-[11px] text-slate-500"></p>
+                <p id="omUsage" class="text-[11px] text-slate-500"></p>
             </section>
             <section class="space-y-3">
                 <div>
@@ -612,7 +613,9 @@
         // are re-run every 6–12 h and cost the most of Open-Meteo's free
         // allowance (each member counts), so they're asked for less often;
         // the Refresh button always asks.
-        const FORECAST_MAX_AGE_MS = { ensemble: 2 * 3600e3, deterministic: 3600e3 };
+        // Models run every 3–12 h: an ensemble update is reused for 3 h, a Models
+        // one for 2 h (Refresh always asks).
+        const FORECAST_MAX_AGE_MS = { ensemble: 3 * 3600e3, deterministic: 2 * 3600e3 };
         // Days always requested: enough for the 1-week window. Open-Meteo
         // counts any request of up to 14 days the same, so asking for the
         // whole week once costs no more than 2 days — and switching the
@@ -947,7 +950,7 @@
                 durationMinOption: "{m} min",
                 durationHourOption: "{h} h",
                 icingToggleLabel: "Icing indicator (experimental)",
-                icingToggleDesc: "Screens the models' atmosphere along that flight for sub-zero cloud, freezing fog and freezing rain (DWD ICON and UK Met Office, ≈ 5 Open-Meteo calls per update). Not a validated icing forecast: no icing signs never means safe.",
+                icingToggleDesc: "Screens the models' atmosphere along that flight for sub-zero cloud, freezing fog, freezing rain and drizzle (DWD ICON and UK Met Office, ≈ 4 Open-Meteo calls every 3 hours). Not a validated icing forecast: no icing signs never means safe.",
                 icingVerdictLabel: "Include icing in the flight verdict",
                 icingThresholdsTitle: "Icing thresholds (experimental)",
                 icingRhRedLabel: "Potential icing from RH",
@@ -961,9 +964,9 @@
                 icingState_none: "No icing signs in the forecast data",
                 icingState_unknown: "No icing data",
                 icingStateShort_red: "potential icing",
-                icingStateShort_marginal: "marginal",
+                icingStateShort_marginal: "marginal conditions",
                 icingAt: "at {h} m ({t} °C, RH {rh} %)",
-                icingClimbOnly: "on the climb or descent only — ~{min} min through {from}–{to} m",
+                icingClimbOnly: "on the climb or descent only — ≈ {min} min in the layer ({from}–{to} m); propeller thrust and airspeed readings can be lost within 1–3 min",
                 icingFog: "freezing fog at the ground",
                 icingFzp: "freezing rain or drizzle",
                 icingNoLevel: "no model level near the flight altitude here (high ground)",
@@ -979,18 +982,31 @@
                 icingErrNetwork: "no network",
                 icingErrLoad: "could not load the icing module",
                 icingStale: "data from {time}",
-                icingPhase: "{phase}: {min} min {state}",
+                icingPhase: "{phase}: ≈ {min} min in {state}",
                 icingPhaseClimb: "climb",
                 icingPhaseCruise: "cruise",
                 icingPhaseDescent: "descent",
                 icingPartlyUnknown: "partly beyond the models' data",
                 icingFlightDesc: "{dur} at {h} m above takeoff, climb {c} m/s, descent {d} m/s",
-                icingDetailNote: "Experimental screening (DWD ICON, UK Met Office): sub-zero air near saturation (RH ≥ {rh} % over water), freezing fog, freezing rain. Not a validated icing forecast. Stay out of icing layers rather than passing through: ice picked up on the climb stays on.",
-                icingStripLegend: "Lower strip: icing (experimental) — red potential icing, yellow marginal, green no signs, grey no data.",
+                icingDetailNote: "Experimental screening (DWD ICON, UK Met Office): sub-zero air near saturation (RH ≥ {rh} % over water), freezing fog, freezing rain and drizzle. Not a validated icing forecast. Assumes no ice protection, an unheated pitot tube and a fixed-wing climb (not a VTOL hover). In icing, propeller thrust and airspeed readings can be lost within 1–3 min and the ice stays on — keep out of icing layers rather than passing through.",
+                icingStripLegend: "Lower strip: icing (experimental) — red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead.",
                 icingProfileToggle: "Icing profile",
-                icingProfileHint: "Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, green no signs, grey no data). The dashed line is the flight altitude.",
+                icingProfileHint: "Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, grey no signs, hatched no data). The dashed line is the flight altitude.",
                 planIcing: "Icing signs {from}–{to}",
-                planIcingAbove: "Icing layer from ~{h} m above — stay below it",
+                icingFzdz: "freezing drizzle from low stratus",
+                icingThin: "low cloud between the model levels",
+                icingFar: "beyond 3 days: less reliable",
+                icingOnlyData: "only {model} forecasts this hour",
+                icingFlag: "Icing risk",
+                icingFlagTitle_cruise: "Both icing models show potential icing at the flight altitude. An unprotected UAV should stay out.",
+                icingFlagTitle_freezingPrecip: "Freezing rain or drizzle in the forecast. An unprotected UAV should stay out.",
+                icingFlagLine_cruise: "Icing: both models show potential icing at the flight altitude. The verdict above does not count it — an unprotected UAV should stay out.",
+                icingFlagLine_freezingPrecip: "Icing: freezing rain or drizzle in the forecast. The verdict above does not count it — an unprotected UAV should stay out.",
+                omUsage: "This browser's Open-Meteo use: {h} calls in the last hour, {d} in the last 24 h (free limits per connection: 600 a minute, 5,000 an hour, 10,000 a day).",
+                omPaused: "paused to stay under Open-Meteo's free limit ({n} of {max} calls in the last {span})",
+                omSpan_hour: "hour",
+                omSpan_day: "24 h",
+                planIcingAbove: "Icing layer above — no signs up to ~{h} m; stay below",
                 flightFactorIcing: "Icing",
                 factorIcing: "icing",
                 planFactorIcing: "icing marginal",
@@ -1098,8 +1114,8 @@
                 modelsButton: "Models",
                 modelsDrawerDesc: "For the mode chosen in the bottom bar (Ensemble or Models).",
                 modelCost: "One update ≈ {n} Open-Meteo calls of the free allowance (600 a minute, 10,000 a day); updated {every} or with Refresh.",
-                modelCostEvery2h: "every 2 h",
-                modelCostEvery1h: "every hour",
+                modelCostEveryEns: "every 3 h",
+                modelCostEveryDet: "every 2 h",
                 modelCostHigh: "Many members: fewer models keep you well under the limits.",
                 toastRateWait: "Open-Meteo's per-minute limit reached — trying again in a minute.",
                 toastRateLimited: "Open-Meteo's free limit reached for {n} model(s) ({reason}). The last forecast stays; try again later.",
@@ -1249,7 +1265,7 @@
                 durationMinOption: "{m} хв",
                 durationHourOption: "{h} год",
                 icingToggleLabel: "Індикатор обледеніння (експериментальний)",
-                icingToggleDesc: "Перевіряє атмосферу моделей уздовж цього польоту на хмари з від'ємною температурою, крижаний туман і крижаний дощ (DWD ICON і UK Met Office, ≈ 5 викликів Open-Meteo на оновлення). Це не перевірений прогноз обледеніння: відсутність ознак ніколи не означає безпеку.",
+                icingToggleDesc: "Перевіряє атмосферу моделей уздовж цього польоту на хмари з від'ємною температурою, крижаний туман, крижаний дощ і мряку (DWD ICON і UK Met Office, ≈ 4 виклики Open-Meteo раз на 3 години). Це не перевірений прогноз обледеніння: відсутність ознак ніколи не означає безпеку.",
                 icingVerdictLabel: "Враховувати обледеніння у вердикті польоту",
                 icingThresholdsTitle: "Пороги обледеніння (експериментальні)",
                 icingRhRedLabel: "Можливе обледеніння від вологості",
@@ -1265,7 +1281,7 @@
                 icingStateShort_red: "можливе обледеніння",
                 icingStateShort_marginal: "межові умови",
                 icingAt: "на {h} м ({t} °C, вологість {rh} %)",
-                icingClimbOnly: "лише під час набору чи зниження — ~{min} хв у шарі {from}–{to} м",
+                icingClimbOnly: "лише під час набору чи зниження — ≈ {min} хв у шарі ({from}–{to} м); тягу гвинта й показання швидкості можна втратити за 1–3 хв",
                 icingFog: "крижаний туман біля землі",
                 icingFzp: "крижаний дощ або мряка",
                 icingNoLevel: "тут немає рівня моделі поблизу висоти польоту (висока місцевість)",
@@ -1281,18 +1297,31 @@
                 icingErrNetwork: "немає мережі",
                 icingErrLoad: "не вдалося завантажити модуль обледеніння",
                 icingStale: "дані на {time}",
-                icingPhase: "{phase}: {min} хв {state}",
+                icingPhase: "{phase}: ≈ {min} хв — {state}",
                 icingPhaseClimb: "набір",
                 icingPhaseCruise: "політ",
                 icingPhaseDescent: "зниження",
                 icingPartlyUnknown: "частково поза даними моделей",
                 icingFlightDesc: "{dur} на {h} м над точкою зльоту, набір {c} м/с, зниження {d} м/с",
-                icingDetailNote: "Експериментальна перевірка (DWD ICON, UK Met Office): повітря з від'ємною температурою, близьке до насичення (вологість ≥ {rh} % над водою), крижаний туман, крижаний дощ. Це не перевірений прогноз обледеніння. Краще оминати шари обледеніння, ніж пролітати крізь них: лід, набраний під час набору висоти, лишається.",
-                icingStripLegend: "Нижня смужка: обледеніння (експериментально) — червоний: можливе обледеніння, жовтий: межові умови, зелений: ознак немає, сірий: немає даних.",
+                icingDetailNote: "Експериментальна перевірка (DWD ICON, UK Met Office): повітря з від'ємною температурою, близьке до насичення (вологість ≥ {rh} % над водою), крижаний туман, крижаний дощ і мряка. Це не перевірений прогноз обледеніння. Припущення: без протиобледенювальної системи, ПВД без підігріву, набір висоти літаком (не зависання VTOL). В обледенінні тягу гвинта й показання швидкості можна втратити за 1–3 хв, а лід лишається — оминайте шари обледеніння, а не пролітайте крізь них.",
+                icingStripLegend: "Нижня смужка: обледеніння (експериментально) — червоний: можливе обледеніння, жовтий: межові умови, сірий: ознак немає, штрихування: немає даних; смуги: лише одна модель; блідо: понад 3 доби вперед.",
                 icingProfileToggle: "Профіль обледеніння",
-                icingProfileHint: "Кожен рядок — рівень моделі на його звичайній висоті над землею тут, кожен стовпчик — година; колір — гірший із двох моделей (червоний: можливе обледеніння, жовтий: межові умови, зелений: ознак немає, сірий: немає даних). Пунктир — висота польоту.",
+                icingProfileHint: "Кожен рядок — рівень моделі на його звичайній висоті над землею тут, кожен стовпчик — година; колір — гірший із двох моделей (червоний: можливе обледеніння, жовтий: межові умови, сірий: ознак немає, штрихування: немає даних). Пунктир — висота польоту.",
                 planIcing: "Ознаки обледеніння {from}–{to}",
-                planIcingAbove: "Вище шар обледеніння, від ~{h} м — тримайтеся нижче",
+                icingFzdz: "крижана мряка з низьких шаруватих хмар",
+                icingThin: "низька хмарність між рівнями моделі",
+                icingFar: "понад 3 доби: менш надійно",
+                icingOnlyData: "цю годину прогнозує лише {model}",
+                icingFlag: "Ризик обледеніння",
+                icingFlagTitle_cruise: "Обидві моделі показують можливе обледеніння на висоті польоту. БпЛА без захисту від обледеніння має триматися осторонь.",
+                icingFlagTitle_freezingPrecip: "У прогнозі крижаний дощ чи мряка. БпЛА без захисту від обледеніння має триматися осторонь.",
+                icingFlagLine_cruise: "Обледеніння: обидві моделі показують можливе обледеніння на висоті польоту. Вердикт вище цього не враховує — БпЛА без захисту має триматися осторонь.",
+                icingFlagLine_freezingPrecip: "Обледеніння: у прогнозі крижаний дощ чи мряка. Вердикт вище цього не враховує — БпЛА без захисту має триматися осторонь.",
+                omUsage: "Використання Open-Meteo цим браузером: {h} викликів за останню годину, {d} за 24 год (безплатні ліміти на з'єднання: 600 за хвилину, 5 000 за годину, 10 000 на добу).",
+                omPaused: "призупинено, щоб не перевищити безплатний ліміт Open-Meteo ({n} з {max} викликів за останню {span})",
+                omSpan_hour: "годину",
+                omSpan_day: "добу",
+                planIcingAbove: "Шар обледеніння вище — до ~{h} м ознак немає; тримайтеся нижче",
                 flightFactorIcing: "Обледеніння",
                 factorIcing: "обледеніння",
                 planFactorIcing: "обледеніння: межові умови",
@@ -1400,8 +1429,8 @@
                 modelsButton: "Моделі",
                 modelsDrawerDesc: "Для режиму, вибраного в нижній панелі (Ансамбль або Моделі).",
                 modelCost: "Одне оновлення ≈ {n} запитів Open-Meteo з безплатного ліміту (600 за хвилину, 10 000 за добу); оновлюється {every} або кнопкою «Оновити».",
-                modelCostEvery2h: "кожні 2 год",
-                modelCostEvery1h: "щогодини",
+                modelCostEveryEns: "кожні 3 год",
+                modelCostEveryDet: "кожні 2 год",
                 modelCostHigh: "Багато членів ансамблю: менше моделей — далі від ліміту.",
                 toastRateWait: "Досягнуто похвилинного ліміту Open-Meteo — повтор за хвилину.",
                 toastRateLimited: "Досягнуто безплатного ліміту Open-Meteo для моделей: {n} ({reason}). Залишається останній прогноз; спробуйте пізніше.",
@@ -1551,7 +1580,7 @@
                 durationMinOption: "{m} min",
                 durationHourOption: "{h} h",
                 icingToggleLabel: "Indicador de gelo (experimental)",
-                icingToggleDesc: "Verifica a atmosfera dos modelos ao longo desse voo em busca de nuvens abaixo de zero, nevoeiro congelante e chuva congelante (DWD ICON e UK Met Office, ≈ 5 chamadas do Open-Meteo por atualização). Não é uma previsão de gelo validada: sem sinais de gelo nunca significa seguro.",
+                icingToggleDesc: "Verifica a atmosfera dos modelos ao longo desse voo em busca de nuvens abaixo de zero, nevoeiro congelante, chuva e garoa congelantes (DWD ICON e UK Met Office, ≈ 4 chamadas do Open-Meteo a cada 3 horas). Não é uma previsão de gelo validada: sem sinais de gelo nunca significa seguro.",
                 icingVerdictLabel: "Incluir gelo no veredito de voo",
                 icingThresholdsTitle: "Limites de gelo (experimentais)",
                 icingRhRedLabel: "Gelo possível a partir de UR",
@@ -1565,9 +1594,9 @@
                 icingState_none: "Sem sinais de gelo nos dados da previsão",
                 icingState_unknown: "Sem dados de gelo",
                 icingStateShort_red: "gelo possível",
-                icingStateShort_marginal: "marginal",
+                icingStateShort_marginal: "condições marginais",
                 icingAt: "a {h} m ({t} °C, UR {rh} %)",
-                icingClimbOnly: "só na subida ou na descida — ~{min} min entre {from} e {to} m",
+                icingClimbOnly: "só na subida ou na descida — ≈ {min} min na camada ({from}–{to} m); a tração da hélice e a leitura de velocidade podem se perder em 1–3 min",
                 icingFog: "nevoeiro congelante junto ao solo",
                 icingFzp: "chuva ou garoa congelante",
                 icingNoLevel: "não há nível do modelo perto da altitude de voo aqui (terreno alto)",
@@ -1583,18 +1612,31 @@
                 icingErrNetwork: "sem rede",
                 icingErrLoad: "não foi possível carregar o módulo de gelo",
                 icingStale: "dados de {time}",
-                icingPhase: "{phase}: {min} min {state}",
+                icingPhase: "{phase}: ≈ {min} min — {state}",
                 icingPhaseClimb: "subida",
                 icingPhaseCruise: "cruzeiro",
                 icingPhaseDescent: "descida",
                 icingPartlyUnknown: "em parte além dos dados dos modelos",
                 icingFlightDesc: "{dur} a {h} m acima da decolagem, subida {c} m/s, descida {d} m/s",
-                icingDetailNote: "Triagem experimental (DWD ICON, UK Met Office): ar abaixo de zero perto da saturação (UR ≥ {rh} % sobre a água), nevoeiro congelante, chuva congelante. Não é uma previsão de gelo validada. Fique fora das camadas de gelo em vez de atravessá-las: o gelo acumulado na subida permanece.",
-                icingStripLegend: "Faixa de baixo: gelo (experimental) — vermelho gelo possível, amarelo marginal, verde sem sinais, cinza sem dados.",
+                icingDetailNote: "Triagem experimental (DWD ICON, UK Met Office): ar abaixo de zero perto da saturação (UR ≥ {rh} % sobre a água), nevoeiro congelante, chuva e garoa congelantes. Não é uma previsão de gelo validada. Supõe sem proteção contra gelo, tubo de pitot sem aquecimento e subida de asa fixa (não um pairado VTOL). Em gelo, a tração da hélice e a leitura de velocidade podem se perder em 1–3 min e o gelo permanece — fique fora das camadas de gelo em vez de atravessá-las.",
+                icingStripLegend: "Faixa de baixo: gelo (experimental) — vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados; listrado: um só modelo; esmaecido: mais de 3 dias à frente.",
                 icingProfileToggle: "Perfil de gelo",
-                icingProfileHint: "Cada linha é um nível do modelo na sua altura habitual acima do solo aqui, cada coluna uma hora; cor: o pior dos dois modelos (vermelho gelo possível, amarelo marginal, verde sem sinais, cinza sem dados). A linha tracejada é a altitude de voo.",
+                icingProfileHint: "Cada linha é um nível do modelo na sua altura habitual acima do solo aqui, cada coluna uma hora; cor: o pior dos dois modelos (vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados). A linha tracejada é a altitude de voo.",
                 planIcing: "Sinais de gelo {from}–{to}",
-                planIcingAbove: "Camada de gelo acima, a partir de ~{h} m — fique abaixo dela",
+                icingFzdz: "garoa congelante de nuvens stratus baixas",
+                icingThin: "nuvens baixas entre os níveis do modelo",
+                icingFar: "além de 3 dias: menos confiável",
+                icingOnlyData: "só {model} prevê esta hora",
+                icingFlag: "Risco de gelo",
+                icingFlagTitle_cruise: "Os dois modelos mostram gelo possível na altitude de voo. Um VANT sem proteção deve ficar fora.",
+                icingFlagTitle_freezingPrecip: "Chuva ou garoa congelante na previsão. Um VANT sem proteção deve ficar fora.",
+                icingFlagLine_cruise: "Gelo: os dois modelos mostram gelo possível na altitude de voo. O veredito acima não o considera — um VANT sem proteção deve ficar fora.",
+                icingFlagLine_freezingPrecip: "Gelo: chuva ou garoa congelante na previsão. O veredito acima não o considera — um VANT sem proteção deve ficar fora.",
+                omUsage: "Uso do Open-Meteo por este navegador: {h} chamadas na última hora, {d} nas últimas 24 h (limites gratuitos por conexão: 600 por minuto, 5.000 por hora, 10.000 por dia).",
+                omPaused: "pausado para ficar abaixo do limite gratuito do Open-Meteo ({n} de {max} chamadas {span})",
+                omSpan_hour: "na última hora",
+                omSpan_day: "nas últimas 24 h",
+                planIcingAbove: "Camada de gelo acima — sem sinais até ~{h} m; fique abaixo",
                 flightFactorIcing: "Gelo",
                 factorIcing: "gelo",
                 planFactorIcing: "gelo marginal",
@@ -1702,8 +1744,8 @@
                 modelsButton: "Modelos",
                 modelsDrawerDesc: "Para o modo escolhido na barra inferior (Conjunto ou Modelos).",
                 modelCost: "Uma atualização ≈ {n} chamadas do limite gratuito do Open-Meteo (600 por minuto, 10.000 por dia); atualizado {every} ou com Atualizar.",
-                modelCostEvery2h: "a cada 2 h",
-                modelCostEvery1h: "a cada hora",
+                modelCostEveryEns: "a cada 3 h",
+                modelCostEveryDet: "a cada 2 h",
                 modelCostHigh: "Muitos membros: menos modelos mantêm você longe dos limites.",
                 toastRateWait: "Limite por minuto do Open-Meteo atingido — tentando de novo em um minuto.",
                 toastRateLimited: "Limite gratuito do Open-Meteo atingido para {n} modelo(s) ({reason}). A última previsão continua; tente mais tarde.",
@@ -1792,6 +1834,92 @@
             } catch (err) {
                 console.error('FlySky: failed to save to local storage.', err);
             }
+        }
+
+        // ================= Open-Meteo calls =================
+        // Free use is per connection (IP): 600 calls a minute, 5,000 an hour,
+        // 10,000 a day, shared by everything FlySky asks (and any other app on
+        // the same connection); the ensemble API counts apart from the forecast
+        // API (pool 'e' / 'f'). Every answer says what it cost (X-RateLimit-Cost,
+        // readable here); FlySky logs its own use for 24 h in this browser, to
+        // show it and to hold map requests back before a limit instead of
+        // running into it. The forecast and the icing data always go.
+        const OM_LIMITS = { minute: 600, hour: 5000, day: 10000 };
+        const OM_SOFT = { minute: 0.85, hour: 0.85, day: 0.9 };   // share map requests may fill
+        const OM_LOG_KEY = 'flysky_om_usage';
+        const omLog = (() => {   // [time ms, cost, pool]
+            const saved = loadFromStorage(OM_LOG_KEY, []);
+            const cut = Date.now() - 86400e3;
+            return Array.isArray(saved) ? saved.filter(e => Array.isArray(e) && e[0] >= cut && Number.isFinite(e[1])) : [];
+        })();
+        let omSaveTimer = null;
+
+        function omSave() {
+            clearTimeout(omSaveTimer);
+            omSaveTimer = setTimeout(() => saveToStorage(OM_LOG_KEY, omLog), 1000);
+        }
+
+        // Logs a call (the entry is returned, so its cost can be corrected).
+        function omRecord(cost, pool = 'f') {
+            const entry = [Date.now(), Math.round(cost * 100) / 100, pool];
+            omLog.push(entry);
+            const cut = Date.now() - 86400e3;
+            while (omLog.length && omLog[0][0] < cut) omLog.shift();
+            omSave();
+            return entry;
+        }
+
+        // Calls logged in the last `ms` milliseconds (one pool, or all).
+        function omUsed(ms, pool) {
+            const since = Date.now() - ms;
+            let n = 0;
+            for (let k = omLog.length - 1; k >= 0 && omLog[k][0] >= since; k--) if (!pool || (omLog[k][2] || 'f') === pool) n += omLog[k][1];
+            return n;
+        }
+
+        // How long until the pool's last minute has room for `cost` (ms).
+        function omWaitMs(cost, pool = 'f') {
+            const cap = OM_LIMITS.minute * OM_SOFT.minute;
+            let used = omUsed(60e3, pool);
+            if (cost > cap || used + cost <= cap) return 0;
+            const since = Date.now() - 60e3;
+            for (const [at, c, p] of omLog) {
+                if (at < since || (p || 'f') !== pool) continue;
+                used -= c;
+                if (used + cost <= cap) return at + 60e3 - Date.now() + 250;
+            }
+            return 60e3;
+        }
+
+        // fetch() for Open-Meteo, logging the cost (`cost` when sent, so
+        // requests in parallel see each other; then the answer's header).
+        // `deferrable` (map requests): waits while the last minute is nearly
+        // full, and is refused (with the reason) while the hour's or the day's
+        // use is near its limit.
+        async function omFetch(url, { cost = 1, deferrable = false, signal } = {}) {
+            const pool = url.includes('ensemble-api.') ? 'e' : 'f';
+            if (deferrable) {
+                for (const span of ['day', 'hour']) {
+                    const used = omUsed(span === 'day' ? 86400e3 : 3600e3, pool), max = OM_LIMITS[span];
+                    if (used + cost > max * OM_SOFT[span]) throw new Error(t('omPaused', { n: Math.round(used).toLocaleString(currentLang), max: max.toLocaleString(currentLang), span: t('omSpan_' + span) }));
+                }
+                for (let wait; (wait = omWaitMs(cost, pool)) > 0;) {
+                    await new Promise(resolve => setTimeout(resolve, Math.min(wait, 60e3)));
+                    if (signal && signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                }
+            }
+            const entry = omRecord(cost, pool);
+            let res;
+            try {
+                res = await fetch(url, signal ? { signal } : undefined);
+            } catch (err) {
+                entry[1] = 0; omSave();
+                throw err;
+            }
+            const c = parseFloat(res.headers.get('x-ratelimit-cost'));
+            entry[1] = res.status === 429 ? 0 : Number.isFinite(c) ? Math.round(c * 100) / 100 : entry[1];
+            omSave();
+            return res;
         }
 
         function isValidLocation(loc) {
@@ -1941,9 +2069,21 @@
         // UK Met Office (docs/icing-forecast-handoff.md). Its own request
         // (≈ 5 Open-Meteo calls), read again after an hour, the last one kept
         // for offline use; it never holds up the forecast.
-        const ICING_JS = 'icing.js?v=1';
+        const ICING_JS = 'icing.js?v=2';
         const ICING_STORE_KEY = 'flysky_icing';
-        const ICING_MAX_AGE_MS = 3600e3;
+        // Read again after 3 h (ICON-EU runs every 3 h, UKMO every 6 h); after
+        // 12 h when the last answer has no temperature at or below +3 °C at any
+        // level or hour (no icing possible: summer).
+        const ICING_MAX_AGE_MS = 3 * 3600e3;
+        const ICING_WARM_MAX_AGE_MS = 12 * 3600e3;
+        function icingMaxAge(data) {
+            if (!data || !data.body || !data.body.hourly) return ICING_MAX_AGE_MS;
+            if (data.warm === undefined) {
+                const h = data.body.hourly;
+                data.warm = !Object.keys(h).some(k => k.startsWith('temperature_') && h[k].some(v => Number.isFinite(v) && v <= 3));
+            }
+            return data.warm ? ICING_WARM_MAX_AGE_MS : ICING_MAX_AGE_MS;
+        }
         // data: { key, fetchedAt, body } — the response for `key` (location +
         // variables); result: icing.js evaluate() of it for the flight profile.
         // byKey: the last few responses (altitudes needing other levels switch back
@@ -2028,7 +2168,7 @@
             }
             if (ICING.byKey.has(key)) ICING.data = ICING.byKey.get(key);
             const have = ICING.data && ICING.data.key === key;
-            if (have && !force && Date.now() - ICING.data.fetchedAt < ICING_MAX_AGE_MS) {
+            if (have && !force && Date.now() - ICING.data.fetchedAt < icingMaxAge(ICING.data)) {
                 if (icingEvalKey() !== ICING.evalKey || !ICING.result) icingChanged();
                 return;
             }
@@ -2038,7 +2178,7 @@
             icingChanged();
             const promise = (async () => {
                 try {
-                    const res = await fetch(`${MODES.deterministic.url}?${new URLSearchParams(params)}`);
+                    const res = await omFetch(`${MODES.deterministic.url}?${new URLSearchParams(params)}`, { cost: window.FlySkyIcing.requestCost(params) });
                     const body = await res.json().catch(() => null);
                     if (!res.ok || !body || body.error || !body.hourly) throw new Error((body && body.reason) || `HTTP ${res.status}`);
                     if (Number.isFinite(body.elevation)) ICING.elevations.set(lk, body.elevation);
@@ -2094,7 +2234,31 @@
             const r = Math.round(v * 10) / 10;
             return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toLocaleString(currentLang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
         }
-        function icingColor(st) { return FLIGHT_STATUS[ICING_STATUS[st] || 'none'].color; }
+        // Icing colours: red, yellow, grey for "no icing signs" (never green:
+        // no evidence is not a clearance), hatched grey for no data.
+        const ICING_COLORS = { red: '#d03b3b', marginal: '#fab219', none: '#64748b', unknown: '#334155' };
+        const ICING_HATCH = 'repeating-linear-gradient(135deg, #475569 0 2px, #1e293b 2px 5px)';
+        const ICING_ONE_MODEL = 'repeating-linear-gradient(135deg, rgba(2, 6, 23, 0.55) 0 2px, transparent 2px 5px)';
+        const ICING_FAR_H = 72;   // hours ahead: faded beyond (low-cloud forecasts lose skill)
+        function icingColor(st) { return ICING_COLORS[st] || ICING_COLORS.unknown; }
+        function icingInk(st) { return st === 'none' ? '#cbd5e1' : st === 'unknown' ? '#94a3b8' : icingColor(st); }
+        function icingFill(st) { return st === 'unknown' ? ICING_HATCH : icingColor(st); }
+        // Hours ahead of now (the window starts at the current hour).
+        function icingLead(time) {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            return Math.max(0, hours.findIndex(h => h.time === time));
+        }
+        // A strong signal for the hour: 'freezingPrecip' | 'cruise' (2 of 2
+        // models at the flight altitude) | null — flagged on the headline.
+        function icingStrongAt(time) {
+            const hr = icingOn() ? icingHour(time) : null;
+            return hr ? hr.strong : null;
+        }
+        // Precipitation in any icing model in that hour.
+        function icingPrecipAt(time) {
+            const r = ICING.result, j = r ? ICING.index.get(time) : undefined;
+            return j !== undefined && r.models.some(m => (r.profiles[m][j].sfc.precip || 0) >= 0.1);
+        }
         function icingModelName(id) {
             const m = window.FlySkyIcing && window.FlySkyIcing.MODELS[id];
             return m ? m.name : id;
@@ -2107,9 +2271,12 @@
         // Why one model's flight has that state: freezing precipitation, the
         // cruise level's values, freezing fog, or the climb / descent bands.
         // { text, cue } — a cue (fog, freezing rain) reads after a colon.
+        function fzpText(src) { return t(src === 'drizzle' ? 'icingFzdz' : 'icingFzp'); }
         function icingWhat(f, st) {
             const cues = [f.cues.start, f.cues.end].filter(Boolean);
-            if (st === 'red' && (cues.some(c => c.freezingPrecip) || f.cruise.slots.some(sl => sl.freezingPrecip))) return { text: t('icingFzp'), cue: true };
+            const fzp = cues.map(c => c.freezingPrecip).concat(f.cruise.slots.map(sl => sl.freezingPrecip)).find(Boolean);
+            if (st === 'red' && fzp) return { text: fzpText(fzp.source), cue: true };
+            if (st === 'marginal' && (cues.some(c => c.thinLayer) || f.cruise.slots.some(sl => sl.thinLayer)) && !f.cruise.slots.some(sl => sl.levelState === 'marginal')) return { text: t('icingThin'), cue: true };
             const slot = f.cruise.slots.find(sl => sl.levelState === st && Number.isFinite(sl.t));
             if (slot) return { text: t('icingAt', { h: state.flightProfile.heightM, t: fmtC(slot.t), rh: Math.round(slot.rhw) }) };
             if (st === 'red' && cues.some(c => c.fog)) return { text: t('icingFog'), cue: true };
@@ -2128,7 +2295,9 @@
             }
             const same = ids.filter(id => hr.models[id].flight.state === hr.state);
             const what = icingWhat(hr.models[same[0]].flight, hr.state);
-            const models = hr.state !== 'none' && same.length < c.known
+            const models = c.known < c.total
+                ? t('icingOnlyData', { model: ids.filter(id => hr.models[id].flight.state !== 'unknown').map(icingModelName).join(', ') })
+                : hr.state !== 'none' && same.length < c.known
                 ? t('icingModelOnly', { model: same.map(icingModelName).join(', ') })
                 : t('icingModelsN', { n: same.length, of: c.known });
             return `${t('icingState_' + hr.state)}${what.text ? (what.cue ? ': ' : ' ') + what.text : ''} · ${models}`;
@@ -2168,10 +2337,11 @@
             if (!hr) return `<div data-now-icing class="rounded-lg border border-slate-800 px-2.5 py-1.5 text-xs">${head} <span class="ml-1 text-slate-400">${escapeHtml(icingStatusText())}</span></div>`;
             const color = icingColor(hr.state);
             const layer = icingLayerText(hr);
-            const stale = ICING.error && ICING.data && Date.now() - ICING.data.fetchedAt > ICING_MAX_AGE_MS
+            const stale = ICING.error && ICING.data && Date.now() - ICING.data.fetchedAt > icingMaxAge(ICING.data)
                 ? t('icingStale', { time: new Date(ICING.data.fetchedAt).toLocaleTimeString(currentLang, { hour: '2-digit', minute: '2-digit' }) }) : '';
+            const notes = [stale, icingLead(time) > ICING_FAR_H ? t('icingFar') : ''].filter(Boolean).join(' · ');
             return `<div data-now-icing class="rounded-lg border px-2.5 py-1.5 text-xs" style="border-color: ${color}66; background: ${color}14">
-                <div>${head} <span class="ml-1 font-semibold" style="color: ${color}">${escapeHtml(icingSummary(hr))}</span>${stale ? ` <span class="text-slate-500">· ${escapeHtml(stale)}</span>` : ''}</div>
+                <div>${head} <span class="ml-1 font-semibold" style="color: ${icingInk(hr.state)}">${escapeHtml(icingSummary(hr))}</span>${notes ? ` <span class="text-slate-500">· ${escapeHtml(notes)}</span>` : ''}</div>
                 ${layer ? `<div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(layer)}</div>` : ''}
             </div>`;
         }
@@ -2180,7 +2350,7 @@
         function icingLineHtml(time) {
             const hr = icingOn() ? icingHour(time) : null;
             if (!hr || icingVerdictOn()) return '';
-            return `<span class="block mt-0.5 text-[11px]" style="color: ${icingColor(hr.state)}"><i class="fa-solid fa-snowflake mr-1"></i>${escapeHtml(`${t('icingTitle')}: ${icingSummary(hr)}`)}</span>`;
+            return `<span class="block mt-0.5 text-[11px]" style="color: ${icingInk(hr.state)}"><i class="fa-solid fa-snowflake mr-1"></i>${escapeHtml(`${t('icingTitle')}: ${icingSummary(hr)}`)}</span>`;
         }
 
         // Pinned hour (and the icing breakdown bar): each model's climb,
@@ -2208,11 +2378,13 @@
                     ].filter(Boolean);
                     const cues = [f.cues.start, f.cues.end].filter(Boolean);
                     if (cues.some(c => c.fog)) parts.push(t('icingFog'));
-                    if (cues.some(c => c.freezingPrecip) || f.cruise.slots.some(sl => sl.freezingPrecip)) parts.push(t('icingFzp'));
+                    const fzp = cues.map(c => c.freezingPrecip).concat(f.cruise.slots.map(sl => sl.freezingPrecip)).find(Boolean);
+                    if (fzp) parts.push(fzpText(fzp.source));
+                    if (cues.some(c => c.thinLayer) || f.cruise.slots.some(sl => sl.thinLayer)) parts.push(t('icingThin'));
                     txt = parts.length ? parts.join(' · ') : t('icingState_' + f.state);
                     if (f.partlyUnknown) txt += ' · ' + t('icingPartlyUnknown');
                 }
-                return `<div><span class="font-semibold" style="color: ${icingColor(f.state)}">${escapeHtml(icingModelName(id))}</span>: ${escapeHtml(txt)}</div>`;
+                return `<div><span class="font-semibold" style="color: ${icingInk(f.state)}">${escapeHtml(icingModelName(id))}</span>: ${escapeHtml(txt)}</div>`;
             });
             const layer = icingLayerText(hr);
             return `<div class="mt-1.5 space-y-0.5 text-[11px] text-slate-400">
@@ -2233,7 +2405,8 @@
             el.innerHTML = hours.map((h, i) => {
                 const hr = icingHour(h.time);
                 const st = hr ? hr.state : 'unknown';
-                return `<div data-flight-hour="${i}" class="flex-1 min-w-0" style="background: ${icingColor(st)}" title="${escapeHtml(`${formatDayHour(h.time)} · ${t('icingTitle')}: ${t('icingState_' + st)}`)}"></div>`;
+                const one = hr && st !== 'unknown' && hr.combined.known < hr.combined.total;
+                return `<div data-flight-hour="${i}" class="flex-1 min-w-0" style="background: ${one ? ICING_ONE_MODEL + ', ' : ''}${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(`${formatDayHour(h.time)} · ${t('icingTitle')}: ${t('icingState_' + st)}`)}"></div>`;
             }).join('');
             legend.innerHTML = `<i class="fa-solid fa-snowflake text-sky-300 mr-1"></i>${escapeHtml(t('icingStripLegend'))}`;
         }
@@ -2276,7 +2449,7 @@
                         vals.push(`${icingModelName(m)} ${fmtC(l.t)} °C ${Math.round(l.rhw)} %`);
                     });
                     const tip = `${formatDayHour(h.time)} · ~${roundM(row.agl)} m (${row.p} hPa) · ${t('icingState_' + st)}${vals.length ? ' · ' + vals.join(' · ') : ''}`;
-                    return `<div data-icing-cell data-tip="${escapeHtml(tip)}" class="flex-1 min-w-0" style="background: ${icingColor(st)}" title="${escapeHtml(tip)}"></div>`;
+                    return `<div data-icing-cell data-tip="${escapeHtml(tip)}" class="flex-1 min-w-0" style="background: ${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(tip)}"></div>`;
                 }).join('');
                 html += `<div class="relative"><div class="flex h-3.5">${cells}</div><span class="absolute left-0.5 top-0 z-20 px-1 rounded-sm bg-slate-950/75 text-[9px] leading-[14px] font-mono text-white pointer-events-none">~${roundM(row.agl)} m</span></div>`;
             });
@@ -2286,19 +2459,35 @@
 
         // Planner: icing signs in a flyable slot (when they don't count in the
         // verdict), or a layer above the flight altitude to stay below.
+        // Planner notes (design review): icing signs in a slot or in the hour
+        // either side of it (stratus timing errors); else "stay below" only when,
+        // in every hour of the slot and the hours either side, both models have
+        // data, show no icing signs on the flight, no precipitation falls, and
+        // the air is clear up to at least 150 m above the flight altitude —
+        // measured from the highest clear level, not the layer's red level.
         function icingSlotNote(hours, sl) {
             if (!icingOn() || !ICING.result) return null;
             const H = state.flightProfile.heightM;
-            let from = -1, to = -1, above = Infinity;
+            const hr = i => (i >= 0 && i < hours.length ? icingHour(hours[i].time) : undefined);
+            let from = -1, to = -1;
             for (let i = sl.start; i <= sl.end; i++) {
-                const hr = icingHour(hours[i].time);
-                if (!hr) continue;
-                if (hr.state === 'red') { if (from < 0) from = i; to = i; continue; }
-                Object.values(hr.models).forEach(m => m.layers.layers.forEach(l => { if (l.bottomAgl >= H + 150) above = Math.min(above, l.bottomAgl); }));
+                if ([hr(i - 1), hr(i), hr(i + 1)].some(x => x && x.state === 'red')) { if (from < 0) from = i; to = i; }
             }
             if (from >= 0) return { red: true, text: t('planIcing', { from: formatHour(hours[from].time), to: formatHour(addHoursToLocal(hours[to].time, 1)) }) };
-            if (above < Infinity) return { red: false, text: t('planIcingAbove', { h: roundM(above) }) };
-            return null;
+            let clear = Infinity, layer = false;
+            for (let i = sl.start - 1; i <= sl.end + 1; i++) {
+                const x = hr(i);
+                if (x === undefined) continue;   // outside the window
+                if (!x || x.combined.known < 2 || x.combined.known < x.combined.total || icingPrecipAt(hours[i].time)) return null;
+                for (const m of Object.values(x.models)) {
+                    if (m.flight.state !== 'none') return null;
+                    if (!m.layers.layers.length) continue;
+                    if (m.layers.clearToAgl < H + 150) return null;
+                    clear = Math.min(clear, m.layers.clearToAgl);
+                    if (i >= sl.start && i <= sl.end) layer = true;
+                }
+            }
+            return layer ? { red: false, text: t('planIcingAbove', { h: roundM(clear) }) } : null;
         }
 
         // Chart.js instances keyed by parameter key.
@@ -2526,7 +2715,7 @@
             let vars = apiVars(mode).filter(v => !unsupportedVars[mode].has(v));
             let rateRetried = false;
             for (;;) {
-                const res = await fetch(buildForecastUrl(mode, models.join(','), vars, days), { signal });
+                const res = await omFetch(buildForecastUrl(mode, models.join(','), vars, days), { cost: forecastCost(mode, models), signal });
                 const body = await res.json().catch(() => null);
                 if (res.ok && body && !body.error && body.hourly) return { data: body };
                 const reason = (body && body.reason) || `HTTP ${res.status}`;
@@ -3125,9 +3314,10 @@
                 parts.push(status !== 'good' && h.checks.icing === status ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt);
             }
             const label = factor ? `${factorLabel(factor)}: ${t(st.labelKey)}` : t(st.labelKey);
+            const strong = !factor && icingStrongAt(h.time);
             const conf = !factor && h.agree ? ` <span class="text-slate-600">·</span> <span style="color: ${CONF_TEXT[h.agree.level]}">${escapeHtml(confText(h))}</span>` : '';
             return `<span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
-                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>
+                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>${strong ? `<span data-icing-flag="${strong}" class="mr-1.5 px-1.5 rounded font-semibold text-white" style="background: #d03b3bcc" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i> ${escapeHtml(t('icingFlag'))}</span>` : ''}
                 <span class="text-slate-400">${parts.join(' · ')}</span>${conf}`;
         }
 
@@ -3317,7 +3507,10 @@
             const f = processed && processed.flight;
             const i = nowIndex();
             const h = f && f.hours[i];
-            document.getElementById('nowIcing').innerHTML = h ? icingRowHtml(h.time) : '';
+            // Under the scrubber (its height changes from hour to hour): the icing
+            // row, led by the "not in the verdict" line on a strong signal.
+            const flagged = h && !icingVerdictOn() ? icingStrongAt(h.time) : null;
+            document.getElementById('nowIcing').innerHTML = h ? (flagged ? `<p data-icing-flagline class="mb-1 text-xs font-semibold text-rose-300"><i class="fa-solid fa-snowflake mr-1"></i>${escapeHtml(t('icingFlagLine_' + flagged))}</p>` : '') + icingRowHtml(h.time) : '';
             const isNow = i === 0;
             const title = `<div class="flex items-center justify-between gap-2">
                 <h3 class="min-w-0 font-semibold text-slate-200 text-sm flex items-center gap-2"><i class="fa-solid fa-plane-up text-emerald-400"></i><span class="truncate">${escapeHtml(isNow || !h ? t('nowTitle') : t('nowTitleAt'))}</span></h3>
@@ -3332,10 +3525,12 @@
             }
             const st = FLIGHT_STATUS[h.status];
             const a = h.agree;
+            const strong = icingStrongAt(h.time);
             const verdict = `<div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
                 <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-base font-bold border" style="color: ${st.color}; background: ${st.color}1f; border-color: ${st.color}66">
                     <i class="fa-solid ${st.icon}"></i>${escapeHtml(t(st.labelKey))}</span>
                 <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }))}</span>` : ''}</span>
+                ${strong ? `<span data-icing-flag="${strong}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold text-white" style="background: #d03b3b" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i>${escapeHtml(t('icingFlag'))}</span>` : ''}
                 <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}" class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>
             </div>`;
             const limiting = h.status === 'none' ? '' : h.status === 'good'
@@ -4346,7 +4541,8 @@
             // What an update costs of Open-Meteo's free allowance.
             const cost = forecastCost();
             const costEl = document.getElementById('modelCost');
-            costEl.innerHTML = `<i class="fa-solid fa-gauge-high mr-1 ${cost > 150 ? 'text-amber-400' : ''}"></i>${escapeHtml(t('modelCost', { n: cost, every: t(state.mode === 'ensemble' ? 'modelCostEvery2h' : 'modelCostEvery1h') }))}${cost > 150 ? ` <span class="text-amber-300">${escapeHtml(t('modelCostHigh'))}</span>` : ''}`;
+            costEl.innerHTML = `<i class="fa-solid fa-gauge-high mr-1 ${cost > 150 ? 'text-amber-400' : ''}"></i>${escapeHtml(t('modelCost', { n: cost, every: t(state.mode === 'ensemble' ? 'modelCostEveryEns' : 'modelCostEveryDet') }))}${cost > 150 ? ` <span class="text-amber-300">${escapeHtml(t('modelCostHigh'))}</span>` : ''}`;
+            document.getElementById('omUsage').textContent = t('omUsage', { h: Math.round(omUsed(3600e3)).toLocaleString(currentLang), d: Math.round(omUsed(86400e3)).toLocaleString(currentLang) });
             document.getElementById('membersTotal').textContent = state.mode === 'ensemble'
                 ? t('membersTotal', { count: chosen.reduce((sum, m) => sum + m.members, 0) })
                 : t('modelsCount', { count: chosen.length });
@@ -5329,7 +5525,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=21';
+        const MAP_JS = 'map.js?v=22';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 

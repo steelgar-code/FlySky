@@ -33,14 +33,18 @@
 (function (root) {
     'use strict';
 
-    const VERSION = 1;
+    const VERSION = 2;
 
     // Pressure levels (hPa) the engine knows, from the ground up, with their
     // height above sea level in the standard atmosphere (m) — only used to
     // choose which levels to request; the real heights come with the data.
     const LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700];
     const STD_HEIGHT = { 1000: 110, 975: 320, 950: 540, 925: 760, 900: 990, 850: 1460, 800: 1950, 700: 3010 };
-    const SURFACE_VARS = ['temperature_2m', 'relative_humidity_2m', 'weather_code', 'visibility', 'precipitation'];
+    // Surface values. Level heights come from the surface pressure (hypsometric
+    // equation, within a few metres of the models' geopotential height in the
+    // Phase 0 data), which saves asking each level's height.
+    const SURFACE_VARS = ['surface_pressure', 'temperature_2m', 'relative_humidity_2m', 'weather_code', 'visibility', 'precipitation', 'rain', 'cloud_cover_low'];
+    const RD = 287.05, G0 = 9.80665;
 
     // How each model reports relative humidity below 0 °C (design §4.4):
     //  'water' — over water (used as is);
@@ -49,8 +53,10 @@
     //  'ice'   — over ice below 0 °C (converted to over water).
     // `rhConfirmed` false: the convention is not documented / not clear from
     // the Phase 0 data, so the values are used as given and the details say so.
+    // `rainSplit`: the model's own rain / snow split (ICON's rain falls at 2 m
+    // temperatures below 0 °C too; UKMO's follows the 2 m temperature only).
     const MODELS = {
-        icon_seamless: { name: 'DWD ICON', rh: 'water', rhConfirmed: true, codes: true },
+        icon_seamless: { name: 'DWD ICON', rh: 'water', rhConfirmed: true, codes: true, rainSplit: true },
         ukmo_seamless: { name: 'UK Met Office', rh: 'water', rhConfirmed: false },
         ecmwf_ifs025: { name: 'ECMWF IFS', rh: 'ecmwf', rhConfirmed: true },
         ecmwf_aifs025_single: { name: 'ECMWF AIFS', rh: 'ecmwf', rhConfirmed: false },
@@ -63,12 +69,17 @@
     const DEFAULT_MODELS = ['icon_seamless', 'ukmo_seamless'];
 
     // Experimental thresholds (design §7.4). Temperatures °C, RH % over water.
+    // v2 (design review): red down to −30 °C (RH over water ≥ 90 % there is
+    // well above ice saturation), marginal up to +2 °C (model temperature
+    // errors in inversions are 1–2 K).
     const DEFAULT_THRESHOLDS = {
-        tMin: -20, tMax: 0,         // red: tMin ≤ T ≤ tMax and RH ≥ rhRed
-        tWarm: 1, tCold: -30,       // marginal margins in temperature
+        tMin: -30, tMax: 0,         // red: tMin ≤ T ≤ tMax and RH ≥ rhRed
+        tWarm: 2,                   // marginal up to this temperature
         rhRed: 90, rhMarginal: 80,
         fogT2m: 0, fogRh2m: 97, fogVisM: 1000,   // freezing fog at the ground
-        precipMm: 0.1               // mm/h: precipitation for the freezing-precipitation cue
+        precipMm: 0.1,              // mm/h: precipitation for the freezing-precipitation cues
+        drizzleTopMin: -12,         // freezing drizzle from stratus: cloud top warmer than this
+        lowCloudPct: 80             // thin-layer guard: low cloud cover from this
     };
     // Flight profile defaults (design §5.2): metres above takeoff, m/s, minutes.
     const DEFAULT_PROFILE = { heightM: 400, climbMs: 2, descentMs: 2, durationMin: 120 };
@@ -125,27 +136,62 @@
         if (!Number.isFinite(t) || !Number.isFinite(rhw)) return 'unknown';
         if (t >= th.tMin && t <= th.tMax && rhw >= th.rhRed) return 'red';
         if ((t >= th.tMin && t <= th.tWarm && rhw >= th.rhMarginal && rhw < th.rhRed)
-            || (t > th.tMax && t <= th.tWarm && rhw >= th.rhRed)
-            || (t >= th.tCold && t < th.tMin && rhw >= th.rhRed)) return 'marginal';
+            || (t > th.tMax && t <= th.tWarm && rhw >= th.rhRed)) return 'marginal';
         return 'none';
     }
 
-    // Surface cues for one hour: freezing fog (code 48, or sub-zero 2 m air
-    // with low visibility or near saturation) and freezing precipitation
-    // (code 56/57/66/67, or precipitation with sub-zero 2 m air under a layer
-    // warmer than 0 °C — the warm nose). `source` says which data showed it.
-    function surfaceCues(sfc, levels, th = DEFAULT_THRESHOLDS) {
-        const out = { fog: null, freezingPrecip: null };
+    // Surface cues for one hour (`source` says which data showed it):
+    //  fog — freezing fog: code 48, or sub-zero 2 m air with low visibility
+    //        or near saturation;
+    //  freezingPrecip — code 56/57/66/67; rain at a sub-zero 2 m temperature
+    //        (models with their own rain / snow split); precipitation under a
+    //        layer warmer than 0 °C (warm nose); or freezing drizzle from
+    //        supercooled stratus without a melting layer — a red layer with
+    //        its top warmer than drizzleTopMin, dry or warmer air above and
+    //        sub-zero air below (most freezing drizzle forms this way);
+    //  thinLayer — much low cloud, everything sub-zero, but no level red: a
+    //        thin deck may sit between two levels (marginal).
+    function surfaceCues(sfc, levels, th = DEFAULT_THRESHOLDS, model) {
+        const out = { fog: null, freezingPrecip: null, thinLayer: null };
         const cold = Number.isFinite(sfc.t2) && sfc.t2 <= th.fogT2m;
         if (sfc.code === FOG_CODE) out.fog = { source: 'code' };
         else if (cold && Number.isFinite(sfc.vis) && sfc.vis < th.fogVisM) out.fog = { source: 'visibility' };
         else if (cold && Number.isFinite(sfc.rh2) && sfc.rh2 >= th.fogRh2m) out.fog = { source: 'humidity' };
+        const sub0 = Number.isFinite(sfc.t2) && sfc.t2 <= 0;
+        const wet = Number.isFinite(sfc.precip) && sfc.precip >= th.precipMm;
+        const v = levels.filter(l => l.valid);
         if (FREEZING_CODES.includes(sfc.code)) out.freezingPrecip = { source: 'code', code: sfc.code };
-        else if (Number.isFinite(sfc.precip) && sfc.precip >= th.precipMm && Number.isFinite(sfc.t2) && sfc.t2 <= 0) {
+        else if (sub0 && (MODELS[model] || {}).rainSplit && Number.isFinite(sfc.rain) && sfc.rain >= th.precipMm) out.freezingPrecip = { source: 'rain', rain: sfc.rain };
+        else if (sub0 && wet) {
             const warm = levels.find(l => Number.isFinite(l.t) && l.t > 0 && !(l.agl !== null && l.agl < MIN_AGL));
             if (warm) out.freezingPrecip = { source: 'profile', warmLevel: warm.p, warmT: warm.t };
+            else {
+                for (let k = 0; k < v.length; k++) {
+                    if (v[k].state !== 'red') continue;
+                    let top = k;
+                    while (top + 1 < v.length && v[top + 1].state === 'red') top++;
+                    const up = v[top + 1];
+                    const below = v.slice(0, k).every(l => l.t <= 0);
+                    if (below && v[top].t > th.drizzleTopMin && up && (up.t > 0 || up.rhw < DRY_ABOVE_RH)) {
+                        out.freezingPrecip = { source: 'drizzle', topAgl: v[top].agl, topT: v[top].t };
+                        break;
+                    }
+                    k = top;
+                }
+            }
+        }
+        if (sub0 && Number.isFinite(sfc.lowCloud) && sfc.lowCloud >= th.lowCloudPct && v.length
+            && !v.some(l => l.state === 'red') && v.filter(l => l.agl <= 2000).every(l => l.t <= 0)) {
+            out.thinLayer = { source: 'lowCloud', pct: sfc.lowCloud };
         }
         return out;
+    }
+
+    // Virtual temperature (K) from T (°C), RH (%) and pressure (hPa).
+    function virtualT(t, rh, p) {
+        const e = (Number.isFinite(rh) ? rh : 0) / 100 * esWater(t);
+        const q = 0.622 * e / Math.max(p - 0.378 * e, 1);
+        return (t + 273.15) * (1 + 0.61 * q);
     }
 
     // ---- Request
@@ -153,11 +199,17 @@
     // Pressure levels to request for a flight height (m above sea level): up
     // to 500 m above it and at least up to 850 hPa (for the layer report),
     // plus the next level when none of those is 300 m or more above it.
-    function levelsFor(targetAsl) {
+    // Levels certainly inside the terrain (standard height + 250 m below the
+    // ground) are not asked: Open-Meteo counts every variable.
+    const BELOW_GROUND_MARGIN = 250;
+    function levelsFor(targetAsl, elevation) {
         const top = Math.max(targetAsl + 500, STD_HEIGHT[850]);
-        const out = LEVELS.filter(p => STD_HEIGHT[p] <= top);
-        const next = LEVELS.find(p => !out.includes(p));
-        if (next && STD_HEIGHT[out[out.length - 1]] < targetAsl + COARSE_DIST) out.push(next);
+        const ground = Number.isFinite(elevation) ? elevation : -Infinity;
+        const above = LEVELS.filter(p => STD_HEIGHT[p] + BELOW_GROUND_MARGIN >= ground);
+        const out = above.filter(p => STD_HEIGHT[p] <= top);
+        const last = out.length ? STD_HEIGHT[out[out.length - 1]] : -Infinity;
+        const next = above.find(p => STD_HEIGHT[p] > last);
+        if (next && last < targetAsl + COARSE_DIST) out.push(next);
         return out;
     }
 
@@ -166,9 +218,10 @@
     // needed; without it 300 m is assumed.
     function requestParams({ latitude, longitude, heightM = DEFAULT_PROFILE.heightM, elevation, models = DEFAULT_MODELS, days = 8, timezone = 'auto' }) {
         const targetAsl = (Number.isFinite(elevation) ? elevation : 300) + heightM;
-        const levels = levelsFor(targetAsl);
+        const levels = levelsFor(targetAsl, elevation);
         const hourly = [];
-        levels.forEach(p => hourly.push(`temperature_${p}hPa`, `relative_humidity_${p}hPa`, `geopotential_height_${p}hPa`));
+        // No geopotential height: the heights come from the surface pressure.
+        levels.forEach(p => hourly.push(`temperature_${p}hPa`, `relative_humidity_${p}hPa`));
         // The warm-nose check looks up to 700 hPa.
         if (!levels.includes(700)) hourly.push('temperature_700hPa');
         hourly.push(...SURFACE_VARS);
@@ -209,19 +262,39 @@
     function profileAt(cols, i, elevation, model, th = DEFAULT_THRESHOLDS) {
         const at = k => { const s = cols && cols[k]; const v = s ? s[i] : null; return Number.isFinite(v) ? v : null; };
         const conv = (MODELS[model] || {}).rh || 'water';
-        const levels = [];
+        const sfc = {
+            ps: at('surface_pressure'), t2: at('temperature_2m'), rh2: at('relative_humidity_2m'), code: at('weather_code'),
+            vis: at('visibility'), precip: at('precipitation'), rain: at('rain'), lowCloud: at('cloud_cover_low')
+        };
+        const raw = [];
         LEVELS.forEach(p => {
             const z = at(`geopotential_height_${p}hPa`), t = at(`temperature_${p}hPa`), rh = at(`relative_humidity_${p}hPa`);
-            if (z === null && t === null && rh === null) return;
-            const agl = z === null || !Number.isFinite(elevation) ? null : z - elevation;
-            const valid = z !== null && t !== null && rh !== null && agl !== null && agl >= MIN_AGL;
-            const rhw = rhOverWater(rh, t, conv);
-            levels.push({ p, z, agl, t, rh, rhw, valid, state: valid ? levelState(t, rhw, th) : 'unknown' });
+            if (z !== null || t !== null || rh !== null) raw.push({ p, z, t, rh, agl: z === null || !Number.isFinite(elevation) ? null : z - elevation });
         });
-        levels.sort((a, b) => b.p - a.p);
-        const sfc = { t2: at('temperature_2m'), rh2: at('relative_humidity_2m'), code: at('weather_code'), vis: at('visibility'), precip: at('precipitation') };
+        raw.sort((a, b) => b.p - a.p);
+        // No geopotential height: heights from the surface pressure, from the
+        // ground up (hypsometric equation with the virtual temperature).
+        if (raw.some(l => l.z === null) && sfc.ps !== null && sfc.t2 !== null && Number.isFinite(elevation)) {
+            let z = 0, p0 = sfc.ps, tv0 = virtualT(sfc.t2, sfc.rh2, sfc.ps);
+            raw.forEach(l => {
+                if (l.t === null) return;
+                const tv1 = virtualT(l.t, l.rh, l.p);
+                if (l.p >= sfc.ps) l.agl = -RD / G0 * (tv0 + tv1) / 2 * Math.log(l.p / sfc.ps);
+                else {
+                    z += RD / G0 * (tv0 + tv1) / 2 * Math.log(p0 / l.p);
+                    p0 = l.p; tv0 = tv1;
+                    l.agl = z;
+                }
+                l.z = elevation + l.agl;
+            });
+        }
+        const levels = raw.map(l => {
+            const valid = l.z !== null && l.t !== null && l.rh !== null && l.agl !== null && l.agl >= MIN_AGL;
+            const rhw = rhOverWater(l.rh, l.t, conv);
+            return { ...l, rhw, valid, state: valid ? levelState(l.t, rhw, th) : 'unknown' };
+        });
         const hasData = levels.some(l => l.valid) || sfc.t2 !== null;
-        return { i, time: cols && cols.time ? cols.time[i] : null, model, elevation, levels, sfc, cues: surfaceCues(sfc, levels, th), hasData };
+        return { i, time: cols && cols.time ? cols.time[i] : null, model, elevation, levels, sfc, cues: surfaceCues(sfc, levels, th, model), hasData };
     }
 
     // State at a fixed height above sea level: the worse of the nearest
@@ -339,7 +412,8 @@
                 : surfaceOnly ? { state: Number.isFinite(prof.sfc.t2) ? 'none' : 'unknown', levels: [] }
                 : stateAt(prof, targetAsl);
             const fzp = prof && prof.cues.freezingPrecip;
-            slots.push({ index: i + j, minutes, ...at, state: fzp ? 'red' : at.state, freezingPrecip: fzp || null, levelState: at.state });
+            const thin = prof && prof.cues.thinLayer;
+            slots.push({ index: i + j, minutes, ...at, state: fzp ? 'red' : thin ? worst(at.state, 'marginal') : at.state, freezingPrecip: fzp || null, thinLayer: thin || null, levelState: at.state });
         }
         const cruiseMinutes = { red: 0, marginal: 0, none: 0, unknown: 0 };
         slots.forEach(s => { cruiseMinutes[s.state] += s.minutes; });
@@ -349,7 +423,7 @@
         // A phase without levels to cross (surface-only flight): the fog cue,
         // or "none" when the ground values are there.
         const phase = (list, prof) => !prof ? 'unknown'
-            : worst(list.map(b => b.state), prof.cues.fog ? 'red' : [], surfaceOnly && Number.isFinite(prof.sfc.t2) ? 'none' : []);
+            : worst(list.map(b => b.state), prof.cues.fog ? 'red' : [], prof.cues.thinLayer ? 'marginal' : [], surfaceOnly && Number.isFinite(prof.sfc.t2) ? 'none' : []);
         const climbState = phase(climbBands, start);
         const descentState = phase(descentBands, end);
         const cruiseState = worst(slots.map(s => s.state));
@@ -390,6 +464,20 @@
         return out;
     }
 
+    // A strong icing signal for the hour (design review): freezing
+    // precipitation (rain / drizzle) in any model, or potential icing at the
+    // cruise in every model with data — at least two.
+    // 'freezingPrecip' | 'cruise' | null.
+    function strongSignal(per, models) {
+        const known = models.filter(m => per[m].flight.state !== 'unknown');
+        const fzp = known.some(m => {
+            const f = per[m].flight;
+            return [f.cues.start, f.cues.end].some(c => c && c.freezingPrecip) || f.cruise.slots.some(sl => sl.freezingPrecip);
+        });
+        if (fzp) return 'freezingPrecip';
+        return known.length >= 2 && known.every(m => per[m].flight.cruise && per[m].flight.cruise.state === 'red') ? 'cruise' : null;
+    }
+
     // ---- Mode A for a whole response
 
     // Evaluates the forecast-tab icing response: every hour as a departure
@@ -412,7 +500,7 @@
             const per = {};
             models.forEach(m => { per[m] = { flight: flight(profiles[m], i, profile), layers: layers(profiles[m][i]) }; });
             const combined = combine(Object.fromEntries(models.map(m => [m, per[m].flight.state])), rule);
-            return { time, state: combined.state, combined, models: per };
+            return { time, state: combined.state, combined, models: per, strong: strongSignal(per, models) };
         });
         return { elevation, times, models, profile, thresholds: th, rule, hours, profiles };
     }
@@ -434,7 +522,7 @@
 
     const api = {
         VERSION, LEVELS, STD_HEIGHT, MODELS, DEFAULT_MODELS, DEFAULT_THRESHOLDS, DEFAULT_PROFILE, STATES, RANK,
-        worst, esWater, esIce, esEcmwf, rhOverWater, dewPoint, levelState, surfaceCues,
+        worst, esWater, esIce, esEcmwf, rhOverWater, dewPoint, virtualT, levelState, surfaceCues, strongSignal,
         levelsFor, requestParams, requestCost, splitModels, profileAt, stateAt, bands, layers, flight, combine,
         evaluate, pointState
     };
