@@ -273,6 +273,44 @@ const h0 = (body, opts) => run(body, opts).hours[0];
     ok('strong signal: cruise red in 2 of 2 models; not for one model or climb only', both.strong === 'cruise' && one.strong === null && climb.strong === null, [both.strong, one.strong, climb.strong]);
 }
 
+// ---- Route (calculator): levels, request, points from a route-style answer, climb / descent at A
+{
+    ok('route levels: 975 / 950 / 925 hPa for 579 m above sea level', I.routeLevels(579).join() === '975,950,925', I.routeLevels(579));
+    ok('route levels: 850 / 800 for 1679 m, 800 / 700 over the mountains (2425 m), every level between for 500–900 m',
+        I.routeLevels(1679).join() === '850,800' && I.routeLevels(2425).join() === '800,700' && I.routeLevels(500, 900).join() === '975,950,925,900,850', [I.routeLevels(1679), I.routeLevels(2425), I.routeLevels(500, 900)]);
+    const p = I.routeRequestParams({ latitudes: [50.5, 50.5], longitudes: [30.8, 31.1], zMin: 579, zMax: 579 });
+    ok('route request: T / RH at three levels + surface pressure, 2 m temperature, weather code; GMT, 2 days, 2 points → 3.6 calls',
+        p.hourly === 'temperature_975hPa,relative_humidity_975hPa,temperature_950hPa,relative_humidity_950hPa,temperature_925hPa,relative_humidity_925hPa,surface_pressure,temperature_2m,weather_code'
+        && p.latitude === '50.5,50.5' && p.timezone === 'GMT' && p.forecast_days === 2 && p.models === 'icon_seamless,ukmo_seamless' && near(I.requestCost(p), 3.6), { p, cost: I.requestCost(p) });
+    // A route-style answer: only the asked levels, no heights, no other surface values.
+    const keep = new Set(p.hourly.split(','));
+    const routeBody = o => {
+        const full = makeBody(o);
+        Object.keys(full.hourly).forEach(k => { if (k !== 'time' && !keep.has(k.replace(/_(icon_seamless|ukmo_seamless)$/, ''))) delete full.hourly[k]; });
+        return full;
+    };
+    const wet = routeBody({ level: (m, i, p) => (p === 950 || p === 925 ? WET : {}), sfc: () => ({ ps: 997 }) });
+    const cols = I.splitModels(wet.hourly, TWO);
+    const at = I.pointState(cols.icon_seamless, 0, ELEV, ELEV + 400, 'icon_seamless');
+    const l950 = I.profileAt(cols.icon_seamless, 0, ELEV, 'icon_seamless').levels.find(l => l.p === 950);
+    ok('route point: heights from the surface pressure without the lower levels (950 hPa ≈ 390 m above the ground), 400 m red', at.state === 'red' && l950.agl > 350 && l950.agl < 430, { state: at.state, agl: l950 && l950.agl });
+    const code = routeBody({ sfc: () => ({ ps: 997, code: 66 }) });
+    const fz = I.pointState(I.splitModels(code.hourly, TWO).ukmo_seamless, 0, ELEV, ELEV + 400, 'ukmo_seamless');
+    ok('route point: freezing rain code → red, source code', fz.state === 'red' && fz.freezingPrecip && fz.freezingPrecip.source === 'code', fz);
+    const hill = I.pointState(cols.icon_seamless, 0, 700, 600, 'icon_seamless');
+    ok('route point below the ground there: unknown, below-ground', hill.state === 'unknown' && hill.reason === 'below-ground', hill);
+    // climb / descent at A from a full column
+    const low = makeBody({ level: (m, i, p) => (p === 975 ? WET : {}) });
+    const prof = I.profileAt(I.splitModels(low.hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless');
+    const c = I.columnPhase(prof, 400, 2);
+    ok('column at A: a low layer → climb red through the bands to ~380 m, minutes at the rate', c.state === 'red' && near(c.minutes.red, 380 / 2 / 60, 0.02) && c.bands[0].fromAgl === 0, c);
+    const fog = I.columnPhase(I.profileAt(I.splitModels(makeBody({ sfc: () => ({ t2: -2, vis: 300 }) }).hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless'), 400, 2);
+    ok('column at A: freezing fog at the ground → red', fog.state === 'red' && !!fog.fog, fog.state);
+    const dry = I.columnPhase(I.profileAt(I.splitModels(makeBody().hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless'), 400, 2);
+    const ten = I.columnPhase(I.profileAt(I.splitModels(makeBody().hourly, TWO).icon_seamless, 0, ELEV, 'icon_seamless'), 10, 2);
+    ok('column at A: cold and dry → none; a 10 m flight: no bands, none', dry.state === 'none' && ten.state === 'none' && !ten.bands.length, [dry.state, ten.state]);
+}
+
 // ---- Browser global
 {
     const sandbox = { window: {} };

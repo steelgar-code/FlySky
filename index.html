@@ -994,6 +994,7 @@
                 icingProfileHint: "Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, grey no signs, hatched no data). The dashed line is the flight altitude.",
                 planIcing: "Icing signs {from}–{to}",
                 icingFzdz: "freezing drizzle from low stratus",
+                icingRangeM: "({from}–{to} m)",
                 icingThin: "low cloud between the model levels",
                 icingFar: "beyond 3 days: less reliable",
                 icingOnlyData: "only {model} forecasts this hour",
@@ -1309,6 +1310,7 @@
                 icingProfileHint: "Кожен рядок — рівень моделі на його звичайній висоті над землею тут, кожен стовпчик — година; колір — гірший із двох моделей (червоний: можливе обледеніння, жовтий: межові умови, сірий: ознак немає, штрихування: немає даних). Пунктир — висота польоту.",
                 planIcing: "Ознаки обледеніння {from}–{to}",
                 icingFzdz: "крижана мряка з низьких шаруватих хмар",
+                icingRangeM: "({from}–{to} м)",
                 icingThin: "низька хмарність між рівнями моделі",
                 icingFar: "понад 3 доби: менш надійно",
                 icingOnlyData: "цю годину прогнозує лише {model}",
@@ -1624,6 +1626,7 @@
                 icingProfileHint: "Cada linha é um nível do modelo na sua altura habitual acima do solo aqui, cada coluna uma hora; cor: o pior dos dois modelos (vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados). A linha tracejada é a altitude de voo.",
                 planIcing: "Sinais de gelo {from}–{to}",
                 icingFzdz: "garoa congelante de nuvens stratus baixas",
+                icingRangeM: "({from}–{to} m)",
                 icingThin: "nuvens baixas entre os níveis do modelo",
                 icingFar: "além de 3 dias: menos confiável",
                 icingOnlyData: "só {model} prevê esta hora",
@@ -2069,7 +2072,7 @@
         // UK Met Office (docs/icing-forecast-handoff.md). Its own request
         // (≈ 5 Open-Meteo calls), read again after an hour, the last one kept
         // for offline use; it never holds up the forecast.
-        const ICING_JS = 'icing.js?v=2';
+        const ICING_JS = 'icing.js?v=3';
         const ICING_STORE_KEY = 'flysky_icing';
         // Read again after 3 h (ICON-EU runs every 3 h, UKMO every 6 h); after
         // 12 h when the last answer has no temperature at or below +3 °C at any
@@ -2266,7 +2269,7 @@
         function tempRangeText(warm, cold) {
             return Math.abs(warm - cold) < 0.05 ? `${fmtC(warm)} °C` : `${fmtC(warm)}…${fmtC(cold)} °C`;
         }
-        const bandRange = list => list.length ? ` (${roundM(Math.min(...list.map(b => b.fromAgl)))}–${roundM(Math.max(...list.map(b => b.toAgl)))} m)` : '';
+        const bandRange = list => list.length ? ' ' + t('icingRangeM', { from: roundM(Math.min(...list.map(b => b.fromAgl))), to: roundM(Math.max(...list.map(b => b.toAgl))) }) : '';
 
         // Why one model's flight has that state: freezing precipitation, the
         // cruise level's values, freezing fog, or the climb / descent bands.
@@ -5525,7 +5528,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=22';
+        const MAP_JS = 'map.js?v=23';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 

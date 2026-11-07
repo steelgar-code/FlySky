@@ -33,7 +33,7 @@
 (function (root) {
     'use strict';
 
-    const VERSION = 2;
+    const VERSION = 3;
 
     // Pressure levels (hPa) the engine knows, from the ground up, with their
     // height above sea level in the standard atmosphere (m) — only used to
@@ -520,11 +520,47 @@
         return { ...at, state: fzp ? 'red' : at.state, levelState: at.state, freezingPrecip: fzp || null, agl: targetAsl - elevation };
     }
 
+    // Pressure levels for a route flown between zMin and zMax m above sea
+    // level: the nearest standard level at least 100 m below zMin, the nearest
+    // at least 100 m above zMax, and those between — the real heights drift
+    // about ±150 m with the weather, so the flight height stays bracketed.
+    function routeLevels(zMin, zMax = zMin) {
+        const lo = LEVELS.filter(p => STD_HEIGHT[p] <= zMin - 100).pop() ?? LEVELS[0];
+        const hi = LEVELS.find(p => STD_HEIGHT[p] >= zMax + 100) ?? LEVELS[LEVELS.length - 1];
+        return LEVELS.filter(p => STD_HEIGHT[p] >= STD_HEIGHT[lo] && STD_HEIGHT[p] <= STD_HEIGHT[hi]);
+    }
+
+    // The route request (calculator): several points, the icing models, T and
+    // RH at routeLevels(); surface pressure and 2 m temperature for the level
+    // heights; the weather code for freezing rain / drizzle. With three levels
+    // 9 variables × 2 models → 1.8 calls per point.
+    const ROUTE_SURFACE_VARS = ['surface_pressure', 'temperature_2m', 'weather_code'];
+    function routeRequestParams({ latitudes, longitudes, zMin, zMax, models = DEFAULT_MODELS, days = 2, timezone = 'GMT' }) {
+        const hourly = [];
+        routeLevels(zMin, zMax).forEach(p => hourly.push(`temperature_${p}hPa`, `relative_humidity_${p}hPa`));
+        hourly.push(...ROUTE_SURFACE_VARS);
+        return { latitude: latitudes.join(','), longitude: longitudes.join(','), hourly: hourly.join(','), models: models.join(','), forecast_days: days, timezone };
+    }
+
+    // A climb or descent between the ground and heightM in one model's
+    // column at one hour (calculator, at A): the bands crossed, minutes at the
+    // rate, and the ground cues — freezing fog or freezing precipitation make
+    // it red, the thin-layer cue marginal.
+    // → { state, bands, minutes, fog, freezingPrecip, thinLayer }
+    function columnPhase(prof, heightM, rateMs) {
+        if (!prof || !prof.hasData) return { state: 'unknown', bands: [], minutes: null, fog: null, freezingPrecip: null, thinLayer: null };
+        const list = heightM >= SURFACE_ONLY_M ? bands(prof, 0, heightM) : [];
+        const c = prof.cues;
+        const state = worst(list.map(b => b.state), c.fog || c.freezingPrecip ? 'red' : [], c.thinLayer ? 'marginal' : [],
+            !list.length && Number.isFinite(prof.sfc.t2) ? 'none' : []);
+        return { state, bands: list, minutes: bandMinutes(list, rateMs), fog: c.fog, freezingPrecip: c.freezingPrecip, thinLayer: c.thinLayer };
+    }
+
     const api = {
         VERSION, LEVELS, STD_HEIGHT, MODELS, DEFAULT_MODELS, DEFAULT_THRESHOLDS, DEFAULT_PROFILE, STATES, RANK,
         worst, esWater, esIce, esEcmwf, rhOverWater, dewPoint, virtualT, levelState, surfaceCues, strongSignal,
         levelsFor, requestParams, requestCost, splitModels, profileAt, stateAt, bands, layers, flight, combine,
-        evaluate, pointState
+        evaluate, pointState, routeLevels, routeRequestParams, columnPhase, bandMinutes
     };
     if (typeof module === 'object' && module.exports) module.exports = api;
     else root.FlySkyIcing = api;

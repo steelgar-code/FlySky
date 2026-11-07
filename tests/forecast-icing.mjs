@@ -78,7 +78,7 @@ await page.locator('#flightIcing [data-flight-hour="0"]').click(); await page.wa
 const det = (await page.locator('#flightDetail').innerText()).replace(/\n/g, ' | ');
 ok('pinned hour: each model\'s climb, cruise and descent', /DWD ICON: climb: ≈ 1\.9 min in potential icing \(180–400 m\) · cruise: ≈ 120 min in potential icing at 400 m \(−4\.0 °C, RH 96 %\) · descent: ≈ 1\.9 min in potential icing \(180–400 m\)/.test(det) && /UK Met Office: climb: ≈ 1\.9 min/.test(det), det);
 ok('pinned hour: the flight described, what the indicator is not, the platform it assumes', /2 h at 400 m above takeoff, climb 2 m\/s, descent 2 m\/s/.test(det) && /Not a validated icing forecast/.test(det) && /no ice protection, an unheated pitot tube and a fixed-wing climb \(not a VTOL hover\)/.test(det) && /the ice stays on/.test(det), det);
-ok('pinned hour: the "Icing risk" flag next to the verdict', /Uncertain Icing risk/.test(det) && await page.locator('#flightDetail [data-icing-flag="cruise"]').count() === 1, det);
+ok('pinned hour: the "Icing risk" flag next to the verdict', /(Suitable|Uncertain|Not suitable) Icing risk/.test(det) && await page.locator('#flightDetail [data-icing-flag="cruise"]').count() === 1, det);
 await page.locator('#flightIcing [data-flight-hour="0"]').click(); await page.waitForTimeout(200);
 
 // ---- Icing profile

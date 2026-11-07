@@ -34,11 +34,14 @@ Every external request is answered locally, so the suites run offline and are re
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
   forecast requests get a 429 "limit exceeded". The flight time calculator's wind request gets a
   uniform wind, `routeWind: { speed, from, ramp }` (default 6 m/s from the west; `ramp`: m/s more per hour ahead).
-  The icing request (ICON + UKMO with pressure levels, recognised by `surface_pressure`) gets profiles over a 179 m
-  ground from `icingScenario()` — a surface pressure of 997 hPa (the app works the level heights out from it;
-  geopotential heights only if asked), a layer at the flight altitude for both models for 3 h, then ICON only, a
-  layer below, freezing fog, a layer above, UKMO ending after 100 h; `icing(model, k, level)` /
-  `icingSfc(model, k)` override it (e.g. `precipitation` for the drizzle cue), `icingFail` fails it.
+  The icing requests (ICON + UKMO with pressure levels, recognised by `surface_pressure`: the forecast view's, and
+  the calculator's route points and column at A in GMT, several points at once) get profiles over a 179 m ground
+  (`routeElevation(lat, lon)` for other points) from `icingScenario()` — a surface pressure for that ground (the app
+  works the level heights out from it; geopotential heights only if asked), a layer at the flight altitude for
+  both models for 3 h, then ICON only, a layer below, freezing fog, a layer above, UKMO ending after 100 h;
+  `icing(model, k, level, lat, lon)` / `icingSfc(model, k, lat, lon)` override it (e.g. `precipitation` for the
+  drizzle cue, `weather_code` 66 for freezing rain), `icingFail` fails it. Logged in `icingReq` (the calculator's
+  also in `routeIcingReq`).
 - OSM tiles: flat dark tiles.
 
 ## Suites
@@ -51,6 +54,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows (and their pause near Open-Meteo's hourly limit, the per-minute pacing), place names |
+| `map-route-icing.mjs` | icing along the route in the flight time calculator: the route request (every second point and B, ICON + UKMO, the levels around the flight height), A's column from the forecast data or its own request, out / back / at-A lines, red stretches and the tag's ❄, panning without requests, +6 h climb and descent at A, 1500 m, one model, freezing rain code, hilly ground, no return flight, Ukrainian, the indicator off |
 | `map-route.mjs` | map defaults for new users, zoom 18; flight time calculator: Aim mode (B at the crosshair while panning, zoom keeps it, tap recentres), Tap mode (tap sets B, free map), switching between them, MGRS for A / B (waypoints, bad input, cancel, round trip), route tag (beside the line, stays in view, hidden off screen), start here, swap, clear, wind triangle, airspeed, height, return leg, hazards folded while open; one wind height for the calculator and the map's wind arrows (both directions, earlier '925' setting carried over) |
 | `map-drag.mjs` | lightning / fire stacks as one canvas each (also while stepping), no backdrop blur on map panels, readout kept open while dragging and read once settled (no reads in between, tiny moves reuse it), crosshair clear of the notes / readout, scrolling them by touch |
 | `map-settings.mjs` | map side menu: folding cards (only Layers open for a new user, remembered), summaries while folded, a layer's settings shown when switched on and folded by its sliders button, wind heights fitting the card |

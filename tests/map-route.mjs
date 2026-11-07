@@ -181,8 +181,8 @@ opts.routeElevation = null;
 opts.routeWind = { speed: 25, from: 0 };
 await page.selectOption('[data-route-level]', '1500'); await page.waitForTimeout(1000);
 ok('too strong a crosswind: no headway, where and why', /No headway/.test(await head()) && /No headway/.test(await tagText()) && /Can't hold the course: at the start, at \d\d:\d\d, the forecast crosswind there is 25\.0 m\/s, more than the 18 m\/s airspeed/.test(await msg()), { h: await head(), t: await tagText(), m: await msg() });
-// a headwind that strengthens over the hours of the flight: stalls part way (the wind of the
-// whole hour it reaches: 1x or 2x m/s, depending on the minute the test starts)
+// a headwind that strengthens over the hours of the flight: stalls part way (the wind changes on
+// the half hour, also within a long stretch between two points: 18–22 km along whatever the minute)
 opts.routeWind = { speed: 10, from: 270, ramp: 6 };
 await page.selectOption('[data-route-level]', '10');   // a height not read yet in this test
 await page.waitForFunction(() => /headway|course/.test(document.getElementById('mapRouteMsg').innerText), null, { timeout: 5000 }).catch(() => {});

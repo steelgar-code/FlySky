@@ -465,6 +465,17 @@
             rtBack: "Back: {time} · ETA {eta}",
             rtBackBlocked: "Back: can't make headway against this wind.",
             rtBackNoWind: "Back: no wind data for the return.",
+            rtIceTitle: "Icing (experimental)",
+            rtIceOut: "Out: {text}",
+            rtIceBack: "Back: {text}",
+            rtIceNoBack: "Back: not worked out (no return flight).",
+            rtIceAtA: "At A: {text}",
+            rtIceStretch: "{state} {km} km (≈ {min} min)",
+            rtIceValues: "{t} °C, RH {rh} %",
+            rtIceAgl: "{range} m above the ground",
+            rtIcePartly: "partly no data",
+            rtIceReading: "Icing: reading the models along the route…",
+            rtIceErr: "Icing: data unavailable ({msg}).",
             rtDurMin: "{m} min",
             rtDurHourMin: "{h} h {m} min"
         },
@@ -744,6 +755,17 @@
             rtBack: "Назад: {time} · прибуття {eta}",
             rtBackBlocked: "Назад: проти цього вітру не пролетіти.",
             rtBackNoWind: "Назад: немає даних про вітер.",
+            rtIceTitle: "Обледеніння (експериментально)",
+            rtIceOut: "Туди: {text}",
+            rtIceBack: "Назад: {text}",
+            rtIceNoBack: "Назад: не розраховано (немає зворотного польоту).",
+            rtIceAtA: "В A: {text}",
+            rtIceStretch: "{state} {km} км (≈ {min} хв)",
+            rtIceValues: "{t} °C, вологість {rh} %",
+            rtIceAgl: "{range} м над землею",
+            rtIcePartly: "частково без даних",
+            rtIceReading: "Обледеніння: читаю моделі вздовж маршруту…",
+            rtIceErr: "Обледеніння: дані недоступні ({msg}).",
             rtDurMin: "{m} хв",
             rtDurHourMin: "{h} год {m} хв"
         },
@@ -1023,6 +1045,17 @@
             rtBack: "Volta: {time} · chegada {eta}",
             rtBackBlocked: "Volta: não dá para avançar contra este vento.",
             rtBackNoWind: "Volta: sem dados de vento.",
+            rtIceTitle: "Gelo (experimental)",
+            rtIceOut: "Ida: {text}",
+            rtIceBack: "Volta: {text}",
+            rtIceNoBack: "Volta: não calculada (sem voo de volta).",
+            rtIceAtA: "Em A: {text}",
+            rtIceStretch: "{state} {km} km (≈ {min} min)",
+            rtIceValues: "{t} °C, UR {rh} %",
+            rtIceAgl: "{range} m acima do solo",
+            rtIcePartly: "em parte sem dados",
+            rtIceReading: "Gelo: lendo os modelos ao longo da rota…",
+            rtIceErr: "Gelo: dados indisponíveis ({msg}).",
             rtDurMin: "{m} min",
             rtDurHourMin: "{h} h {m} min"
         }
@@ -3920,7 +3953,7 @@
             }
             if (id === RT.seq) RT.loading = false;
         }
-        if (id === RT.seq) renderRouteResult();
+        if (id === RT.seq) { renderRouteResult(); loadRouteIcing(); }
     }
 
     // The calculator flies a constant height above sea level: A's ground plus
@@ -3930,6 +3963,275 @@
         if (H <= 120 || !pts.length) return null;
         const c = RT.wind.get(`${H}|${pts[0].key}`);
         return c && Number.isFinite(c.elev) ? c.elev + H : null;
+    }
+
+    // ---- Icing along the route (experimental; design §9)
+    // ICON + UKMO at every second sample point and B: T and RH at the levels
+    // around the flight height (FlySkyIcing.routeRequestParams(), ≈ 1.8 calls
+    // a point), one request for the missing ones. Climb and descent at A (and
+    // A's own point) from a full column: the forecast view's icing data when
+    // A is at the forecast location, else one request there (≈ 4 calls). Only
+    // while the icing indicator is on, and from 50 m up.
+    const ROUTE_ICING_MAX_AGE_MS = 3 * 3600e3;
+    const RI = { cells: new Map(), cols: new Map(), srcs: new WeakMap(), seq: 0, loading: false, error: '', segs: [], group: null };
+    const RI_INK = { red: '#fca5a5', marginal: '#fcd34d', none: '#94a3b8', unknown: '#64748b' };
+    const RI_LINE = { red: '#ef4444', marginal: '#f59e0b' };
+
+    function routeIcingOn() {
+        return !!(state.flightProfile && state.flightProfile.icing) && flightHeight() >= 50;
+    }
+
+    // Sample points with icing data of their own: every second one, and B.
+    function routeIcingIdx(n) {
+        const out = [];
+        for (let i = 0; i < n; i++) if (i % 2 === 0 || i === n - 1) out.push(i);
+        return out;
+    }
+
+    // Height flown above sea level at each point: constant from A above
+    // 120 m, else following the ground; null until the wind (with the ground
+    // heights) is read.
+    function routeHeights(pts, H) {
+        const zAsl = routeAsl(pts, H);
+        return pts.map(p => {
+            if (zAsl !== null) return zAsl;
+            if (H > 120) return null;
+            const c = RT.wind.get(`${H}|${p.key}`);
+            return c && Number.isFinite(c.elev) ? c.elev + H : null;
+        });
+    }
+
+    // One location's answer: columns per model, its ground height, and the
+    // index of the hour nearest a time (ms).
+    function iceSource(body) {
+        const I = window.FlySkyIcing;
+        const off = (body.utc_offset_seconds || 0) * 1000;
+        const at = new Map(body.hourly.time.map((x, i) => [x.slice(0, 13), i]));
+        return { elev: body.elevation, models: I.DEFAULT_MODELS, cols: I.splitModels(body.hourly, I.DEFAULT_MODELS),
+            index: ms => at.get(new Date(Math.round(ms / 3600e3) * 3600e3 + off).toISOString().slice(0, 13)) ?? -1 };
+    }
+
+    const forecastCell = () => (state.location ? `${state.location.latitude.toFixed(1)},${state.location.longitude.toFixed(1)}` : '');
+
+    // The full column at a point (A): the forecast view's icing data for this
+    // flight altitude when the point is in the forecast location's 0.1° cell,
+    // else the calculator's own.
+    function routeColumn(p, H) {
+        if (!window.FlySkyIcing) return null;
+        if (p.key === forecastCell() && typeof icingOn === 'function' && icingOn()) {
+            const d = ICING.byKey.get(icingRequest().key);
+            if (d && d.body && d.body.hourly && Date.now() - d.fetchedAt < icingMaxAge(d)) {
+                if (!RI.srcs.has(d)) RI.srcs.set(d, iceSource(d.body));
+                return RI.srcs.get(d);
+            }
+        }
+        const c = RI.cols.get(`${H}|${p.key}`);
+        return c && Date.now() - c.at < ROUTE_ICING_MAX_AGE_MS ? c.src : null;
+    }
+
+    function routeIcingLevels(pts, z) {
+        const zs = routeIcingIdx(pts.length).filter(i => i > 0).map(i => z[i]);
+        return window.FlySkyIcing.routeLevels(Math.min(...zs), Math.max(...zs)).join('/');
+    }
+
+    // The source for sample point i: A (and points in A's cell) from the
+    // column, every second point from the route request, none in between.
+    function routeIcingSrc(pts, i, H, levels) {
+        const p = pts[i];
+        if (p.key === pts[0].key) return routeColumn(pts[0], H);
+        if (i % 2 && i !== pts.length - 1) return null;
+        const c = RI.cells.get(`${levels}|${p.key}`);
+        return c ? c.src : null;
+    }
+
+    async function loadRouteIcing() {
+        const line = routeLine();
+        if (!S.route.on || !routeIcingOn() || line.length < 2 || lineLength(line) < 50) return;
+        const id = ++RI.seq;
+        const done = () => { if (id === RI.seq) { RI.loading = false; renderRouteResult(); } };
+        try { await loadIcingScript(); } catch (err) { RI.error = t('icingErrLoad'); return done(); }
+        const I = window.FlySkyIcing;
+        const H = flightHeight();
+        const pts = routeSamples(line);
+        const z = routeHeights(pts, H);
+        if (z.some(v => v === null)) return done();   // the ground heights come with the wind
+        const a = pts[0];
+        // The forecast view may be reading A's column right now.
+        if (a.key === forecastCell() && ICING.pending) await ICING.pending.promise.catch(() => {});
+        if (id !== RI.seq) return;
+        const needCol = !routeColumn(a, H);
+        const levels = routeIcingLevels(pts, z);
+        const zs = routeIcingIdx(pts.length).filter(i => i > 0).map(i => z[i]);
+        const cells = [...new Map(routeIcingIdx(pts.length).map(i => pts[i]).filter(p => p.key !== a.key).map(p => [p.key, p])).values()];
+        const missing = cells.filter(p => { const c = RI.cells.get(`${levels}|${p.key}`); return !c || Date.now() - c.at > ROUTE_ICING_MAX_AGE_MS; });
+        if (!needCol && !missing.length) { RI.error = ''; return done(); }
+        RI.loading = true; RI.error = '';
+        renderRouteResult();
+        const get = async params => {
+            const res = await omFetch(`${MAP_CONFIG.openMeteo}?${new URLSearchParams(params)}`, { cost: I.requestCost(params), deferrable: true });
+            const body = await res.json();
+            if (!res.ok || body.error) throw new Error(body.reason || `HTTP ${res.status}`);
+            return Array.isArray(body) ? body : [body];
+        };
+        const jobs = [];
+        if (needCol) {
+            const [lat, lon] = a.key.split(',').map(Number);
+            const elev = (RT.wind.get(`${H}|${a.key}`) || {}).elev;
+            jobs.push(get(I.requestParams({ latitude: lat, longitude: lon, heightM: H, elevation: elev, days: 2, timezone: 'GMT' }))
+                .then(([b]) => { if (b && b.hourly) RI.cols.set(`${H}|${a.key}`, { at: Date.now(), src: iceSource(b) }); }));
+        }
+        if (missing.length) {
+            jobs.push(get(I.routeRequestParams({ latitudes: missing.map(p => p.key.split(',')[0]), longitudes: missing.map(p => p.key.split(',')[1]), zMin: Math.min(...zs), zMax: Math.max(...zs) }))
+                .then(list => missing.forEach((p, k) => { if (list[k] && list[k].hourly) RI.cells.set(`${levels}|${p.key}`, { at: Date.now(), src: iceSource(list[k]) }); })));
+        }
+        const bad = (await Promise.allSettled(jobs)).find(r => r.status === 'rejected');
+        if (RI.cells.size > 300) [...RI.cells.keys()].slice(0, RI.cells.size - 300).forEach(k => RI.cells.delete(k));
+        if (RI.cols.size > 20) [...RI.cols.keys()].slice(0, RI.cols.size - 20).forEach(k => RI.cols.delete(k));
+        if (id === RI.seq) RI.error = bad ? (bad.reason instanceof TypeError ? t('mapErrNetwork') : bad.reason.message) : '';
+        done();
+    }
+
+    // Icing on one leg: `order` the sample indices in flight order, `leg`
+    // flyLeg()'s result over them. Each point: the two models' state at the
+    // height flown, at the hour it is reached; a point without data of its
+    // own takes the worse of its neighbours. Each point stands for the
+    // stretch half-way to its neighbours. → { state, spans, runs (of the
+    // worst state when red or marginal), known, total }
+    function routeIcingLeg(pts, order, leg, z, H, levels, th) {
+        const I = window.FlySkyIcing;
+        const raw = order.map((i, k) => {
+            const src = routeIcingSrc(pts, i, H, levels);
+            if (!src) return null;
+            const j = src.index(leg.times[k]);
+            const per = {};
+            src.models.forEach(m => { per[m] = j < 0 ? { state: 'unknown', reason: 'no-data' } : I.pointState(src.cols[m], j, src.elev, z[i], m, th); });
+            const c = I.combine(Object.fromEntries(src.models.map(m => [m, per[m].state])));
+            return { state: c.state, c, per, agl: z[i] - src.elev };
+        });
+        const pick = (a, b) => (!a ? b : !b ? a : I.RANK[b.state] > I.RANK[a.state] ? b : a);
+        const n = order.length;
+        const edge = (arr, k) => (k <= 0 ? arr[0] : k >= n ? arr[n - 1] : (arr[k - 1] + arr[k]) / 2);
+        const spans = raw.map((p, k) => ({ ...(p || pick(raw[k - 1], raw[k + 1]) || { state: 'unknown', c: null, per: {}, agl: null }),
+            from: edge(leg.kms, k), to: edge(leg.kms, k + 1), t0: edge(leg.times, k), t1: edge(leg.times, k + 1) }));
+        const state = I.worst(spans.map(sp => sp.state));
+        const runs = [];
+        if (state === 'red' || state === 'marginal') spans.forEach(sp => {
+            if (sp.state !== state) return;
+            const last = runs[runs.length - 1];
+            if (last && Math.abs(last.to - sp.from) < 1e-9) { last.to = sp.to; last.t1 = sp.t1; last.list.push(sp); }
+            else runs.push({ from: sp.from, to: sp.to, t0: sp.t0, t1: sp.t1, list: [sp] });
+        });
+        const cs = spans.map(sp => sp.c).filter(Boolean);
+        return { state, spans, runs, known: Math.max(0, ...cs.map(c => c.known)), total: Math.max(0, ...cs.map(c => c.total)),
+            partly: state !== 'unknown' && spans.some(sp => sp.state === 'unknown'), noLevel: spans.some(sp => Object.values(sp.per).some(x => x.reason === 'no-level-near')) };
+    }
+
+    // One line for a leg, e.g. "Potential icing 15–32 km (≈ 25 min), −4.0 °C,
+    // RH 95 %, 380–450 m above the ground · 2 of 2 models".
+    function routeIcingText(L, H) {
+        if (L.state === 'unknown') return t(L.noLevel ? 'icingNoLevel' : 'icingState_unknown');
+        const parts = [];
+        let models;
+        if (!L.runs.length) {
+            parts.push(t('icingState_' + L.state));
+            models = t('icingModelsN', { n: L.known, of: L.total });
+        } else {
+            const list = L.runs.flatMap(r => r.list);
+            const km = L.runs.map(r => `${Math.round(r.from)}–${Math.max(Math.round(r.to), Math.round(r.from) + 1)}`).join(', ');
+            const min = Math.max(1, Math.round(L.runs.reduce((a, r) => a + r.t1 - r.t0, 0) / 60000));
+            parts.push(t('rtIceStretch', { state: t('icingState_' + L.state), km, min }));
+            const hits = list.flatMap(sp => Object.entries(sp.per).filter(([, x]) => x.state === L.state));
+            const fzp = hits.find(([, x]) => x.freezingPrecip);
+            const lv = hits.find(([, x]) => Number.isFinite(x.t) && Number.isFinite(x.rhw));
+            if (fzp) parts.push(fzpText(fzp[1].freezingPrecip.source));
+            else if (lv) parts.push(t('rtIceValues', { t: fmtC(lv[1].t), rh: Math.round(lv[1].rhw) }));
+            const agl = list.map(sp => sp.agl).filter(Number.isFinite);
+            // Height above the ground where it differs from the flight altitude (hills).
+            if (H > 120 && agl.length && agl.some(v => Math.abs(v - H) > 30)) {
+                const lo = roundM(Math.min(...agl)), hi = roundM(Math.max(...agl));
+                parts.push(t('rtIceAgl', { range: lo === hi ? `${lo}` : `${lo}–${hi}` }));
+            }
+            const ids = [...new Set(hits.map(([m]) => m))];
+            models = ids.length > 1 || L.known < 2 ? t('icingModelsN', { n: ids.length, of: L.total }) : t('icingModelOnly', { model: icingModelName(ids[0]) });
+        }
+        let text = `${parts.join(', ')} · ${models}`;
+        if (L.partly) text += ' · ' + t('rtIcePartly');
+        return text;
+    }
+
+    // Climb (at departure) or descent (at the return) at A, from the column:
+    // { state, text } — text only with icing signs.
+    function routeIcingPhase(src, ms, H, rate, key) {
+        const I = window.FlySkyIcing;
+        if (!src) return { state: 'unknown', text: '' };
+        const j = src.index(ms);
+        if (j < 0) return { state: 'unknown', text: '' };
+        const per = src.models.map(m => I.columnPhase(I.profileAt(src.cols[m], j, src.elev, m, { ...I.DEFAULT_THRESHOLDS, ...routeIcingTh() }), H, rate));
+        const state = I.worst(per.map(x => x.state));
+        if (state !== 'red' && state !== 'marginal') return { state, text: '' };
+        const hit = per.filter(x => x.state === state);
+        const parts = [];
+        const mins = Math.max(...hit.map(x => (x.minutes ? x.minutes.red + x.minutes.marginal : 0)));
+        const bands = hit.flatMap(x => x.bands.filter(b => b.state === 'red' || b.state === 'marginal'));
+        if (mins > 0) parts.push(t('icingPhase', { phase: t(key), min: (Math.round(mins * 10) / 10).toLocaleString(currentLang), state: t('icingStateShort_' + state) }) + bandRange(bands));
+        if (hit.some(x => x.fog)) parts.push(t('icingFog'));
+        const fzp = hit.find(x => x.freezingPrecip);
+        if (fzp) parts.push(fzpText(fzp.freezingPrecip.source));
+        if (!parts.length && hit.some(x => x.thinLayer)) parts.push(t('icingThin'));
+        // "climb: ≈ 2 min in potential icing (180–380 m)" already names the phase.
+        return { state, text: mins > 0 ? parts.join(', ') : `${t(key)}: ${parts.join(', ')}` };
+    }
+
+    function routeIcingTh() {
+        const P = state.flightProfile || {};
+        return { rhRed: P.icingRhRed || 90, rhMarginal: P.icingRhMarginal || 80 };
+    }
+
+    // The icing lines of the panel, the tag's mark and the coloured stretches
+    // of the outbound line. → { html, mark: 'red' | 'marginal' | null }
+    function routeIcing(pts, out, back, eta, H) {
+        RI.segs = [];
+        if (!routeIcingOn() || !window.FlySkyIcing) return { html: '', mark: null };
+        const I = window.FlySkyIcing, P = state.flightProfile;
+        const z = routeHeights(pts, H);
+        const line = (state, text, lead = '') => `<div style="color: ${RI_INK[state] || RI_INK.unknown}">${lead}${h(text)}</div>`;
+        const icon = '<i class="fa-solid fa-snowflake text-sky-300 mr-1"></i>';
+        const label = `${icon}<span class="font-semibold text-slate-300">${h(t('rtIceTitle'))}</span> · `;
+        if (z.some(v => v === null)) return { html: '', mark: null };
+        const levels = routeIcingLevels(pts, z);
+        const th = { ...I.DEFAULT_THRESHOLDS, ...routeIcingTh() };
+        const order = pts.map((_, i) => i);
+        const hasAny = order.some(i => routeIcingSrc(pts, i, H, levels));
+        if (!hasAny) {
+            const msg = RI.loading ? `<i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-1"></i>${h(t('rtIceReading'))}` : RI.error ? `<span class="text-amber-300">${icon}${h(t('rtIceErr', { msg: RI.error }))}</span>` : '';
+            return { html: msg, mark: null };
+        }
+        const L1 = routeIcingLeg(pts, order, out, z, H, levels, th);
+        // The outbound line, coloured where icing is indicated.
+        L1.spans.forEach((sp, k) => {
+            if (sp.state !== 'red' && sp.state !== 'marginal') return;
+            const mid = (a, b) => L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+            const p = pts[k].ll;
+            RI.segs.push({ color: RI_LINE[sp.state], latlngs: [k ? mid(pts[k - 1].ll, p) : p, p, k < pts.length - 1 ? mid(p, pts[k + 1].ll) : p] });
+        });
+        const lines = [line(L1.state, t('rtIceOut', { text: routeIcingText(L1, H) }), label)];
+        let L2 = null;
+        if (back) {
+            L2 = routeIcingLeg(pts, order.slice().reverse(), back, z, H, levels, th);
+            lines.push(line(L2.state, t('rtIceBack', { text: routeIcingText(L2, H) })));
+        } else lines.push(line('unknown', t('rtIceNoBack')));
+        const col = routeColumn(pts[0], H);
+        const climb = routeIcingPhase(col, out.times[0], H, P.climbMs || 2, 'icingPhaseClimb');
+        const descent = back ? routeIcingPhase(col, eta + back.ms, H, P.descentMs || 2, 'icingPhaseDescent') : { state: 'unknown', text: '' };
+        const atA = [climb, descent].filter(x => x.text);
+        if (atA.length) lines.push(line(I.worst(atA.map(x => x.state)), t('rtIceAtA', { text: atA.map(x => x.text).join(' · ') })));
+        const worstAll = I.worst(L1.state, L2 ? L2.state : [], climb.state, descent.state);
+        const note = RI.loading ? `<div class="text-slate-500"><i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-1"></i>${h(t('rtIceReading'))}</div>`
+            : RI.error ? `<div class="text-amber-300">${h(t('rtIceErr', { msg: RI.error }))}</div>` : '';
+        return {
+            html: lines.join('') + note,
+            mark: worstAll === 'red' || worstAll === 'marginal' ? worstAll : null
+        };
     }
 
     // Wind at a sample point for time `ms`, as the vector it blows towards
@@ -3951,29 +4253,43 @@
     // rises into the flight height, { missing } without wind.
     function flyLeg(pts, V, t0, fl) {
         let t = t0, dist = 0, alongSum = 0, cross = 0;
+        const times = [t0], kms = [0];   // at every point (icing along the route)
         for (let i = 0; i < pts.length - 1; i++) {
             const p = pts[i], q = pts[i + 1];
             const d = distM(p.ll, q.ll);
-            if (d < 1) continue;
-            const w1 = windVector(p, t, fl), w2 = windVector(q, t, fl);
-            const low = [[w1, 0], [w2, d]].find(([w]) => w && w.below);
-            if (low) return { ground: true, km: (dist + low[1]) / 1000, elev: low[0].elev };
-            if (!w1 || !w2) return { missing: true };
-            const u = (w1.u + w2.u) / 2, v = (w1.v + w2.v) / 2;
-            const W = Math.hypot(u, v);
-            const delta = Math.atan2(u, v) - toRad(courseDeg(p.ll, q.ll));
-            const along = W * Math.cos(delta), cr = W * Math.sin(delta);
-            // Where, when and why it stalls (the wind of that hour, which can
-            // be stronger than the map's arrows for the image's hour).
-            const stall = kind => ({ blocked: kind, km: dist / 1000, at: t, flown: t - t0, wind: W, head: -along, cross: Math.abs(cr) });
-            if (Math.abs(cr) >= V) return stall('cross');
-            const gs = Math.sqrt(V * V - cr * cr) + along;
-            if (gs < 1) return stall('head');
-            t += d / gs * 1000;
-            dist += d; alongSum += along * d; cross = Math.max(cross, Math.abs(cr));
+            if (d < 1) { times.push(t); kms.push(dist / 1000); continue; }
+            const course = toRad(courseDeg(p.ll, q.ll));
+            // The wind is that of the hour nearest the time, so it changes on
+            // the half hour: a long, slow stretch is flown in steps, and a wind
+            // growing on the way is met where and when it does.
+            let done = 0;
+            while (done < d) {
+                const w1 = windVector(p, t, fl), w2 = windVector(q, t, fl);
+                const low = [[w1, 0], [w2, d]].find(([w]) => w && w.below);
+                if (low) return { ground: true, km: (dist + low[1]) / 1000, elev: low[0].elev };
+                if (!w1 || !w2) return { missing: true };
+                const u = (w1.u + w2.u) / 2, v = (w1.v + w2.v) / 2;
+                const W = Math.hypot(u, v);
+                const delta = Math.atan2(u, v) - course;
+                const along = W * Math.cos(delta), cr = W * Math.sin(delta);
+                // Where, when and why it stalls (the wind of that hour, which can
+                // be stronger than the map's arrows for the image's hour).
+                const stall = kind => ({ blocked: kind, km: (dist + done) / 1000, at: t, flown: t - t0, wind: W, head: -along, cross: Math.abs(cr) });
+                if (Math.abs(cr) >= V) return stall('cross');
+                const gs = Math.sqrt(V * V - cr * cr) + along;
+                if (gs < 1) return stall('head');
+                const next = (Math.floor((t - 1800e3) / 3600e3) + 1) * 3600e3 + 1800e3;   // the next half hour
+                const reach = gs * (next - t) / 1000;
+                const step = Math.min(d - done, reach);
+                if (step < reach) t += step / gs * 1000;
+                else t = next;
+                done += step; alongSum += along * step; cross = Math.max(cross, Math.abs(cr));
+            }
+            dist += d;
+            times.push(t); kms.push(dist / 1000);
         }
         const ms = t - t0;
-        return { ms, dist, gs: ms ? dist / (ms / 1000) : V, along: dist ? alongSum / dist : 0, cross };
+        return { ms, dist, gs: ms ? dist / (ms / 1000) : V, along: dist ? alongSum / dist : 0, cross, times, kms };
     }
 
     function blockedText(b, V) {
@@ -4038,6 +4354,11 @@
         }
         RT.casing.setLatLngs(line.length > 1 ? line : []);
         RT.line.setLatLngs(line.length > 1 ? line : []);
+        // Icing on the way out: red / yellow under the dashed line.
+        if (!RI.group || !RT.group.hasLayer(RI.group)) RI.group = L.layerGroup().addTo(RT.group);
+        RI.group.clearLayers();
+        if (line.length > 1) RI.segs.forEach(sg => L.polyline(sg.latlngs, { pane: 'route', color: sg.color, weight: 7, opacity: 0.85, lineCap: 'butt', interactive: false, className: 'fs-route-ice' }).addTo(RI.group));
+        RT.line.bringToFront();
         if (!RT.tagHtml || line.length < 2) {
             if (RT.label) { RT.group.removeLayer(RT.label); RT.label = null; }
             return;
@@ -4193,7 +4514,8 @@
                     <select data-route-depart class="${sel}" aria-label="${h(t('rtDepart'))}">${ROUTE_DEPART.map(n => `<option value="${n}" ${n === S.route.depart ? 'selected' : ''}>${h(n ? t('rtIn', { n }) : t('rtNow'))}</option>`).join('')}</select></label>
             </div>
             <div id="mapRouteRow" class="px-2 pt-2 pb-1.5"></div>
-            <p id="mapRouteMsg" class="px-3 pb-2 -mt-0.5 text-[10.5px] text-slate-400 leading-snug empty:hidden"></p>`;
+            <p id="mapRouteMsg" class="px-3 pb-2 -mt-0.5 text-[10.5px] text-slate-400 leading-snug empty:hidden"></p>
+            <div id="mapRouteIce" class="px-3 pb-2 -mt-1 text-[10.5px] text-slate-400 leading-snug empty:hidden"></div>`;
         renderRouteRow();
         renderRouteResult();
     }
@@ -4238,7 +4560,7 @@
             n.textContent = p.length === 4 ? `${p[2]} ${p[3]}` : '—';
         });
         const dist = lineLength(line);
-        let headHtml, msg = '', tag = '';
+        let headHtml, msg = '', tag = '', ice = { html: '', mark: null };
         if (line.length < 2 || dist < 50) {
             headHtml = `<span class="font-semibold">${h(t('rtTitle'))}</span>`;
             msg = h(t(RT.follow ? 'rtHintPan' : 'rtHintTap'));
@@ -4269,13 +4591,18 @@
                 const backTitle = backOk ? t('rtBack', { time: fmtDuration(back.ms), eta: fmtClock(eta + back.ms) }) : t(back.blocked ? 'rtBackBlocked' : 'rtBackNoWind');
                 headHtml = `<span class="text-base font-semibold">${h(fmtDuration(out.ms))}</span> <span class="text-slate-300">· ${h(t('rtEta', { time: fmtClock(eta) }))}</span>`
                     + ` <span class="text-slate-400" title="${h(backTitle)}">· ${h(t('rtBackShort', { time: backOk ? fmtDuration(back.ms) : '—' }))}</span>`;
-                tag = `<b><i class="fa-solid fa-stopwatch"></i>${h(fmtDuration(out.ms))}</b><span>${h(km)} · ${h(num1(out.gs))} m/s</span>`;
+                ice = routeIcing(pts, out, backOk ? back : null, eta, H);
+                const mark = ice.mark ? `<i class="fa-solid fa-snowflake" style="color: ${RI_LINE[ice.mark]}" title="${h(t('icingState_' + ice.mark))}"></i>` : '';
+                tag = `<b><i class="fa-solid fa-stopwatch"></i>${h(fmtDuration(out.ms))}${mark}</b><span>${h(km)} · ${h(num1(out.gs))} m/s</span>`;
                 if (fl.zAsl !== null) msg = h(t('rtHeightInfo', { h: H, asl: Math.round(fl.zAsl) }));
             }
         }
         head.innerHTML = headHtml;
         const m = $('mapRouteMsg');
         if (m) m.innerHTML = RT.editMsg ? `<span class="text-amber-300">${h(RT.editMsg)}</span>` : RT.edit ? h(t('rtMgrsNone')) : msg;
+        const iceEl = $('mapRouteIce');
+        if (iceEl && iceEl.innerHTML !== ice.html) iceEl.innerHTML = ice.html;
+        if (!ice.html) RI.segs = [];
         RT.tagHtml = tag;
         drawRouteLine();
     }
@@ -4431,5 +4758,5 @@
 
     window.FlySkyMap = { show, hide, refresh, onLangChange, onLocationChange, onHazardChange, replayHazard, focusHazard, showHour, onFlightHeight, renderDrawer: () => renderPanel(),
         // exposed for tests / diagnostics
-        _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, W, RT, MGRS, cache, windAt, windVars, windLevelsFor, flightHeight } };
+        _internals: { parseTimeDimension, parseCapabilities, buildWmsUrl, isoDurationMs, R, S, W, RT, RI, MGRS, cache, windAt, windVars, windLevelsFor, flightHeight } };
 })();

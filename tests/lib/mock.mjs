@@ -139,35 +139,49 @@ export async function routeAll(page, opts = {}) {
       return route.fulfill({ json: { hourly: series(+lats[0], +lons[0]) } });
     }
     if (url.includes('api.open-meteo.com/v1/forecast') && url.includes('models=') && url.includes('surface_pressure')) {
-      // Icing request (icing.js, forecast tab): the same time axis as the forecast mock; surface pressure
-      // 997 hPa over a 179 m ground (the app works out the level heights from it: ~180 m at 975 hPa,
-      // ~380 m at 950, ~590 m at 925); geopotential heights only if asked. opts.icing(model, k, p) → { temperature, relative_humidity }
-      // overrides of level p (null: no data), opts.icingSfc(model, k) → surface overrides (null: no data),
-      // k = hours from the app's current hour; default icingScenario(). opts.icingFail = reason: an error.
+      // Icing requests (icing.js): the forecast view's (one location, the app's time zone) and the flight
+      // time calculator's (route points and the column at A, GMT). Surface pressure 997 hPa over a 179 m
+      // ground (opts.routeElevation(lat, lon) for other points; the app works the level heights out from
+      // it: ~180 m at 975 hPa, ~380 m at 950, ~590 m at 925); geopotential heights only if asked.
+      // opts.icing(model, k, p, lat, lon) → { temperature, relative_humidity } overrides of level p (null: no
+      // data), opts.icingSfc(model, k, lat, lon) → surface overrides (null: no data), k = hours from the
+      // current hour; default icingScenario(). opts.icingFail = reason: an error. Logged in log.icingReq
+      // (the calculator's also in log.routeIcingReq).
       const u = new URL(url);
       log.icingReq = (log.icingReq || []).concat(url);
+      const gmt = u.searchParams.get('timezone') === 'GMT';
+      if (gmt) log.routeIcingReq = (log.routeIcingReq || []).concat(url);
       if (opts.icingFail) return route.fulfill({ status: 500, json: { error: true, reason: opts.icingFail } });
       const models = u.searchParams.get('models').split(','), vars = u.searchParams.get('hourly').split(',');
+      const lats = u.searchParams.get('latitude').split(',').map(Number), lons = u.searchParams.get('longitude').split(',').map(Number);
       const days = +(u.searchParams.get('forecast_days') || 8), start = Math.floor(Date.now() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
-      const now = Math.floor((Date.now() + 7200e3 - start) / 3600e3);   // the app's hour (UTC+2, like the forecast mock)
+      // The current hour's index: the app's (UTC+2, like the forecast mock) or UTC.
+      const offset = gmt ? 0 : 7200;
+      const now = Math.floor((Date.now() + offset * 1000 - start) / 3600e3);
       const level = opts.icing || icingScenario, sfc = opts.icingSfc || icingSfcScenario;
-      const hourly = { time };
-      models.forEach(m => vars.forEach(v => {
-        hourly[models.length > 1 ? `${v}_${m}` : v] = time.map((_, i) => {
-          const k = i - now;
-          const lm = v.match(/^(temperature|relative_humidity|geopotential_height)_(\d+)hPa$/);
-          if (lm) {
-            const p = +lm[2], o = level(m, k, p);
+      const one = (la, lo) => {
+        const ground = opts.routeElevation ? opts.routeElevation(la, lo) : ICING_GROUND;
+        const hourly = { time };
+        models.forEach(m => vars.forEach(v => {
+          hourly[models.length > 1 ? `${v}_${m}` : v] = time.map((_, i) => {
+            const k = i - now;
+            const lm = v.match(/^(temperature|relative_humidity|geopotential_height)_(\d+)hPa$/);
+            if (lm) {
+              const p = +lm[2], o = level(m, k, p, la, lo);
+              if (o === null) return null;
+              return { geopotential_height: ground + ICING_AGL[p], temperature: -4 - ICING_AGL[p] * 0.005, relative_humidity: 60, ...o }[lm[1]];
+            }
+            const o = sfc(m, k, la, lo);
             if (o === null) return null;
-            return { geopotential_height: ICING_GROUND + ICING_AGL[p], temperature: -4 - ICING_AGL[p] * 0.005, relative_humidity: 60, ...o }[lm[1]];
-          }
-          const o = sfc(m, k);
-          if (o === null) return null;
-          return { surface_pressure: 997, temperature_2m: -3, relative_humidity_2m: 80, weather_code: 3, visibility: 20000, precipitation: 0, rain: 0, cloud_cover_low: 20, ...o }[v] ?? null;
-        });
-      }));
-      return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), elevation: ICING_GROUND, utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', hourly } });
+            // Surface pressure for the ground height (≈ 8.3 m per hPa near the ground).
+            return { surface_pressure: +(997 - (ground - ICING_GROUND) / 8.3).toFixed(1), temperature_2m: -3, relative_humidity_2m: 80, weather_code: 3, visibility: 20000, precipitation: 0, rain: 0, cloud_cover_low: 20, ...o }[v] ?? null;
+          });
+        }));
+        return { latitude: la, longitude: lo, elevation: ground, utc_offset_seconds: offset, timezone: gmt ? 'GMT' : 'Europe/Kyiv', hourly };
+      };
+      const list = lats.map((la, i) => one(la, lons[i]));
+      return route.fulfill({ json: list.length === 1 ? list[0] : list });
     }
     if ((url.includes('ensemble-api.open-meteo.com') || url.includes('api.open-meteo.com/v1/forecast')) && url.includes('models=')) {
       // Forecast mock: every requested model / variable, ensemble members for the ensemble API.
