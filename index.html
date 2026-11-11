@@ -24,8 +24,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js, pinned (sw.js caches the same URL) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -377,7 +377,7 @@
                             <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                         </div>
                         <div id="icingProfileDetail" class="text-[11px] text-slate-300 min-h-[1.25rem]"></div>
-                        <p class="text-[11px] text-slate-500" data-i18n="icingProfileHint">Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, green no signs, grey no data). The dashed line is the flight altitude.</p>
+                        <p class="text-[11px] text-slate-500" data-i18n="icingProfileHint">Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, grey no signs, hatched no data). The dashed line is the flight altitude.</p>
                     </div>
                 </div>
 
@@ -489,7 +489,7 @@
                         <span class="flex items-center gap-2"><i class="fa-solid fa-snowflake text-sky-300 w-4 text-center"></i><span data-i18n="icingToggleLabel">Icing indicator (experimental)</span></span>
                         <input type="checkbox" id="icingToggle" class="sr-only"><span class="fs-switch" aria-hidden="true"></span>
                     </label>
-                    <p class="text-[11px] text-slate-500" data-i18n="icingToggleDesc">Screens the models' atmosphere along that flight for sub-zero cloud, freezing fog and freezing rain (DWD ICON and UK Met Office, ≈ 5 Open-Meteo calls per update). Not a validated icing forecast: no icing signs never means safe.</p>
+                    <p class="text-[11px] text-slate-500" data-i18n="icingToggleDesc">Screens the models' atmosphere along that flight for sub-zero cloud, freezing fog, freezing rain and drizzle (DWD ICON and UK Met Office, ≈ 4 Open-Meteo calls every 3 hours). Not a validated icing forecast: no icing signs never means safe.</p>
                     <label id="icingVerdictRow" class="flex items-center justify-between gap-3 text-sm text-slate-300 cursor-pointer select-none">
                         <span data-i18n="icingVerdictLabel">Include icing in the flight verdict</span>
                         <input type="checkbox" id="icingVerdictToggle" class="sr-only"><span class="fs-switch" aria-hidden="true"></span>
@@ -596,7 +596,7 @@
     </div>
 
     <!-- Toasts -->
-    <div id="toastContainer" class="fixed bottom-32 lg:bottom-20 right-4 z-50 flex flex-col gap-2 items-end"></div>
+    <div id="toastContainer" role="status" aria-live="polite" class="fixed bottom-32 lg:bottom-20 right-4 z-50 flex flex-col gap-2 items-end"></div>
 
     <!-- Back to the top of the forecast (shown once scrolled down) -->
     <button type="button" id="btnToTop" class="hidden fixed bottom-32 lg:bottom-6 right-4 z-40 w-10 h-10 rounded-full bg-slate-800/90 border border-slate-600 text-slate-200 shadow-xl shadow-black/40 backdrop-blur-md hover:bg-slate-700 hover:text-white transition" data-i18n-title="toTop" title="Back to top" data-i18n-aria-label="toTop" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></button>
@@ -608,13 +608,10 @@
         // location). Only as many forecast days as the window needs are fetched.
         const WINDOWS = [3, 8, 24, 48, 72, 168];
         const DEFAULT_WINDOW = 24;
-        // A forecast is re-fetched automatically once it's older than this.
-        // How long a loaded forecast is used before asking again. Ensembles
-        // are re-run every 6–12 h and cost the most of Open-Meteo's free
-        // allowance (each member counts), so they're asked for less often;
-        // the Refresh button always asks.
-        // Models run every 3–12 h: an ensemble update is reused for 3 h, a Models
-        // one for 2 h (Refresh always asks).
+        // How long a model's saved forecast is used before asking again.
+        // Ensembles are re-run every 6–12 h and cost the most of Open-Meteo's
+        // free allowance (each member counts): reused for 3 h; Models mode for
+        // 2 h. The Refresh button always asks.
         const FORECAST_MAX_AGE_MS = { ensemble: 3 * 3600e3, deterministic: 2 * 3600e3 };
         // Days always requested: enough for the 1-week window. Open-Meteo
         // counts any request of up to 14 days the same, so asking for the
@@ -624,6 +621,10 @@
         // An hour counts as "wet" for the chance-of-precipitation bars when a
         // member predicts at least this much (in mm, before unit conversion).
         const WET_HOUR_MM = 0.1;
+        // Open-Meteo variables that describe the hour BEFORE their timestamp
+        // (precipitation: sum, gusts: maximum of the preceding hour). Wind,
+        // cloud and visibility are values at the timestamp.
+        const PRECEDING_HOUR_VARS = new Set(['precipitation', 'wind_gusts_10m']);
 
         // Two data sources that feed the same charts:
         //  - ensemble: every member of each ensemble model run (Ensemble API);
@@ -827,7 +828,6 @@
                 mapLoadFailed: "Could not load the map. Check your connection and try again.",
                 refreshMapTitle: "Reload satellite images",
                 refreshTitle: "Reload forecast",
-                currentLocationLabel: "Location",
                 changeLocationTitle: "Change location",
                 statsTitle: "Forecast Summary",
                 noLocation: "No location selected",
@@ -912,7 +912,6 @@
                 confHour: "confidence {level} ({pct})",
                 confSplit: "suitable {good} · uncertain {marginal} · not suitable {bad}",
                 confByModel: "by model",
-                confMembersN: "{n} members",
                 confCause: "{conf} — {cause} uncertain",
                 confCause_rain: "rain",
                 confCause_wind: "wind",
@@ -1060,7 +1059,6 @@
                 paramPrecipitation: "Precipitation",
                 paramWindSpeed: "Wind Speed (10 m)",
                 paramWindGusts: "Wind Gusts (10 m)",
-                perHour: "per hour",
                 legendP10P90: "10–90% (80% likely)",
                 legendP25P75: "25–75% (50% likely)",
                 legendMedian: "Median",
@@ -1109,6 +1107,7 @@
                 chartNotInMode: "Not available from ensemble models — switch to Models mode.",
                 loading: "Loading forecast…",
                 toastSelectModel: "Select at least one model",
+                toastClose: "Tap to close",
                 toastFavAdded: "Added {name} to favorites",
                 toastFavRemoved: "Removed {name} from favorites",
                 toastForecastError: "Could not load forecast: {error}",
@@ -1143,7 +1142,6 @@
                 mapLoadFailed: "Не вдалося завантажити карту. Перевірте з’єднання та спробуйте ще раз.",
                 refreshMapTitle: "Перезавантажити супутникові знімки",
                 refreshTitle: "Перезавантажити прогноз",
-                currentLocationLabel: "Місце",
                 changeLocationTitle: "Змінити місце",
                 statsTitle: "Підсумок прогнозу",
                 noLocation: "Місце не вибрано",
@@ -1228,7 +1226,6 @@
                 confHour: "впевненість {level} ({pct})",
                 confSplit: "придатно {good} · невизначено {marginal} · непридатно {bad}",
                 confByModel: "за моделями",
-                confMembersN: "{n} членів",
                 confCause: "{conf} — невизначеність: {cause}",
                 confCause_rain: "опади",
                 confCause_wind: "вітер",
@@ -1376,7 +1373,6 @@
                 paramPrecipitation: "Опади",
                 paramWindSpeed: "Швидкість вітру (10 м)",
                 paramWindGusts: "Пориви вітру (10 м)",
-                perHour: "за годину",
                 legendP10P90: "10–90% (ймовірність 80%)",
                 legendP25P75: "25–75% (ймовірність 50%)",
                 legendMedian: "Медіана",
@@ -1425,6 +1421,7 @@
                 chartNotInMode: "Недоступно для ансамблевих моделей — перейдіть у режим «Моделі».",
                 loading: "Завантаження прогнозу…",
                 toastSelectModel: "Виберіть хоча б одну модель",
+                toastClose: "Торкніться, щоб закрити",
                 toastFavAdded: "{name} додано в обране",
                 toastFavRemoved: "{name} видалено з обраного",
                 toastForecastError: "Не вдалося завантажити прогноз: {error}",
@@ -1459,7 +1456,6 @@
                 mapLoadFailed: "Não foi possível carregar o mapa. Verifique a conexão e tente novamente.",
                 refreshMapTitle: "Recarregar imagens de satélite",
                 refreshTitle: "Recarregar previsão",
-                currentLocationLabel: "Local",
                 changeLocationTitle: "Mudar local",
                 statsTitle: "Resumo da previsão",
                 noLocation: "Nenhum local selecionado",
@@ -1544,7 +1540,6 @@
                 confHour: "confiança {level} ({pct})",
                 confSplit: "adequado {good} · incerto {marginal} · inadequado {bad}",
                 confByModel: "por modelo",
-                confMembersN: "{n} membros",
                 confCause: "{conf} — incerteza: {cause}",
                 confCause_rain: "chuva",
                 confCause_wind: "vento",
@@ -1692,7 +1687,6 @@
                 paramPrecipitation: "Precipitação",
                 paramWindSpeed: "Velocidade do vento (10 m)",
                 paramWindGusts: "Rajadas de vento (10 m)",
-                perHour: "por hora",
                 legendP10P90: "10–90% (80% provável)",
                 legendP25P75: "25–75% (50% provável)",
                 legendMedian: "Mediana",
@@ -1741,6 +1735,7 @@
                 chartNotInMode: "Indisponível nos modelos de conjunto — mude para o modo Modelos.",
                 loading: "Carregando previsão…",
                 toastSelectModel: "Selecione pelo menos um modelo",
+                toastClose: "Toque para fechar",
                 toastFavAdded: "{name} adicionado aos favoritos",
                 toastFavRemoved: "{name} removido dos favoritos",
                 toastForecastError: "Não foi possível carregar a previsão: {error}",
@@ -1916,7 +1911,9 @@
             try {
                 res = await fetch(url, signal ? { signal } : undefined);
             } catch (err) {
-                entry[1] = 0; omSave();
+                // A cancelled request has usually reached Open-Meteo and been
+                // counted: keep the estimate. Only a failed connection is free.
+                if (err.name !== 'AbortError') { entry[1] = 0; omSave(); }
                 throw err;
             }
             const c = parseFloat(res.headers.get('x-ratelimit-cost'));
@@ -2003,9 +2000,6 @@
             minSlotHours: loadFromStorage('flysky_min_slot_hours', DEFAULT_MIN_SLOT),
             // { heightM, climbMs, descentMs, durationMin, icing, … }: see "Flight profile" above.
             flightProfile: loadFlightProfile(),
-            // Which wind the flight rules judge: 'surface' = 10 m wind + gusts,
-            // 'aloft' = the wind-aloft chart's values for the current mode.
-
             // Order of the chart panels (param keys); unknown/missing keys are
             // appended in PARAMS order.
             chartOrder: loadFromStorage('flysky_chart_order', []),
@@ -2070,9 +2064,9 @@
         // icing.js (loaded on demand) screens a flight from the location —
         // climb, cruise at the flight altitude, descent — with DWD ICON and the
         // UK Met Office (docs/icing-forecast-handoff.md). Its own request
-        // (≈ 5 Open-Meteo calls), read again after an hour, the last one kept
+        // (≈ 4 Open-Meteo calls), read again after 3 h (12 h in warm weather), the last one kept
         // for offline use; it never holds up the forecast.
-        const ICING_JS = 'icing.js?v=3';
+        const ICING_JS = 'icing.js?v=4';
         const ICING_STORE_KEY = 'flysky_icing';
         // Read again after 3 h (ICON-EU runs every 3 h, UKMO every 6 h); after
         // 12 h when the last answer has no temperature at or below +3 °C at any
@@ -2153,7 +2147,7 @@
         }
 
         // Reads the icing data when there is none for this location / altitude
-        // or it is older than an hour (force: always, e.g. Refresh).
+        // or it is older than icingMaxAge() (force: always, e.g. Refresh).
         async function loadIcing({ force = false } = {}) {
             if (!icingOn()) return;
             try {
@@ -2500,14 +2494,18 @@
         let processed = null;
 
         // ================= Forecast store (IndexedDB) =================
-        // The last forecasts (up to 4: per location / mode / models / units)
-        // are kept in IndexedDB rather than localStorage: one ensemble week is
-        // ~2 MB, and localStorage's ~5 MB is shared with FlyLog, FlySend and
-        // FlyStock (same origin), whose own saves would fail once it is full.
-        // IndexedDB also saves without blocking the page. Where it can't be
-        // opened, the last forecast goes to localStorage as before.
-        const FORECAST_DB = 'flysky', FORECAST_STORE = 'forecasts', FORECAST_KEEP = 4;
+        // One record per mode / location / model ({ key, mode, model,
+        // fetchedAt, days, meta, hourly }, values always in m/s and mm), so
+        // adding a model asks only for that one and removing one asks for
+        // nothing. The newest FORECAST_KEEP records are kept in IndexedDB
+        // rather than localStorage: one ensemble model's week is ~0.5 MB, and
+        // localStorage's ~5 MB is shared with FlyLog, FlySend and FlyStock
+        // (same origin). Where IndexedDB can't be opened, the current
+        // records go to localStorage.
+        const FORECAST_DB = 'flysky', FORECAST_STORE = 'forecasts', FORECAST_KEEP = 24;
         const LEGACY_FORECAST_KEY = 'flysky_forecast_cache';
+        const MODEL_RECORD_TAG = 'm5';   // bumped when a record's shape changes
+        const modelRecords = new Map();  // in memory: record key → record
         let forecastDbPromise = null;
 
         function openForecastDb() {
@@ -2537,55 +2535,98 @@
             });
         }
 
-        async function forecastStoreGet(key) {
-            const db = await openForecastDb();
-            if (!db) {
-                const fc = loadFromStorage(LEGACY_FORECAST_KEY, null);
-                return fc && fc.key === key ? fc : null;
-            }
-            return new Promise(resolve => {
-                const req = db.transaction(FORECAST_STORE).objectStore(FORECAST_STORE).get(key);
-                req.onsuccess = () => resolve(req.result || null);
-                req.onerror = () => resolve(null);
-            });
+        function modelRecordKey(mode, loc, model) {
+            return [MODEL_RECORD_TAG, mode, locationKey(loc), model].join('|');
         }
 
-        // Saves a forecast and drops all but the newest FORECAST_KEEP.
-        async function forecastStorePut(fc) {
+        function validRecord(r) {
+            return !!r && typeof r.key === 'string' && r.key.startsWith(MODEL_RECORD_TAG + '|') && !!r.hourly && Array.isArray(r.hourly.time) && !!r.meta && Number.isFinite(r.fetchedAt);
+        }
+
+        function rememberRecord(r) {
+            modelRecords.delete(r.key);
+            modelRecords.set(r.key, r);
+            while (modelRecords.size > FORECAST_KEEP) modelRecords.delete(modelRecords.keys().next().value);
+        }
+
+        // A model's saved forecast: from memory, else from the store.
+        async function modelRecordGet(key) {
+            if (modelRecords.has(key)) return modelRecords.get(key);
             const db = await openForecastDb();
-            if (!db) { saveToStorage(LEGACY_FORECAST_KEY, fc); return; }
+            let rec = null;
+            if (!db) {
+                const saved = loadFromStorage(LEGACY_FORECAST_KEY, null);
+                rec = saved && Array.isArray(saved.records) ? saved.records.find(r => r && r.key === key) || null : null;
+            } else {
+                rec = await new Promise(resolve => {
+                    const req = db.transaction(FORECAST_STORE).objectStore(FORECAST_STORE).get(key);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => resolve(null);
+                });
+            }
+            if (!validRecord(rec)) return modelRecords.get(key) || null;
+            if (!modelRecords.has(key)) rememberRecord(rec);
+            return modelRecords.get(key);
+        }
+
+        // Saves records; drops all but the newest FORECAST_KEEP, and anything
+        // saved in an older shape.
+        async function modelRecordsPut(records) {
+            records.forEach(rememberRecord);
+            const db = await openForecastDb();
+            if (!db) { saveToStorage(LEGACY_FORECAST_KEY, { records: [...modelRecords.values()].slice(-6) }); return; }
             const tx = db.transaction(FORECAST_STORE, 'readwrite');
             const store = tx.objectStore(FORECAST_STORE);
-            store.put(fc);
+            records.forEach(r => store.put(r));
             let n = 0;
             const cur = store.index('fetchedAt').openKeyCursor(null, 'prev');
             cur.onsuccess = () => {
                 const c = cur.result;
                 if (!c) return;
-                if (++n > FORECAST_KEEP) store.delete(c.primaryKey);
+                if (!String(c.primaryKey).startsWith(MODEL_RECORD_TAG + '|') || ++n > FORECAST_KEEP) store.delete(c.primaryKey);
                 c.continue();
             };
             await idbDone(tx);
         }
 
-        // Startup: the saved forecast for the current settings. A forecast
-        // saved in localStorage by an earlier version moves to IndexedDB once.
+        // The forecast shown: the selected models' records put together.
+        // fetchedAt and days: the oldest / shortest of them.
+        function buildForecast(key, models, recs, errors = {}) {
+            const have = models.map((m, i) => [m, recs[i]]).filter(([, r]) => r);
+            if (!have.length) return null;
+            const first = have[0][1];
+            return {
+                key,
+                days: Math.min(...have.map(([, r]) => r.days)),
+                fetchedAt: Math.min(...have.map(([, r]) => r.fetchedAt)),
+                meta: first.meta,
+                times: first.hourly.time,
+                models: Object.fromEntries(have.map(([m, r]) => [m, r.hourly])),
+                errors
+            };
+        }
+
+        // The current selection from the records already in memory (no
+        // waiting: a model change shows at once what is there).
+        function forecastFromMemory() {
+            if (!state.location) return null;
+            const models = selectedModels();
+            const recs = models.map(m => modelRecords.get(modelRecordKey(state.mode, state.location, m)) || null);
+            const prev = state.forecast && state.forecast.key === forecastKey() ? state.forecast.errors : {};
+            return buildForecast(forecastKey(), models, recs, prev);
+        }
+
+        // Startup: the saved forecast for the current settings. Forecasts
+        // saved by earlier versions (whole sets, in the chosen units) are
+        // dropped: they are read again once.
         async function restoreForecast() {
             const db = await openForecastDb();
-            let legacy = null;
-            try { legacy = db && localStorage.getItem(LEGACY_FORECAST_KEY); } catch (err) {}
-            if (legacy) {
-                try {
-                    const fc = JSON.parse(legacy);
-                    if (validForecast(fc)) await forecastStorePut(fc);
-                    localStorage.removeItem(LEGACY_FORECAST_KEY);
-                } catch (err) {
-                    console.warn('FlySky: could not move the saved forecast to IndexedDB.', err);
-                }
-            }
+            if (db) { try { localStorage.removeItem(LEGACY_FORECAST_KEY); } catch (err) {} }
             if (!state.location) return;
-            const fc = await forecastStoreGet(forecastKey());
-            if (validForecast(fc)) state.forecast = fc;
+            const models = selectedModels();
+            const recs = await Promise.all(models.map(m => modelRecordGet(modelRecordKey(state.mode, state.location, m)).catch(() => null)));
+            const fc = buildForecast(forecastKey(), models, recs);
+            if (fc) state.forecast = fc;
         }
 
         // ================= Helpers =================
@@ -2674,7 +2715,9 @@
             if (!state.location) return null;
             // Version tag: bumped whenever the saved forecast's shape changes
             // (e.g. new variables), so older saved forecasts are refetched.
-            return ['v4', state.mode, locationKey(state.location), selectedModels().join('+'), state.windUnit, state.precipUnit].join('|');
+            // Values are always asked in m/s and mm and converted for display,
+            // so the units are not part of it.
+            return ['v5', state.mode, locationKey(state.location), selectedModels().join('+')].join('|');
         }
 
         // Forecast days (counted from local midnight today) needed to cover
@@ -2699,8 +2742,9 @@
                 models: model,
                 forecast_days: days,
                 timezone: 'auto',
-                wind_speed_unit: state.windUnit,
-                precipitation_unit: state.precipUnit
+                // Always SI: the display units are applied in processForecast().
+                wind_speed_unit: 'ms',
+                precipitation_unit: 'mm'
             });
             return `${MODES[mode].url}?${params.toString()}`;
         }
@@ -2864,45 +2908,48 @@
         // The load in progress, so overlapping triggers (refresh, tab focus,
         // timer, settings changes) share one request instead of stacking up.
         let inflightLoad = null;
+        const MODEL_CHANGE_DELAY_MS = 1000;
+        let modelChangeTimer = null;
 
+        // Asks only for the selected models whose saved forecast is missing,
+        // older than the reuse time or too short for the window (force: all).
         async function loadForecast({ force = false } = {}) {
             if (!state.location) return;
             if (icingOn()) loadIcing({ force });
-            let key = forecastKey();
-            // Another location / mode / model set: show its saved forecast (if
-            // any) right away, while a fresh one loads.
-            if (!(state.forecast && state.forecast.key === key)) {
-                const stored = await forecastStoreGet(key).catch(() => null);
-                if (key !== forecastKey()) return;   // changed again meanwhile
-                if (validForecast(stored) && !(state.forecast && state.forecast.key === key)) {
-                    state.forecast = stored;
-                    processForecast();
-                    renderAll();
-                }
-            }
-            key = forecastKey();
-            const days = daysNeeded();
-            const fc = state.forecast;
-            const fresh = fc && fc.key === key && fc.days >= days &&
-                Date.now() - fc.fetchedAt < FORECAST_MAX_AGE_MS[state.mode];
-            if (fresh && !force) {
+            const key = forecastKey(), base = forecastBase();
+            const mode = state.mode, loc = state.location, models = selectedModels().slice(), days = daysNeeded();
+            const recs = await Promise.all(models.map(m => modelRecordGet(modelRecordKey(mode, loc, m)).catch(() => null)));
+            if (key !== forecastKey()) return;   // changed again meanwhile
+            const cur = state.forecast;
+            const next = buildForecast(key, models, recs, cur && cur.key === key ? cur.errors : {});
+            const changed = !!next && !(cur && cur.key === key && cur.fetchedAt === next.fetchedAt && Object.keys(cur.models).join() === Object.keys(next.models).join());
+            if (changed) state.forecast = next;
+            const stale = r => !r || r.days < days || Date.now() - r.fetchedAt >= FORECAST_MAX_AGE_MS[mode];
+            const need = force ? models : models.filter((m, i) => stale(recs[i]));
+            if (!need.length) {
                 const wasCache = state.forecastFromCache;
                 state.forecastFromCache = false;
                 // Same forecast and still the same hour: nothing to redraw
                 // (this runs on every return to the app and every 10 min).
-                if (!wasCache && processed && processed.stamp === renderStamp(fc)) return;
+                if (!changed && !wasCache && processed && processed.stamp === renderStamp(state.forecast)) return;
                 processForecast();
                 renderAll();
                 return;
             }
-            // Same data already on its way: wait for it instead of asking again.
-            if (inflightLoad && inflightLoad.key === key && inflightLoad.days >= days) return inflightLoad.promise;
-            // Otherwise anything still running is outdated — cancel it.
-            if (inflightLoad) inflightLoad.controller.abort();
-
+            if (changed) { processForecast(); renderAll(); }
+            if (inflightLoad) {
+                // The same place and mode already loading: wait for it, then
+                // ask for whatever it did not cover.
+                if (inflightLoad.base === base && inflightLoad.days >= days) {
+                    if (need.every(m => inflightLoad.need.includes(m))) return inflightLoad.promise;
+                    await inflightLoad.promise.catch(() => {});
+                    return forecastBase() === base ? loadForecast() : undefined;
+                }
+                inflightLoad.controller.abort();   // another place or mode: outdated
+            }
             const controller = new AbortController();
-            const promise = runForecastLoad(key, days, controller);
-            inflightLoad = { key, days, controller, promise };
+            const promise = runForecastLoad(base, need, days, controller);
+            inflightLoad = { base, need, days, controller, promise };
             try {
                 await promise;
             } finally {
@@ -2910,54 +2957,56 @@
             }
         }
 
-        async function runForecastLoad(key, days, controller) {
-            const fc = state.forecast;
-            const mode = state.mode;
-            const models = selectedModels().slice();
+        // Mode and location: what the saved records belong to.
+        function forecastBase() {
+            return state.location ? `${state.mode}|${locationKey(state.location)}` : null;
+        }
+
+        async function runForecastLoad(base, need, days, controller) {
+            const mode = state.mode, loc = state.location;
             setLoading(true);
             let results;
             try {
-                results = await fetchAllModels(mode, models, days, controller.signal);
+                results = await fetchAllModels(mode, need, days, controller.signal);
             } catch (err) {
                 if (err.name === 'AbortError') return;   // superseded by a newer load
-                throw err;
+                console.error('FlySky: forecast load failed.', err);
+                showToast(t('toastForecastError', { error: err.message || String(err) }), 'warning');
+                return;
             } finally {
                 // A newer load owns the spinner once this one was cancelled.
                 if (!controller.signal.aborted) setLoading(false);
             }
-            // Ignore responses for a location/mode/model set that's no longer current.
-            if (forecastKey() !== key) return;
-
             const ok = results.filter(r => r.data);
             const failed = results.filter(r => r.error);
+            const now = Date.now();
+            const records = ok.map(r => ({
+                key: modelRecordKey(mode, loc, r.model), mode, model: r.model, fetchedAt: now, days,
+                meta: { timezone: r.data.timezone, timezoneAbbreviation: r.data.timezone_abbreviation, utcOffsetSeconds: r.data.utc_offset_seconds || 0 },
+                hourly: r.data.hourly
+            }));
+            records.forEach(rememberRecord);
+            if (records.length) modelRecordsPut(records).catch(err => console.warn('FlySky: could not save the forecast.', err));
+            // Another place or mode by now: the records are kept, nothing shown.
+            if (forecastBase() !== base) return;
+            const prevErrors = state.forecast && state.forecast.key === forecastKey() ? state.forecast.errors || {} : {};
+            const errors = Object.fromEntries(Object.entries(prevErrors).filter(([m]) => !ok.some(r => r.model === m)));
+            failed.forEach(r => { errors[r.model] = r.error; });
+            const fc = forecastFromMemory();
+            if (fc) fc.errors = errors;
             if (!ok.length) {
                 console.error('FlySky: forecast request failed.', failed);
                 const limited = failed.find(r => r.rateLimited);
-                if (fc && fc.key === key) state.forecastFromCache = true;
+                if (fc) state.forecastFromCache = true;
                 if (limited) {
                     showToast(t('toastRateLimited', { n: failed.length, reason: limited.error }), 'warning');
-                } else if (fc && fc.key === key) {
+                } else if (fc) {
                     showToast(t('toastUsingCache'), 'warning');
                 } else {
                     showToast(t('toastForecastError', { error: failed.length ? failed[0].error : '?' }), 'warning');
                 }
             } else {
-                const first = ok[0].data;
-                state.forecast = {
-                    key,
-                    days,
-                    fetchedAt: Date.now(),
-                    meta: {
-                        timezone: first.timezone,
-                        timezoneAbbreviation: first.timezone_abbreviation,
-                        utcOffsetSeconds: first.utc_offset_seconds || 0
-                    },
-                    times: first.hourly.time || [],
-                    models: Object.fromEntries(ok.map(r => [r.model, r.data.hourly])),
-                    errors: Object.fromEntries(failed.map(r => [r.model, r.error]))
-                };
                 state.forecastFromCache = false;
-                forecastStorePut(state.forecast).catch(err => console.warn('FlySky: could not save the forecast.', err));
                 const limited = failed.find(r => r.rateLimited);
                 if (limited) showToast(t('toastRateLimited', { n: failed.filter(r => r.rateLimited).length, reason: limited.error }), 'warning');
                 failed.filter(r => !r.network && !r.rateLimited).forEach(r => {
@@ -2965,6 +3014,7 @@
                     showToast(t('toastModelFailed', { model: m ? m.name : r.model, error: r.error }), 'warning');
                 });
             }
+            if (fc) state.forecast = fc;
             processForecast();
             renderAll();
         }
@@ -3014,10 +3064,17 @@
                         if (!v || !own_vars.includes(v)) return;
                         const series = hourly[k];
                         if (!Array.isArray(series)) return;
+                        // Rain and gusts are stamped at the END of their hour
+                        // (sum / maximum of the preceding hour): the hour
+                        // 14:00–15:00 takes the value stamped 15:00.
+                        const shift = PRECEDING_HOUR_VARS.has(v) ? 1 : 0;
                         let values = aligned
-                            ? series.slice(start, end)
-                            : windowTimes.map(tm => (index.has(tm) ? series[index.get(tm)] : null));
-                        if (param.scale) values = values.map(x => (Number.isFinite(x) ? x * param.scale : x));
+                            ? windowTimes.map((_, i) => (start + i + shift < series.length ? series[start + i + shift] : null))
+                            : windowTimes.map(tm => { const at = shift ? addHoursToLocal(tm, shift) : tm; return index.has(at) ? series[index.get(at)] : null; });
+                        // Data in m/s and mm: the display unit, and the param's scale.
+                        const factor = (param.scale || 1) * (param.unit === 'wind' ? 1 / (WIND_TO_MS[state.windUnit] || 1)
+                            : param.unit === 'precip' && state.precipUnit === 'inch' ? 1 / 25.4 : 1);
+                        if (factor !== 1) values = values.map(x => (Number.isFinite(x) ? x * factor : x));
                         if (!values.some(v => v !== null && v !== undefined)) return;
                         result.modelsWithData.add(modelId);
                         members.push({ key: k, model: modelId, variable: v, values });
@@ -4358,7 +4415,7 @@
             const red = document.getElementById('icingRhRed'), marg = document.getElementById('icingRhMarginal');
             if (document.activeElement !== red) red.value = P.icingRhRed;
             if (document.activeElement !== marg) marg.value = P.icingRhMarginal;
-            const th = window.FlySkyIcing ? window.FlySkyIcing.DEFAULT_THRESHOLDS : { tMin: -20, tMax: 0 };
+            const th = window.FlySkyIcing ? window.FlySkyIcing.DEFAULT_THRESHOLDS : { tMin: -30, tMax: 0 };   // the engine's defaults
             document.getElementById('icingThresholdsNote').textContent = t('icingThresholdsDesc', { t1: th.tMin, t2: th.tMax });
         }
 
@@ -5385,9 +5442,14 @@
                     state.modelsByMode[state.mode] = modeModels().map(m => m.id).filter(m => m === id || current.includes(m));
                 }
                 saveSettings();
+                // What is already read shows at once; the request waits until
+                // the taps stop (quick taps would each start one).
+                const fc = forecastFromMemory();
+                if (fc) state.forecast = fc;
                 processForecast();
                 renderAll();
-                loadForecast();
+                clearTimeout(modelChangeTimer);
+                modelChangeTimer = setTimeout(() => loadForecast(), MODEL_CHANGE_DELAY_MS);
             });
             document.querySelectorAll('[data-mode]').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -5412,16 +5474,16 @@
             document.getElementById('windUnitSelect').addEventListener('change', e => {
                 state.windUnit = e.target.value;
                 saveSettings();
+                // The data stays in m/s and mm: only converted again.
                 processForecast();
                 renderAll();
-                loadForecast();
             });
             document.getElementById('precipUnitSelect').addEventListener('change', e => {
                 state.precipUnit = e.target.value;
                 saveSettings();
+                // The data stays in m/s and mm: only converted again.
                 processForecast();
                 renderAll();
-                loadForecast();
             });
             document.getElementById('btnMembers').addEventListener('click', () => {
                 state.showMembers = !state.showMembers;
@@ -5455,6 +5517,7 @@
         }
 
         // Toast Notification System
+        const TOAST_MS = 3000, TOAST_WARNING_MS = 10000;
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
             if (!container) return;
@@ -5468,8 +5531,9 @@
                          'fa-circle-info text-cyan-400';
 
             const toast = document.createElement('div');
-            toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl border text-xs shadow-xl transition-all duration-300 transform translate-y-2 opacity-0 ${bgClass}`;
-            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span>`;
+            toast.className = `flex items-center gap-2 px-4 py-3 rounded-xl border text-xs shadow-xl transition-all duration-300 transform translate-y-2 opacity-0 cursor-pointer ${bgClass}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${escapeHtml(message)}</span><i class="fa-solid fa-xmark ml-1 opacity-60" aria-hidden="true"></i>`;
+            toast.title = t('toastClose');
 
             container.appendChild(toast);
 
@@ -5477,10 +5541,17 @@
                 toast.classList.remove('translate-y-2', 'opacity-0');
             });
 
-            setTimeout(() => {
+            // Warnings (limits, failures) stay long enough to be read; a tap
+            // closes any toast.
+            let gone = false;
+            const close = () => {
+                if (gone) return;
+                gone = true;
                 toast.classList.add('opacity-0', 'translate-y-2');
                 setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            };
+            toast.addEventListener('click', close);
+            setTimeout(close, type === 'warning' ? TOAST_WARNING_MS : TOAST_MS);
         }
 
         // ================= Init =================
@@ -5509,7 +5580,7 @@
                 renderAll();
                 loadForecast();
             });
-            // Keep the 72-hour window sliding forward while the page stays
+            // Keep the window sliding forward with the hour while the page stays
             // open. Not while the map is shown: the forecast catches up when
             // it is opened again (setView).
             setInterval(() => {
@@ -5528,7 +5599,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=23';
+        const MAP_JS = 'map.js?v=24';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 

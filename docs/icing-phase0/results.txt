@@ -437,7 +437,7 @@ D3  flight level 950 hPa (bracketing for IFS/AIFS/JMA) vs 925 hPa (native everyw
    UKMO 33.2→33.2% (RH925 p50 in −20..0 °C: 89)
    GFS 25.0→19.8% (RH925 p50 in −20..0 °C: 81)
 
-## select.py (model choice)
+## model_select.py (model choice)
 
 ##############################################################################################################
 # reported RH

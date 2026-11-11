@@ -1,5 +1,5 @@
 # FIXED-WING UAV ATMOSPHERIC ICING FORECASTING
-## Technical Handoff & Architecture Specification — v2.8 (FlySky integration)
+## Technical Handoff & Architecture Specification — v2.9 (FlySky integration)
 
 | Document status | Purpose | Intended use |
 |---|---|---|
@@ -11,6 +11,8 @@
 ---
 
 ## 0. Recent changes
+
+**v2.9 — precipitation timing** (§7.3): Open-Meteo's hourly precipitation and rain are sums over the hour *before* their timestamp. The surface cues of a departure hour i now read them at i + 1 (the forecast view shifts rain and gusts the same way). Found in the 2026-11 code review; `icing.js` `VERSION` 4.
 
 **v2.8 — stage 4 implemented: icing along the route** (§6, §9, §12, §13). The flight time calculator, with the icing indicator on and from 50 m up:
 - ICON + UKMO at every second sample point and B: T and RH at the levels around the flight height, surface pressure and 2 m temperature (heights), weather code (freezing rain / drizzle) — `routeRequestParams()`, 9 variables × 2 models ≈ **1.8 calls a point**; a long new route ≈ 30 calls with its wind (48 in the v2.4 plan); answers reused for 3 h.
@@ -575,6 +577,9 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 
 ## 15. Changes
 
+### From v2.8 to v2.9
+1. Precipitation and rain for the cues read at i + 1 (the hour they describe); engine test for it.
+
 ### From v2.7 to v2.8
 1. Stage 4 implemented (§9 rewritten as built): the route request with the weather code and the 2 m temperature (heights) — 1.8 calls a point, ≈ 30 per new 16-point route; A's column from the forecast data or one request; each point at its arrival time; panel lines, stretches on the map, the tag's mark. Simplifications: no one-way descent at B; the stretch around a point without data of its own takes the worse neighbour.
 2. Wind triangle: the wind changes on the half hour within a stretch (a stall hours into a slow stretch is no longer missed).
@@ -624,4 +629,4 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 - WMO 4677 present-weather code table (subset emitted by Open-Meteo: 0–3, 45, 48, 51–57, 61–67, 71–77, 80–82, 85–86, 95, 96, 97, 99).
 - FAA Aviation Weather Handbook / AWC icing guidance (US reference only).
 
-*END OF TECHNICAL HANDOFF DOCUMENT v2.8 — FLYSKY INTEGRATION*
+*END OF TECHNICAL HANDOFF DOCUMENT v2.9 — FLYSKY INTEGRATION*

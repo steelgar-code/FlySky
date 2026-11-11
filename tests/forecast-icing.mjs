@@ -158,7 +158,7 @@ ok('verdict option off again: no icing check', await I(() => !('icing' in proces
 await I(() => selectHour(0));
 
 // ---- Freezing drizzle from low stratus: precipitation from a saturated sub-zero layer under dry air → flagged
-opts.icingSfc = (m, k) => (k === 0 && m === 'ukmo_seamless' ? { precipitation: 0.2 } : icingSfcScenario(m, k));
+opts.icingSfc = (m, k) => (k === 1 && m === 'ukmo_seamless' ? { precipitation: 0.2 } : icingSfcScenario(m, k));   // stamped +1 h: the hour from now
 await page.click('#btnRefresh'); await page.waitForTimeout(3000);
 fl = await flag(0);
 const fzdz = await I(() => icingHour(processed.flight.hours[0].time).models.ukmo_seamless.flight.cues.start.freezingPrecip);

@@ -186,12 +186,16 @@ export async function routeAll(page, opts = {}) {
     if ((url.includes('ensemble-api.open-meteo.com') || url.includes('api.open-meteo.com/v1/forecast')) && url.includes('models=')) {
       // Forecast mock: every requested model / variable, ensemble members for the ensemble API.
       // opts.forecastLimit = { n, reason }: the next n requests get Open-Meteo's 429 "limit exceeded".
+      // opts.forecastValue(variable, k, model, member) → a value (undefined: the default), k = the
+      // timestamp's hours from the current hour. Logged in log.forecastReq.
+      log.forecastReq = (log.forecastReq || []).concat(url);
       if (opts.forecastLimit && opts.forecastLimit.n > 0) { opts.forecastLimit.n--; return route.fulfill({ status: 429, json: { error: true, reason: opts.forecastLimit.reason } }); }
       const u = new URL(url); const ens = url.includes('ensemble-api');
       const models = u.searchParams.get('models').split(','); const vars = u.searchParams.get('hourly').split(',');
       const days = +(u.searchParams.get('forecast_days') || 2); const start = Math.floor(Date.now() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
       const hourly = { time };
+      const nowIdx = Math.floor((Date.now() + 7200e3 - start) / 3600e3);
       models.forEach((m, mi) => {
         const suffix = models.length > 1 ? '_' + m : '';
         const n = ens ? 6 : 1;
@@ -201,6 +205,8 @@ export async function routeAll(page, opts = {}) {
           vars.forEach(v => {
             if (ens && v === 'cloud_cover_low') return;
             hourly[v + mem + suffix] = time.map((_, i) => {
+              const o = opts.forecastValue && opts.forecastValue(v, i - nowIdx, m, k);
+              if (o !== undefined) return o;
               const w = Math.sin(i / 9 + ph);
               if (v === 'precipitation') return i % 24 > 14 && i % 24 < 19 && (k + mi) % 3 === 0 ? +(0.4 + w).toFixed(1) > 0 ? +(0.4 + Math.abs(w)).toFixed(1) : 0 : 0;
               if (v === 'cloud_cover_low') return Math.round(45 + 40 * w);

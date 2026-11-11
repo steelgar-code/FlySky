@@ -273,6 +273,14 @@ const h0 = (body, opts) => run(body, opts).hours[0];
     ok('strong signal: cruise red in 2 of 2 models; not for one model or climb only', both.strong === 'cruise' && one.strong === null && climb.strong === null, [both.strong, one.strong, climb.strong]);
 }
 
+// ---- Precipitation describes the hour before its timestamp
+{
+    const next = h0(makeBody({ sfc: (m, i) => ({ t2: -1, precip: i === 1 ? 0.4 : 0, rain: i === 1 ? 0.4 : 0 }) }));
+    const same = h0(makeBody({ sfc: (m, i) => ({ t2: -1, precip: i === 0 ? 0.4 : 0, rain: i === 0 ? 0.4 : 0 }) }));
+    ok('rain stamped +1 h is the departure hour\'s (ICON rain cue at hour 0)', !!next.models.icon_seamless.flight.cues.start.freezingPrecip);
+    ok('rain stamped at the hour itself belongs to the hour before: no cue at hour 0', !same.models.icon_seamless.flight.cues.start.freezingPrecip);
+}
+
 // ---- Route (calculator): levels, request, points from a route-style answer, climb / descent at A
 {
     ok('route levels: 975 / 950 / 925 hPa for 579 m above sea level', I.routeLevels(579).join() === '975,950,925', I.routeLevels(579));

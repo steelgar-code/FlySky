@@ -2442,7 +2442,7 @@
         if (!windShown()) { W.group.clearLayers(); W.hour = null; W.hidden = 0; renderWindInfo(); return; }
         const hour = windHour();
         const pts = windGrid();
-        // Forget points not refreshed for 30 min (they'd be fetched again
+        // Forget points older than WIND_MAX_AGE_MS (they'd be fetched again
         // anyway), and never keep more than 1500.
         W.cache.forEach((c, k) => { if (Date.now() - c.at > WIND_MAX_AGE_MS) W.cache.delete(k); });
         for (const k of W.cache.keys()) { if (W.cache.size <= 1500) break; W.cache.delete(k); }
@@ -3268,13 +3268,13 @@
         // request per cell, so panning nearby reuses it (Open-Meteo counts
         // every model of every request).
         const lat = (Math.round(ll.lat * 20) / 20).toFixed(2), lon = (Math.round(ll.lng * 20) / 20).toFixed(2);
-        const key = `${lat},${lon},${state.precipUnit},${state.windUnit},${ids.join('+')}`;
+        // Always m/s and mm (converted for display), so a unit change asks nothing.
+        const key = `${lat},${lon},${ids.join('+')}`;
         const hit = P.model.get(key);
         if (hit && Date.now() - hit.at < 60 * 60e3) return hit.data;
         const url = buildWmsUrl(MAP_CONFIG.openMeteo, {
             latitude: lat, longitude: lon, hourly: MODEL_VARS.join(','), models: ids.length ? ids.join(',') : undefined,
-            past_days: 1, forecast_days: 2, timezone: 'GMT', precipitation_unit: state.precipUnit === 'inch' ? 'inch' : undefined,
-            wind_speed_unit: state.windUnit && state.windUnit !== 'ms' ? state.windUnit : undefined
+            past_days: 1, forecast_days: 2, timezone: 'GMT', wind_speed_unit: 'ms'
         }, []);
         const res = await omFetch(url, { cost: Math.max(1, MODEL_VARS.length * Math.max(1, ids.length) / 10), deferrable: true, signal });
         const body = await res.json();
@@ -3399,8 +3399,8 @@
         if (!m || !m.ids.length) return [];
         const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
         const inch = state.precipUnit === 'inch';
-        const mm = v => (inch ? v * 25.4 : v);
-        const fmtP = v => `${v.toLocaleString(currentLang, { maximumFractionDigits: inch ? 2 : 1, minimumFractionDigits: inch ? 2 : 1 })} ${inch ? 'in' : 'mm'}`;
+        const mm = v => v;   // the data is in mm
+        const fmtP = v => `${(inch ? v / 25.4 : v).toLocaleString(currentLang, { maximumFractionDigits: inch ? 2 : 1, minimumFractionDigits: inch ? 2 : 1 })} ${inch ? 'in' : 'mm'}`;
         const out = [];
         const around = (hr, v) => {
             const i = hr.time.findIndex(x => x.slice(0, 13) === target);
@@ -3641,12 +3641,13 @@
                         const num = (v, d) => (Number.isFinite(v) ? v.toLocaleString(currentLang, { maximumFractionDigits: d, minimumFractionDigits: d }) : '–');
                         html = `<span class="text-slate-100">${h(t('mapProbeModelValues', {
                             c: num(hr.cloud_cover_low[i], 0), v: num(hr.visibility[i] / 1000, 1),
-                            p: num(hr.precipitation[i], state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
+                            p: num(hr.precipitation[i] / (state.precipUnit === 'inch' ? 25.4 : 1), state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
                         }))}</span> <span class="text-slate-500">· ${h(fmtTime(Date.parse(hr.time[i] + 'Z')))}</span>`;
                         if (hr.wind_speed_10m && Number.isFinite(hr.wind_speed_10m[i])) {
                             const d = Math.round(hr.wind_direction_10m[i] / 45) % 8;
                             const digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
-                            windHtml = `<span class="text-slate-100">${h(t('mapProbeWindValue', { dir: t('mapCompass')[d], w: num(hr.wind_speed_10m[i], digits), g: num(hr.wind_gusts_10m[i], digits), u: UNIT_LABELS.wind[state.windUnit] }))}</span>`;
+                            const toUnit = WIND_TO_MS[state.windUnit] || 1;   // the data is in m/s
+                            windHtml = `<span class="text-slate-100">${h(t('mapProbeWindValue', { dir: t('mapCompass')[d], w: num(hr.wind_speed_10m[i] / toUnit, digits), g: num(hr.wind_gusts_10m[i] / toUnit, digits), u: UNIT_LABELS.wind[state.windUnit] }))}</span>`;
                         }
                     }
                 }

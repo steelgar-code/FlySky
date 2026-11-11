@@ -12,14 +12,14 @@ Not part of the app (nothing here is loaded by it). [`results.txt`](results.txt)
 | `rain.py` | the models' rain / snow split below 0 °C at 2 m (ICON has rain there, UKMO's split follows the 2 m temperature) — the v2.7 ICON rain cue | `historical-forecast-api.open-meteo.com` | ≈ 15 |
 | `analyze.py` | tables for V1–V6, V9, V10, flag rates, 950 vs 925 hPa | — (saved data) | 0 |
 | `rhnorm.py` | V3: red hours with RH converted to RH over water | — | 0 |
-| `select.py` | one or two models instead of the 5-model consensus (§7.6) | — | 0 |
+| `model_select.py` | one or two models instead of the 5-model consensus (§7.6) | — | 0 |
 | `layers.py` | how far 950 hPa drifts from a fixed 400 m above the ground (§5.1); the icing layers in winter (§7.7) | — | 0 |
 | `engine_check.mjs` | the app's engine (`../../icing.js`) on the same data: cross-check with the Python numbers, and what it reports for the saved forecasts ([`engine_check.txt`](engine_check.txt)) | — | 0 |
 
 ```sh
 cd docs/icing-phase0
 python3 live.py && python3 winter.py && python3 ensemble.py && python3 rain.py
-python3 analyze.py; python3 rhnorm.py; python3 select.py; python3 layers.py
+python3 analyze.py; python3 rhnorm.py; python3 model_select.py; python3 layers.py
 node engine_check.mjs
 ```
 

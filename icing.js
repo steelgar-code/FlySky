@@ -7,33 +7,36 @@
 // never means "safe". Design, decisions and the API checks behind it:
 // docs/icing-forecast-handoff.md.
 //
-// Stage 1: the engine only — not loaded by the app yet. The forecast tab
-// (stage 3) and the flight time calculator (stage 4) will use it. Pure
-// functions: no DOM, no network, no translations. Callers build the request
-// with requestParams(), fetch it, and pass the response to evaluate() (forecast
-// tab) or pointState() (a point of a route).
+// Used by the forecast view (index.html: evaluate() for every departure hour)
+// and the flight time calculator (map.js: routeRequestParams(), pointState(),
+// columnPhase() along a route). Pure functions: no DOM, no network, no
+// translations; callers build the request (requestParams() /
+// routeRequestParams()), fetch it, and pass the response in.
 //
 // Data: Open-Meteo forecast API, deterministic models (v1: DWD ICON and UK Met
 // Office — both have the 975 / 950 hPa levels and report RH over water). Per
-// pressure level: temperature, relative humidity, geopotential height; at the
-// surface: 2 m temperature and humidity, weather code, visibility,
-// precipitation.
+// pressure level: temperature and relative humidity (geopotential height is
+// used when a response has it, else the heights are worked out from the
+// surface pressure); at the surface: pressure, 2 m temperature and humidity,
+// weather code, visibility, precipitation, rain, low cloud. Precipitation and
+// rain are sums over the hour before their timestamp (the hour from i is
+// stamped i + 1).
 //
 // Heights: the flight altitude is metres above the takeoff point. With the
 // takeoff elevation (the response's `elevation`) that is a fixed height above
 // sea level. Each hour, the pressure levels just below and above that height
-// (placed by their geopotential height) give its state — the worse of the two;
-// humidity is never interpolated. Levels less than 20 m above the ground are
-// inside the terrain (Open-Meteo extrapolates values there) and are ignored.
-// The 2 m values feed only the surface cues (freezing fog, freezing
-// precipitation), never the level rule.
+// give its state — the worse of the two; humidity is never interpolated.
+// Levels less than 20 m above the ground are inside the terrain (Open-Meteo
+// extrapolates values there) and are ignored. The 2 m values feed only the
+// surface cues (freezing fog, freezing precipitation, thin layer), never the
+// level rule.
 //
 // Works in the browser (window.FlySkyIcing) and in Node (module.exports):
 // tests in tests/icing-engine.mjs.
 (function (root) {
     'use strict';
 
-    const VERSION = 3;
+    const VERSION = 4;
 
     // Pressure levels (hPa) the engine knows, from the ground up, with their
     // height above sea level in the standard atmosphere (m) — only used to
@@ -260,11 +263,13 @@
     // height above sea level (z) and above the ground (agl), T, reported RH,
     // RH over water and state; surface values and cues.
     function profileAt(cols, i, elevation, model, th = DEFAULT_THRESHOLDS) {
-        const at = k => { const s = cols && cols[k]; const v = s ? s[i] : null; return Number.isFinite(v) ? v : null; };
+        const at = (k, j = i) => { const s = cols && cols[k]; const v = s ? s[j] : null; return Number.isFinite(v) ? v : null; };
         const conv = (MODELS[model] || {}).rh || 'water';
+        // Precipitation and rain are sums over the hour BEFORE their timestamp:
+        // the hour from i (i to i + 1) is stamped i + 1. The rest is at i.
         const sfc = {
             ps: at('surface_pressure'), t2: at('temperature_2m'), rh2: at('relative_humidity_2m'), code: at('weather_code'),
-            vis: at('visibility'), precip: at('precipitation'), rain: at('rain'), lowCloud: at('cloud_cover_low')
+            vis: at('visibility'), precip: at('precipitation', i + 1), rain: at('rain', i + 1), lowCloud: at('cloud_cover_low')
         };
         const raw = [];
         LEVELS.forEach(p => {

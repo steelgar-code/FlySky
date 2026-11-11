@@ -1,7 +1,10 @@
 {
+  "id": "./",
   "short_name": "FlySky",
   "name": "FlySky - Ensemble Weather Forecast",
-  "description": "Ensemble weather forecast ranges for precipitation, wind and gusts.",
+  "description": "Forecast for drone pilots: can I fly now? Ensemble and model forecasts of wind, gusts, rain, low cloud and visibility, an experimental icing indicator, a satellite map with hazard alerts and a flight time calculator.",
+  "lang": "en",
+  "scope": "./",
   "icons": [
     {
       "src": "icon-192.png",

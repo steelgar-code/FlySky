@@ -18,14 +18,14 @@
 // its own copy of the last forecast in localStorage for offline viewing.
 
 const CACHE_PREFIX = 'flysky-cache-';
-const CACHE_NAME = CACHE_PREFIX + 'v29';
+const CACHE_NAME = CACHE_PREFIX + 'v30';
 
 const APP_FILES = [
     './',
     './index.html',
-    './map.js?v=23',
+    './map.js?v=24',
     './hazard.js?v=8',
-    './icing.js?v=3',
+    './icing.js?v=4',
     './manifest.json',
     './favicon.png',
     './icon-192.png',
@@ -39,7 +39,7 @@ const APP_FILES = [
 // must be cached as CORS responses or the browser will refuse them.
 const CDN_NO_CORS = [
     'https://cdn.tailwindcss.com',
-    'https://cdn.jsdelivr.net/npm/chart.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     // Satellite map view (loaded on demand by index.html)
     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
