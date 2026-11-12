@@ -1,5 +1,6 @@
 // "Can I fly now?" card, wind aloft as a flight factor, models in the side menu,
-// Open-Meteo request budget (no refetch on window switch, limits), confidence legend.
+// Open-Meteo request budget (no refetch on window switch, limits), confidence legend, the
+// confidence text naming its group ("90% of members: suitable").
 import { routeAll } from './lib/mock.mjs';
 import { launch, BASE_URL, ok } from './lib/env.mjs';
 const b = await launch();
@@ -94,6 +95,27 @@ console.log('    confidence:', JSON.stringify(conf));
 ok('models without wind aloft take it as the others see it: all 5 strong → 100% high', conf.allStrong.top === 'bad' && conf.allStrong.conf === 1 && conf.allStrong.level === 'high');
 ok('split among the 5 (3 strong, 2 calm) → 60% not suitable, medium', conf.split.top === 'bad' && conf.split.conf === 0.6 && conf.split.level === 'medium' && conf.split.aloft === 0.6);
 ok('a model that is not suitable on its own stays so', conf.ownBad.conf === 0.65, conf.ownBad);
+
+// The confidence names the group it counts. Ensemble: 10 members per model, one of them wet in
+// the current hour (rain is stamped one hour ahead), everything else fine → the median verdict
+// "Uncertain" (any chance of rain), the largest group "suitable" with 90 %.
+const calm = (v, k) => (v === 'wind_speed_10m' ? 3 : /hPa|gust/.test(v) ? 4 : v === 'visibility' ? 20000 : v === 'cloud_cover_low' ? 0 : undefined);
+opts.forecastMembers = 10;
+opts.forecastValue = (v, k, m, member) => (v === 'precipitation' ? (k === 1 && member === 0 ? 2 : 0) : calm(v, k));
+await page.click('#btnRefresh'); await page.waitForTimeout(2500);
+let nowText = await page.locator('#nowMain').innerText();
+ok('10 % of members wet: "Uncertain" and "90% of members: suitable"', /Uncertain/.test(nowText) && /90% of members: suitable/.test(nowText), nowText.split('\n').slice(0, 3).join(' | '));
+ok('confidence strip cell title names the group too', await I(() => [...document.querySelectorAll('[data-flight-hour][title]')].some(e => /90% of members: suitable/.test(e.title))));
+// Models mode: one of the five default models wet → 80 % of models suitable.
+opts.forecastValue = (v, k, m) => (v === 'precipitation' ? (k === 1 && m === 'icon_seamless' ? 2 : 0) : calm(v, k));
+await page.click('[data-mode="deterministic"]'); await page.waitForTimeout(3500);
+nowText = await page.locator('#nowMain').innerText();
+ok('Models mode: "80% of models: suitable"', /Uncertain/.test(nowText) && /80% of models: suitable/.test(nowText), nowText.split('\n').slice(0, 3).join(' | '));
+await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(800);
+nowText = await page.locator('#nowMain').innerText();
+ok('Ukrainian: "80% моделей: придатно"', /80% моделей: придатно/.test(nowText), nowText.split('\n').slice(0, 3).join(' | '));
+await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
+opts.forecastMembers = null; opts.forecastValue = undefined;
 
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await b.close();

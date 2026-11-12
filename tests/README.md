@@ -32,7 +32,9 @@ Every external request is answered locally, so the suites run offline and are re
 - **Open-Meteo**: ensemble / models forecasts (members and per-model columns like the real API),
   the map readout's point request (one column per model) and the wind-arrow grid request.
   Option `forecastLimit: { n, reason }` (may be set on the options object later): the next `n`
-  forecast requests get a 429 "limit exceeded". `forecastValue(variable, k, model, member)` overrides a value (k = the timestamp's hours
+  forecast requests get a 429 "limit exceeded". `forecastModelFail: { model, reason, status }`: every forecast request naming that
+  model gets that status (default 400) with `{ error: true, reason }`, so a combined request fails and the app asks one model at a time.
+  `forecastMembers`: members per ensemble model (default 6). `forecastValue(variable, k, model, member)` overrides a value (k = the timestamp's hours
   from the current hour); forecast requests are logged in `forecastReq`. The flight time calculator's wind request gets a
   uniform wind, `routeWind: { speed, from, ramp }` (default 6 m/s from the west; `ramp`: m/s more per hour ahead).
   The icing requests (ICON + UKMO with pressure levels, recognised by `surface_pressure`: the forecast view's, and
@@ -49,13 +51,13 @@ Every external request is answered locally, so the suites run offline and are re
 | File | Covers |
 |---|---|
 | `forecast.mjs` | combined request, charts, flight bar, 72 h window, Models mode, thresholds + reset, planner, language, saved forecast |
-| `forecast-now.mjs` | "Can I fly now?" card, wind aloft as a factor, models in the side menu, 8 days asked once (no request on window switch), daily limit, confidence legend |
+| `forecast-now.mjs` | "Can I fly now?" card, wind aloft as a factor, models in the side menu, 8 days asked once (no request on window switch), daily limit, confidence legend, the confidence text naming its group ("90% of members: suitable" with an uncertain hour, "… of models: …", Ukrainian) |
 | `forecast-scrub.mjs` | "Can I fly now?" hour scrubber: mouse and touch sliding (also off the strip), strip kept under the pointer, tap, ‹ › buttons, keyboard, card following the hour, shared pin with the flight bar, *Now*, *Map* |
 | `forecast-nav.mjs` | date / sunrise / sunset in the location card, card tiles and summary cards opening their chart at the hour in question, back-to-top button |
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line), caching, no reads while playing, Set location, centre button |
 | `map-layers.mjs` | side-menu map settings, products, source cards, colour keys, overlays, nearest lightning / fire, Cloud Mask class, wind arrows (and their pause near Open-Meteo's hourly limit, the per-minute pacing), place names |
-| `forecast-data.mjs` | forecast data: rain and gusts shifted to the hour they describe, requests always in m/s and mm (unit changes ask nothing, values converted), one saved record per model (removing / re-adding a model asks nothing, a new model is asked alone, quick taps make one request, Refresh asks all, records survive a reload), a cancelled request keeps its estimated cost |
+| `forecast-data.mjs` | forecast data: rain and gusts shifted to the hour they describe, requests always in m/s and mm (unit changes ask nothing, values converted), one saved record per model (removing / re-adding a model asks nothing, a new model is asked alone, quick taps make one request, Refresh asks all, records survive a reload), a cancelled request keeps its estimated cost; a model that always fails: asked once per load at first, then not on automatic loads (one toast, no "Offline", "Updated … · 1 model(s) missing"), again with Refresh (toast again) and after 30 min (silently), a limit reply keeping "Cached" while the retry waits, every model limited at a new place (the reason stays in the source line) |
 | `map-route-icing.mjs` | icing along the route in the flight time calculator: the route request (every second point and B, ICON + UKMO, the levels around the flight height), A's column from the forecast data or its own request, out / back / at-A lines, red stretches and the tag's ❄, panning without requests, +6 h climb and descent at A, 1500 m, one model, freezing rain code, hilly ground, no return flight, Ukrainian, the indicator off |
 | `map-route.mjs` | map defaults for new users, zoom 18; flight time calculator: Aim mode (B at the crosshair while panning, zoom keeps it, tap recentres), Tap mode (tap sets B, free map), switching between them, MGRS for A / B (waypoints, bad input, cancel, round trip), route tag (beside the line, stays in view, hidden off screen), start here, swap, clear, wind triangle, airspeed, height, return leg, hazards folded while open; one wind height for the calculator and the map's wind arrows (both directions, earlier '925' setting carried over) |
 | `map-drag.mjs` | lightning / fire stacks as one canvas each (also while stepping), no backdrop blur on map panels, readout kept open while dragging and read once settled (no reads in between, tiny moves reuse it), crosshair clear of the notes / readout, scrolling them by touch |
