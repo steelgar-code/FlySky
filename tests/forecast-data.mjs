@@ -134,6 +134,20 @@ await ctx.close();
     ok('next automatic load: nothing asked, no toast, still "Cached"', reqs().length - n2 === 1 && (await toasts()).length === t1 && /^Cached/.test(await meta()), { asked: reqs().slice(n2), meta: await meta() });
     o.forecastLimit = null;
 
+    // Every model held back at a place with nothing saved: the source line keeps the reason
+    // once the toast has closed; automatic loads ask nothing, Refresh asks.
+    o.forecastLimit = { n: 99, reason: 'Hourly API request limit exceeded. Please try again in one hour.' };
+    n2 = reqs().length;
+    await E(() => selectLocation({ name: 'Lviv', latitude: 49.84, longitude: 24.03, country: 'Ukraine' }));
+    await p.waitForTimeout(11500);   // the 10 s toast closes
+    const held = { asked: reqs().length - n2, toastsOpen: await p.locator('#toastContainer > div').count(), meta: await meta() };
+    await E(() => loadForecast()); await E(() => loadForecast()); await p.waitForTimeout(500);
+    held.after = reqs().length - n2; held.meta2 = await meta();
+    await p.click('#btnRefresh'); await p.waitForTimeout(2500);
+    held.refresh = reqs().length - n2;
+    ok('nothing saved, every model limited: the reason stays in the source line, automatic loads ask nothing, Refresh asks', held.asked === 1 && held.toastsOpen === 0 && /free limit reached for 3 model\(s\) \(Hourly/.test(held.meta) && held.after === 1 && held.meta2 === held.meta && held.refresh === 2, held);
+    o.forecastLimit = null;
+
     ok('no page errors (failing model)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
     await ctx2.close();
 }

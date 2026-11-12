@@ -4684,11 +4684,20 @@
             document.getElementById('precipUnitSelect').value = state.precipUnit;
         }
 
+        // Nothing to show: why, from the selected models' remembered failures
+        // (the toast has closed and the retry waits up to MODEL_RETRY_MS).
+        function heldBackReason() {
+            const fails = selectedModels().map(m => modelFailures.get(modelRecordKey(state.mode, state.location, m))).filter(Boolean);
+            const limited = fails.filter(f => f.rateLimited);
+            if (limited.length) return t('toastRateLimited', { n: limited.length, reason: limited[0].error });
+            return fails.length ? t('toastForecastError', { error: fails[0].error }) : '';
+        }
+
         function renderMeta() {
             const el = document.getElementById('forecastMeta');
             const fc = state.forecast;
             if (!state.location || !fc || fc.key !== forecastKey()) {
-                el.textContent = state.loading ? t('loading') : '';
+                el.textContent = state.loading ? t('loading') : state.location ? heldBackReason() : '';
                 return;
             }
             const time = dateFormat({ dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
