@@ -188,17 +188,21 @@ export async function routeAll(page, opts = {}) {
       // opts.forecastLimit = { n, reason }: the next n requests get Open-Meteo's 429 "limit exceeded".
       // opts.forecastValue(variable, k, model, member) → a value (undefined: the default), k = the
       // timestamp's hours from the current hour. Logged in log.forecastReq.
+      // opts.forecastModelFail = { model, reason, status }: any request naming that model fails
+      // (so a combined request fails too). opts.forecastMembers: members per ensemble model (6).
       log.forecastReq = (log.forecastReq || []).concat(url);
       if (opts.forecastLimit && opts.forecastLimit.n > 0) { opts.forecastLimit.n--; return route.fulfill({ status: 429, json: { error: true, reason: opts.forecastLimit.reason } }); }
       const u = new URL(url); const ens = url.includes('ensemble-api');
       const models = u.searchParams.get('models').split(','); const vars = u.searchParams.get('hourly').split(',');
+      const mf = opts.forecastModelFail;
+      if (mf && models.includes(mf.model)) return route.fulfill({ status: mf.status || 400, json: { error: true, reason: mf.reason } });
       const days = +(u.searchParams.get('forecast_days') || 2); const start = Math.floor(Date.now() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
       const hourly = { time };
       const nowIdx = Math.floor((Date.now() + 7200e3 - start) / 3600e3);
       models.forEach((m, mi) => {
         const suffix = models.length > 1 ? '_' + m : '';
-        const n = ens ? 6 : 1;
+        const n = ens ? opts.forecastMembers || 6 : 1;
         for (let k = 0; k < n; k++) {
           const mem = k ? `_member${String(k).padStart(2, '0')}` : '';
           const ph = (mi * 7 + k) * 0.37;

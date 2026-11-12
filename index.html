@@ -909,7 +909,8 @@
                 conf_high: "high confidence",
                 conf_medium: "medium confidence",
                 conf_low: "low confidence",
-                confHour: "confidence {level} ({pct})",
+                confShare_members: "{pct} of members: {status}",
+                confShare_models: "{pct} of models: {status}",
                 confSplit: "suitable {good} · uncertain {marginal} · not suitable {bad}",
                 confByModel: "by model",
                 confCause: "{conf} — {cause} uncertain",
@@ -1223,7 +1224,8 @@
                 conf_high: "висока впевненість",
                 conf_medium: "середня впевненість",
                 conf_low: "низька впевненість",
-                confHour: "впевненість {level} ({pct})",
+                confShare_members: "{pct} членів ансамблю: {status}",
+                confShare_models: "{pct} моделей: {status}",
                 confSplit: "придатно {good} · невизначено {marginal} · непридатно {bad}",
                 confByModel: "за моделями",
                 confCause: "{conf} — невизначеність: {cause}",
@@ -1537,7 +1539,8 @@
                 conf_high: "confiança alta",
                 conf_medium: "confiança média",
                 conf_low: "confiança baixa",
-                confHour: "confiança {level} ({pct})",
+                confShare_members: "{pct} dos membros: {status}",
+                confShare_models: "{pct} dos modelos: {status}",
                 confSplit: "adequado {good} · incerto {marginal} · inadequado {bad}",
                 confByModel: "por modelo",
                 confCause: "{conf} — incerteza: {cause}",
@@ -2911,8 +2914,35 @@
         const MODEL_CHANGE_DELAY_MS = 1000;
         let modelChangeTimer = null;
 
+        // Models whose last request failed (an error or a limit reply), in
+        // memory only: modelRecordKey → { at, error, rateLimited }. Without
+        // it a model with no data counts as due and is asked on every
+        // trigger (timer, return to the app, online). A network failure is
+        // not kept: it is tried on the next trigger.
+        const MODEL_RETRY_MS = 30 * 60 * 1000;
+        const modelFailures = new Map();
+
+        function recordStale(r, mode, days) {
+            return !r || r.days < days || Date.now() - r.fetchedAt >= FORECAST_MAX_AGE_MS[mode];
+        }
+
+        // "Cached forecast from …": a model's saved record is shown instead of
+        // new data because asking for it failed for the network or a limit
+        // (just now, or a limit kept from earlier while the record is due).
+        function shownFromCache(mode, loc, models, days, justFailed) {
+            return models.some(m => {
+                const key = modelRecordKey(mode, loc, m);
+                const r = modelRecords.get(key);
+                if (!r) return false;
+                if (justFailed.includes(m)) return true;
+                const f = modelFailures.get(key);
+                return !!f && f.rateLimited && recordStale(r, mode, days);
+            });
+        }
+
         // Asks only for the selected models whose saved forecast is missing,
         // older than the reuse time or too short for the window (force: all).
+        // A model that failed is asked again after MODEL_RETRY_MS, or on Refresh.
         async function loadForecast({ force = false } = {}) {
             if (!state.location) return;
             if (icingOn()) loadIcing({ force });
@@ -2924,14 +2954,20 @@
             const next = buildForecast(key, models, recs, cur && cur.key === key ? cur.errors : {});
             const changed = !!next && !(cur && cur.key === key && cur.fetchedAt === next.fetchedAt && Object.keys(cur.models).join() === Object.keys(next.models).join());
             if (changed) state.forecast = next;
-            const stale = r => !r || r.days < days || Date.now() - r.fetchedAt >= FORECAST_MAX_AGE_MS[mode];
-            const need = force ? models : models.filter((m, i) => stale(recs[i]));
+            // Due (stale) and asked now are kept apart: a model held back after
+            // a failure is still due, so its old data never passes for fresh.
+            const due = models.filter((m, i) => recordStale(recs[i], mode, days));
+            const failedRecently = m => {
+                const f = modelFailures.get(modelRecordKey(mode, loc, m));
+                return !!f && Date.now() - f.at < MODEL_RETRY_MS;
+            };
+            const need = force ? models : due.filter(m => !failedRecently(m));
             if (!need.length) {
                 const wasCache = state.forecastFromCache;
-                state.forecastFromCache = false;
+                state.forecastFromCache = shownFromCache(mode, loc, models, days, []);
                 // Same forecast and still the same hour: nothing to redraw
                 // (this runs on every return to the app and every 10 min).
-                if (!changed && !wasCache && processed && processed.stamp === renderStamp(state.forecast)) return;
+                if (!changed && wasCache === state.forecastFromCache && processed && processed.stamp === renderStamp(state.forecast)) return;
                 processForecast();
                 renderAll();
                 return;
@@ -2948,7 +2984,7 @@
                 inflightLoad.controller.abort();   // another place or mode: outdated
             }
             const controller = new AbortController();
-            const promise = runForecastLoad(base, need, days, controller);
+            const promise = runForecastLoad(base, need, days, controller, force);
             inflightLoad = { base, need, days, controller, promise };
             try {
                 await promise;
@@ -2962,7 +2998,7 @@
             return state.location ? `${state.mode}|${locationKey(state.location)}` : null;
         }
 
-        async function runForecastLoad(base, need, days, controller) {
+        async function runForecastLoad(base, need, days, controller, force) {
             const mode = state.mode, loc = state.location;
             setLoading(true);
             let results;
@@ -2987,6 +3023,16 @@
             }));
             records.forEach(rememberRecord);
             if (records.length) modelRecordsPut(records).catch(err => console.warn('FlySky: could not save the forecast.', err));
+            // Remember errors and limit replies (not network failures). Tell
+            // about one when it is new, or after Refresh; an automatic retry
+            // that fails the same way stays silent.
+            ok.forEach(r => modelFailures.delete(modelRecordKey(mode, loc, r.model)));
+            const told = failed.filter(r => {
+                if (r.network) return true;
+                const key = modelRecordKey(mode, loc, r.model), prev = modelFailures.get(key);
+                modelFailures.set(key, { at: now, error: r.error, rateLimited: !!r.rateLimited });
+                return force || !prev || prev.error !== r.error || prev.rateLimited !== !!r.rateLimited;
+            });
             // Another place or mode by now: the records are kept, nothing shown.
             if (forecastBase() !== base) return;
             const prevErrors = state.forecast && state.forecast.key === forecastKey() ? state.forecast.errors || {} : {};
@@ -2994,22 +3040,16 @@
             failed.forEach(r => { errors[r.model] = r.error; });
             const fc = forecastFromMemory();
             if (fc) fc.errors = errors;
-            if (!ok.length) {
-                console.error('FlySky: forecast request failed.', failed);
-                const limited = failed.find(r => r.rateLimited);
-                if (fc) state.forecastFromCache = true;
-                if (limited) {
-                    showToast(t('toastRateLimited', { n: failed.length, reason: limited.error }), 'warning');
-                } else if (fc) {
-                    showToast(t('toastUsingCache'), 'warning');
-                } else {
-                    showToast(t('toastForecastError', { error: failed.length ? failed[0].error : '?' }), 'warning');
-                }
+            if (failed.length) console.error('FlySky: forecast request failed.', failed);
+            state.forecastFromCache = shownFromCache(mode, loc, selectedModels(), days, failed.filter(r => r.network || r.rateLimited).map(r => r.model));
+            const limited = told.find(r => r.rateLimited);
+            if (limited) showToast(t('toastRateLimited', { n: failed.filter(r => r.rateLimited).length, reason: limited.error }), 'warning');
+            if (!fc) {
+                // Nothing to show at all.
+                if (!limited && told.length) showToast(t('toastForecastError', { error: told[0].error }), 'warning');
             } else {
-                state.forecastFromCache = false;
-                const limited = failed.find(r => r.rateLimited);
-                if (limited) showToast(t('toastRateLimited', { n: failed.filter(r => r.rateLimited).length, reason: limited.error }), 'warning');
-                failed.filter(r => !r.network && !r.rateLimited).forEach(r => {
+                if (told.some(r => r.network)) showToast(t('toastUsingCache'), 'warning');
+                told.filter(r => !r.network && !r.rateLimited).forEach(r => {
                     const m = modeModels().find(x => x.id === r.model);
                     showToast(t('toastModelFailed', { model: m ? m.name : r.model, error: r.error }), 'warning');
                 });
@@ -3395,9 +3435,11 @@
         const CONF_BG = { high: '#67e8f9', medium: '#0e7490', low: 'repeating-linear-gradient(135deg, #94a3b8 0 1.5px, #1e293b 1.5px 4px)' };
         const CONF_TEXT = { high: '#67e8f9', medium: '#22d3ee', low: '#94a3b8' };
 
+        // The share of the largest group, named with that group's verdict
+        // (it can differ from the hour's median verdict).
         function confText(h) {
             const a = h.agree;
-            return a ? t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }) : '';
+            return a ? t(state.mode === 'ensemble' ? 'confShare_members' : 'confShare_models', { pct: formatPercent(a.conf * 100), status: t(FLIGHT_STATUS[a.top].labelKey).toLocaleLowerCase(currentLang) }) : '';
         }
 
         function confCellsHtml(hours) {
@@ -3589,7 +3631,7 @@
             const verdict = `<div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
                 <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-base font-bold border" style="color: ${st.color}; background: ${st.color}1f; border-color: ${st.color}66">
                     <i class="fa-solid ${st.icon}"></i>${escapeHtml(t(st.labelKey))}</span>
-                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(t('confHour', { level: t('confLevel_' + a.level), pct: formatPercent(a.conf * 100) }))}</span>` : ''}</span>
+                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(confText(h))}</span>` : ''}</span>
                 ${strong ? `<span data-icing-flag="${strong}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold text-white" style="background: #d03b3b" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i>${escapeHtml(t('icingFlag'))}</span>` : ''}
                 <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}" class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>
             </div>`;
