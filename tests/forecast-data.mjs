@@ -1,7 +1,8 @@
 // Forecast data handling: rain and gusts describe the hour before their timestamp (shifted by
 // one hour), values always asked in m/s and mm and converted in the browser (a unit change asks
 // nothing), one saved record per model (removing a model asks nothing, adding one asks only for
-// it, quick model taps make one request), and a cancelled request keeps its estimated cost.
+// it, quick model taps make one request), a cancelled request keeps its estimated cost, and a
+// model that fails is asked again only after 30 minutes or on Refresh.
 import { routeAll } from './lib/mock.mjs';
 import { launch, BASE_URL, ok } from './lib/env.mjs';
 const b = await launch();
@@ -75,4 +76,65 @@ ok('a cancelled request is logged with its estimated cost (it has usually been c
 
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await ctx.close();
+
+// ---- A model that fails is not asked on every trigger (Models mode, GEM always answers 400)
+{
+    const ctx2 = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    const p = await ctx2.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    // Every toast shown (they close after 10 s, so the container alone is not enough).
+    await p.addInitScript(() => {
+        window.toastLog = [];
+        document.addEventListener('DOMContentLoaded', () => new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => window.toastLog.push(n.textContent.trim()))))
+            .observe(document.getElementById('toastContainer'), { childList: true }));
+    });
+    const o = { forecastModelFail: { model: 'gem_seamless', reason: 'No data is available for this location', status: 400 } };
+    const { log: l2 } = await routeAll(p, o);
+    await p.goto(BASE_URL);
+    await p.evaluate(() => {
+        localStorage.clear();
+        localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 }));
+        localStorage.setItem('flysky_mode', JSON.stringify('deterministic'));
+        localStorage.setItem('flysky_models_by_mode', JSON.stringify({ deterministic: ['icon_seamless', 'ecmwf_ifs025', 'gem_seamless'] }));
+    });
+    await p.reload(); await p.waitForTimeout(5000);
+    const E = fn => p.evaluate(fn);
+    const reqs = () => (l2.forecastReq || []).filter(u => !u.includes('surface_pressure') && !u.includes('ensemble-api')).map(u => new URL(u).searchParams.get('models'));
+    const toasts = () => E(() => window.toastLog);
+    const gemToasts = async () => (await toasts()).filter(x => /GEM unavailable: No data is available/.test(x)).length;
+    const meta = () => p.locator('#forecastMeta').innerText();
+    ok('failing model: combined request, then one per model', JSON.stringify(reqs()) === JSON.stringify(['icon_seamless,ecmwf_ifs025,gem_seamless', 'icon_seamless', 'ecmwf_ifs025', 'gem_seamless']), reqs());
+    let n2 = reqs().length;
+    for (let i = 0; i < 3; i++) await E(() => loadForecast());
+    await p.waitForTimeout(500);
+    ok('three more loads (automatic triggers): nothing asked', reqs().length === n2, reqs().slice(n2));
+    ok('one "unavailable" toast in all, no "Offline" toast', await gemToasts() === 1 && !(await toasts()).some(x => /Offline/.test(x)), await toasts());
+    let m = await meta();
+    ok('source line: "Updated", not "Cached", one model missing', /^Updated/.test(m) && !/Cached/.test(m) && /1 model\(s\) missing/.test(m), m);
+    await p.click('#btnRefresh'); await p.waitForTimeout(2500);
+    ok('Refresh asks for the failed model again', reqs().slice(n2).some(x => x.split(',').includes('gem_seamless')), reqs().slice(n2));
+    ok('Refresh: the toast shows again', await gemToasts() === 2, await toasts());
+    n2 = reqs().length;
+    const t0 = (await toasts()).length;
+    await E(() => { modelFailures.forEach(f => { f.at -= 31 * 60 * 1000; }); return loadForecast(); });
+    await p.waitForTimeout(500);
+    ok('after 30 min one automatic load asks for it once, silently', JSON.stringify(reqs().slice(n2)) === '["gem_seamless"]' && (await toasts()).length === t0, { asked: reqs().slice(n2), toasts: (await toasts()).slice(t0) });
+    m = await meta();
+    ok('…and the source line stays "Updated … 1 model(s) missing"', /^Updated/.test(m) && /1 model\(s\) missing/.test(m), m);
+
+    // A daily limit on due records: the old data stays "Cached" while the retry is held back.
+    o.forecastLimit = { n: 99, reason: 'Daily API request limit exceeded. Please try again tomorrow.' };
+    n2 = reqs().length;
+    await E(() => { modelRecords.forEach(r => { r.fetchedAt -= 24 * 3600e3; }); return loadForecast(); });
+    await p.waitForTimeout(500);
+    ok('limit reply on due records: one request, "Cached" source line', reqs().length - n2 === 1 && /^Cached/.test(await meta()), { asked: reqs().slice(n2), meta: await meta() });
+    const t1 = (await toasts()).length;
+    await E(() => loadForecast());
+    await p.waitForTimeout(500);
+    ok('next automatic load: nothing asked, no toast, still "Cached"', reqs().length - n2 === 1 && (await toasts()).length === t1 && /^Cached/.test(await meta()), { asked: reqs().slice(n2), meta: await meta() });
+    o.forecastLimit = null;
+
+    ok('no page errors (failing model)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
+    await ctx2.close();
+}
 await b.close();
