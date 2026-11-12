@@ -67,6 +67,12 @@ FlySky is static files with no build step: `index.html` (forecast), `map.js` (sa
 
 When changing `map.js`, `hazard.js` or `icing.js`, bump their `?v=` in `index.html` and in `sw.js`, and the service worker cache version.
 
+## Documentation
+
+- [`docs/plan-2026-11.md`](docs/plan-2026-11.md) — the current work plan: the 2026-11 review checked against the code, what is done, what is next, open decisions.
+- [`docs/FlySky-review-2026-11.md`](docs/FlySky-review-2026-11.md) — documentation and code review with suggestions (2026-11).
+- [`docs/icing-forecast-handoff.md`](docs/icing-forecast-handoff.md) — the icing indicator's design, data checks and decisions; Phase 0 scripts in [`docs/icing-phase0/`](docs/icing-phase0/).
+
 ## Tests
 
 Browser tests (Playwright, all external services mocked) live in [`tests/`](tests/README.md):

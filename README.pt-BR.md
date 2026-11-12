@@ -67,6 +67,12 @@ O FlySky é feito de arquivos estáticos, sem etapa de build: `index.html` (prev
 
 Ao alterar `map.js`, `hazard.js` ou `icing.js`, aumente o `?v=` deles em `index.html` e em `sw.js`, e a versão do cache do service worker.
 
+## Documentação
+
+- [`docs/plan-2026-11.md`](docs/plan-2026-11.md) — plano de trabalho atual: a revisão de 2026-11 conferida com o código, o que está feito, o que vem a seguir, decisões em aberto (em inglês).
+- [`docs/FlySky-review-2026-11.md`](docs/FlySky-review-2026-11.md) — revisão da documentação e do código com sugestões (2026-11, em inglês).
+- [`docs/icing-forecast-handoff.md`](docs/icing-forecast-handoff.md) — projeto do indicador de gelo, verificações dos dados e decisões (em inglês); scripts da Fase 0 em [`docs/icing-phase0/`](docs/icing-phase0/).
+
 ## Testes
 
 Os testes de navegador (Playwright, com todos os serviços externos simulados) ficam em [`tests/`](tests/README.md) (descrição em inglês):
