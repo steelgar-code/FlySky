@@ -1,6 +1,7 @@
 // "Can I fly now?" card, wind aloft as a flight factor, models in the side menu,
 // Open-Meteo request budget (no refetch on window switch, limits), confidence legend, the
-// confidence text naming its group ("90% of members: suitable").
+// confidence text naming its group ("90% of members: suitable"); the flight conditions card
+// (low-confidence hatch, the ⓘ panel, the pinned hour's lines, its height on a phone).
 import { routeAll } from './lib/mock.mjs';
 import { launch, BASE_URL, ok } from './lib/env.mjs';
 const b = await launch();
@@ -60,8 +61,9 @@ ok('8 days requested', /forecast_days=8/.test(forecastReqs.at(-1)), forecastReqs
 for (const w of ['48', '72', '168', '24']) { await page.click(`#windowButtons [data-window="${w}"]`); await page.waitForTimeout(600); }
 ok('window switches: no new requests', forecastReqs.length === n0, forecastReqs.length - n0);
 
-// Confidence legend: the three levels stay together (one line each, never split)
-ok('confidence legend levels kept whole', await I(() => [...document.querySelectorAll('#flightConfLegend > span:last-child > span')].every(s => s.getBoundingClientRect().height < 16)));
+// Confidence on the hour bar: one short legend line (the hatch key and the ⓘ), no strip or level legend
+const legend = await I(() => { const k = document.getElementById('flightHatchKey'); return { text: k.innerText.trim(), shown: !k.classList.contains('hidden'), h: k.parentElement.getBoundingClientRect().height, info: !!document.querySelector('#flightMain #btnFlightInfo'), gone: ['flightConf', 'flightConfLegend'].filter(id => document.getElementById(id)) }; });
+ok('confidence legend: one short line, "low confidence" and the ⓘ; no confidence strip', legend.shown && legend.text === 'low confidence' && legend.h < 30 && legend.info && !legend.gone.length, legend);
 
 // Daily limit: one request, no per-model retries, one toast, forecast kept
 opts.forecastLimit = { n: 99, reason: 'Daily API request limit exceeded. Please try again tomorrow.' };
@@ -106,7 +108,7 @@ opts.forecastValue = (v, k, m, member) => (v === 'precipitation' ? (k === 1 && m
 await page.click('#btnRefresh'); await page.waitForTimeout(2500);
 let nowText = await page.locator('#nowMain').innerText();
 ok('10 % of members wet: "Uncertain" and "90% of members: suitable"', /Uncertain/.test(nowText) && /90% of members: suitable/.test(nowText), nowText.split('\n').slice(0, 3).join(' | '));
-ok('confidence strip cell title names the group too', await I(() => [...document.querySelectorAll('[data-flight-hour][title]')].some(e => /90% of members: suitable/.test(e.title))));
+ok('hour bar cell title names the group too', await I(() => [...document.querySelectorAll('#flightStrip [data-flight-hour][title]')].some(e => /90% of members: suitable/.test(e.title))));
 // Models mode: one of the five default models wet → 80 % of models suitable.
 opts.forecastValue = (v, k, m) => (v === 'precipitation' ? (k === 1 && m === 'icon_seamless' ? 2 : 0) : calm(v, k));
 await page.click('[data-mode="deterministic"]'); await page.waitForTimeout(3500);
@@ -144,6 +146,86 @@ const srcUk = await I(() => ({ text: document.getElementById('forecastMeta').inn
 ok('Ukrainian: "Оновлено …" and "Моделі · N"', /^Оновлено \d\d:\d\d$|^Оновлено \S+ \d\d:\d\d$/.test(srcUk.text) && /^Моделі · \d+$/.test(srcUk.label), srcUk);
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
 ok('English again: the Models label is not overwritten by the static string', /^Models · \d+$/.test(await page.locator('#modelsButton').innerText()));
+
+// Batch 1f: the flight conditions card. A 390 px phone with touch, the mock's icing scenario,
+// hour 1 pinned. Before the batch the part of the card above its first folding section was
+// 630 px (the hour bar, three strips, two legends and the pinned hour's ~20 lines; measured at
+// 8990e25 with the same steps); the whole card 2,004 px with the breakdown and the profile open.
+{
+  const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+  const p2 = await ctx2.newPage();
+  p2.on('pageerror', e => errors.push(e.message));
+  await routeAll(p2, {});
+  await p2.goto(BASE_URL);
+  await p2.evaluate(() => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 })); });
+  await p2.reload(); await p2.waitForTimeout(5000);
+  const J = (fn, arg) => p2.evaluate(fn, arg);
+  const OLD_TOP = 630;
+
+  // Low confidence: a light hatch over the hour's colour, only there; none in Split by share.
+  const hatch = () => J(() => [...document.querySelectorAll('#flightStrip [data-flight-hour]')].map((c, i) => ({ i, low: c.hasAttribute('data-low-conf'), img: getComputedStyle(c).backgroundImage, level: (processed.flight.hours[i].agree || {}).level })));
+  let cells = await hatch();
+  const lowC = cells.find(c => c.level === 'low'), highC = cells.find(c => c.level && c.level !== 'low');
+  ok('a low-confidence hour carries the hatch, a medium / high one does not', lowC && highC && lowC.low && /repeating-linear-gradient/.test(lowC.img) && !highC.low && highC.img === 'none' && cells.every(c => c.low === (c.level === 'low')), { low: lowC, high: highC });
+  await p2.tap('#btnFlightSplit'); await p2.waitForTimeout(300);
+  cells = await hatch();
+  ok('Split by share: no hatch (the shares are drawn), no hatch key', cells.every(c => !c.low && !/repeating/.test(c.img)) && await J(() => document.getElementById('flightHatchKey').classList.contains('hidden')));
+  await p2.tap('#btnFlightSplit'); await p2.waitForTimeout(300);
+
+  // The ⓘ panel: touch, mouse, keyboard; Escape; the settings drawer keeps its own Escape.
+  const panel = () => J(() => ({ open: !document.getElementById('flightInfo').classList.contains('hidden'), expanded: document.getElementById('btnFlightInfo').getAttribute('aria-expanded'), controls: document.getElementById('btnFlightInfo').getAttribute('aria-controls'), text: document.getElementById('flightInfo').innerText.replace(/\s*\n\s*/g, ' '), focus: document.activeElement && document.activeElement.id }));
+  await p2.tap('#btnFlightInfo'); await p2.waitForTimeout(200);
+  let pn = await panel();
+  ok('ⓘ by touch: the panel opens (aria-expanded, aria-controls) and explains colours, hatch, band and split', pn.open && pn.expanded === 'true' && pn.controls === 'flightInfo' && /green suitable, yellow uncertain, red not suitable/.test(pn.text) && /Hatched: low confidence — fewer than 60 % of the members agree/.test(pn.text) && /sky blue daylight, indigo night/.test(pn.text) && /“Split by share” stacks each hour/.test(pn.text), pn);
+  await p2.tap('#btnFlightInfo'); await p2.waitForTimeout(200);
+  ok('ⓘ by touch: a second tap closes it', !(await panel()).open);
+  await p2.click('#btnFlightInfo'); await p2.waitForTimeout(200);
+  ok('ⓘ by mouse: opens', (await panel()).open);
+  await p2.click('#btnIcingInfo'); await p2.waitForTimeout(200);
+  ok('one ⓘ panel at a time', !(await panel()).open && await J(() => !document.getElementById('icingInfo').classList.contains('hidden')));
+  await p2.click('#btnIcingInfo'); await p2.waitForTimeout(200);
+  await J(() => document.getElementById('btnFlightInfo').focus());
+  await p2.keyboard.press('Enter'); await p2.waitForTimeout(200);
+  ok('ⓘ by keyboard: Enter opens', (await panel()).open);
+  await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
+  pn = await panel();
+  ok('Escape closes it, the focus back on the ⓘ', !pn.open && pn.expanded === 'false' && pn.focus === 'btnFlightInfo', pn);
+  await p2.keyboard.press('Space'); await p2.waitForTimeout(200);
+  await J(() => setSettingsDrawer(true)); await p2.waitForTimeout(400);
+  await p2.keyboard.press('Escape'); await p2.waitForTimeout(400);
+  const drawerOpen = () => J(() => !document.getElementById('settingsDrawer').classList.contains('-translate-x-full'));
+  ok('with the settings drawer open, Escape closes the drawer only', !(await drawerOpen()) && (await panel()).open);
+  await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
+  ok('…the next Escape the panel', !(await panel()).open);
+
+  // The pinned hour: time · verdict · flag · Map; values; confidence; the split, then the
+  // models' shares on a line of their own named by the largest group's verdict; one icing line.
+  await p2.tap('#flightStrip [data-flight-hour="1"]'); await p2.waitForTimeout(400);
+  const pin = await J(() => {
+    const d = document.getElementById('flightDetail'), q = s => d.querySelector(s);
+    const split = q('[data-conf-split]'), models = q('[data-conf-models]');
+    return { head: q('[data-hour-head]').innerText.replace(/\s+/g, ' ').trim(), map: !!q('[data-hour-head] [data-flight-map]'), values: q('[data-hour-values]').innerText, conf: q('[data-hour-conf]').innerText,
+      split: split.firstElementChild.innerText, models: models ? models.innerText : '', below: models ? models.getBoundingClientRect().top >= split.firstElementChild.getBoundingClientRect().bottom - 1 : false,
+      top: t(FLIGHT_STATUS[processed.flight.hours[1].agree.top].labelKey), icing: d.querySelectorAll('[data-icing-line]').length, text: d.innerText };
+  });
+  ok('pinned hour, line 1: time, verdict, "Icing risk", Map', /^\w{3} \d\d:\d\d (Suitable|Uncertain|Not suitable) Icing risk Map$/.test(pin.head) && pin.map, pin.head);
+  ok('pinned hour, lines 2 and 3: the values, the confidence', /rain chance .* wind .* gusts/.test(pin.values) && /^\d+% of members: (suitable|uncertain|not suitable)$/.test(pin.conf), pin);
+  ok('pinned hour: the split, then "Uncertain: …" (the largest group\'s verdict) on its own line, no "by model"', /^suitable \d+% · uncertain \d+% · not suitable \d+%$/.test(pin.split) && new RegExp(`^${pin.top}: DWD ICON-EU \\d+% · `).test(pin.models) && pin.below && !/by model/.test(pin.text), pin);
+  ok('pinned hour: icing in one line', pin.icing === 1 && !/climb:|Experimental screening/.test(pin.text), pin.text);
+  const hs = await J(() => { const c = document.getElementById('flightCard').getBoundingClientRect().top, at = id => Math.round(document.getElementById(id).getBoundingClientRect().top - c);
+    return { top: at('icingSection'), breakdown: at('btnFlightDetails'), whole: document.getElementById('flightCard').offsetHeight }; });
+  console.log(`    pinned card at 390 px: ${hs.top} px above the icing section (was ${OLD_TOP} px above the first folding section), ${hs.breakdown} px above "Breakdown by cause", whole card ${hs.whole} px (breakdown and icing folded, planner open)`);
+  ok('pinned card on a phone: the hour bar and the hour\'s details at most about half their old height (≤ 55 %)', hs.top <= OLD_TOP * 0.55, { ...hs, old: OLD_TOP });
+  ok('no horizontal scroll at 390 px', await J(() => document.documentElement.scrollWidth <= 390));
+
+  // Three languages: the ⓘ text.
+  for (const [lang, re] of [['uk', /Штрихування: низька впевненість — менше 60 % членів ансамблю згодні/], ['pt-BR', /Hachurado: confiança baixa — menos de 60 % dos membros concordam/]]) {
+    await p2.selectOption('#langSelect', lang); await p2.waitForTimeout(600);
+    const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, key: document.getElementById('flightHatchKey').innerText.trim(), label: document.getElementById('btnFlightInfo').getAttribute('aria-label') }));
+    ok(`${lang}: the ⓘ panel, its label and the hatch key`, re.test(tx.info) && tx.key === (lang === 'uk' ? 'низька впевненість' : 'confiança baixa') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
+  }
+  await ctx2.close();
+}
 
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await b.close();

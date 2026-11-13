@@ -180,8 +180,17 @@
         input:checked + .fs-switch::after { transform: translateX(14px); background: #fff; }
         input:focus-visible + .fs-switch { outline: 2px solid #22d3ee; outline-offset: 2px; }
 
-        /* Hour pinned on the main flight bar. */
-        #flightStrip [data-pinned] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        /* Hour pinned on the main flight bar; hour the icing section details. */
+        #flightStrip [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        /* Low confidence (under 60 % agreeing) on the main flight bar: a light
+           hatch over the hour's colour (inline background-color stays). */
+        #flightStrip [data-low-conf], [data-hatch-swatch] { background-image: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0 1.5px, transparent 1.5px 5px) !important; }
+        [data-hatch-swatch] { background-color: #64748b; }
+        /* ⓘ buttons: a tap target larger than the icon. */
+        .info-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: -4px 0; border-radius: 6px; color: #64748b; }
+        .info-btn:hover, .info-btn[aria-expanded="true"] { color: #67e8f9; }
+        .info-btn:focus-visible { outline: 2px solid #22d3ee; outline-offset: 0; }
+        #icingCell:empty { display: none; }
         #nowStrip { touch-action: pan-y; cursor: ew-resize; -webkit-user-select: none; user-select: none; }
         #nowStrip:focus { outline: none; }
         #nowStrip:focus-visible #nowMarker { border-color: #22d3ee; }
@@ -331,21 +340,56 @@
                         <i class="fa-solid fa-chart-simple"></i><span data-i18n="flightSplitToggle">Split by share</span>
                     </button>
                 </div>
+                <!-- One bar: the verdict per hour (hatched where the confidence is low), the day / night band, the axis -->
                 <div id="flightMain">
                     <div class="relative">
                         <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                         <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                     </div>
-                    <!-- Forecast confidence (members / models agreeing) -->
-                    <div id="flightConf" class="flex h-1.5 mt-1 rounded-full overflow-hidden bg-slate-950 cursor-crosshair"></div>
-                    <!-- Icing indicator (experimental): its state per hour -->
-                    <div id="flightIcing" class="hidden flex h-1.5 mt-1 rounded-full overflow-hidden bg-slate-950 cursor-crosshair"></div>
                     <div data-daynight class="h-1.5 mt-1 rounded-full"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
-                    <p id="flightConfLegend" class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-slate-500"></p>
-                    <p id="flightIcingLegend" class="hidden text-[10px] text-slate-500 mt-0.5"></p>
+                    <!-- One short legend line; the ⓘ explains the colours, the hatch, the band and the split -->
+                    <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                        <span id="flightHatchKey" class="hidden inline-flex items-center gap-1"><span class="legend-swatch" data-hatch-swatch></span><span data-i18n="conf_low">low confidence</span></span>
+                        <button type="button" id="btnFlightInfo" class="info-btn" data-info-btn aria-expanded="false" aria-controls="flightInfo" data-i18n-title="flightInfoTitle" data-i18n-aria-label="flightInfoTitle" title="What the bar shows" aria-label="What the bar shows"><i class="fa-solid fa-circle-info"></i></button>
+                    </div>
+                    <div id="flightInfo" data-info-panel class="hidden mt-1 rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2 text-[11px] text-slate-400 space-y-1"></div>
                 </div>
-                <p id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></p>
+                <div id="flightDetail" class="text-xs text-slate-300 min-h-[1rem]"></div>
+
+                <!-- Icing (experimental): the strip per hour, aligned with the bar; open: the profile and the selected hour -->
+                <div id="icingSection" class="hidden pt-2 border-t border-slate-800/80">
+                    <div class="flex items-center gap-1">
+                        <button type="button" id="btnIcing" class="flex-1 min-w-0 flex items-center gap-2 py-1 text-left text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="icingBody">
+                            <i id="icingChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
+                            <i class="fa-solid fa-snowflake text-sky-300"></i><span data-i18n="icingTitle">Icing</span>
+                            <span class="text-[9px] uppercase tracking-wider text-slate-500 border border-slate-700 rounded px-1" data-i18n="icingExperimental">experimental</span>
+                        </button>
+                        <button type="button" id="btnIcingInfo" class="info-btn" data-info-btn aria-expanded="false" aria-controls="icingInfo" data-i18n-title="icingInfoTitle" data-i18n-aria-label="icingInfoTitle" title="About the icing indicator" aria-label="About the icing indicator"><i class="fa-solid fa-circle-info"></i></button>
+                    </div>
+                    <div id="icingInfo" data-info-panel class="hidden mt-1 rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2 text-[11px] text-slate-400 space-y-1">
+                        <p data-i18n="icingInfoWhat"></p>
+                        <p data-i18n="icingInfoNot"></p>
+                        <p data-i18n="icingInfoColours"></p>
+                    </div>
+                    <div class="relative mt-1.5">
+                        <div id="icingStrip" class="flex rounded-full overflow-hidden bg-slate-950 cursor-pointer" style="height: 10px"></div>
+                        <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
+                    </div>
+                    <div id="icingBody" class="hidden space-y-2 pt-3">
+                        <div class="relative">
+                            <div id="icingProfile" class="rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
+                            <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
+                            <div id="icingProfileMark" class="absolute pointer-events-none" style="top: 0; bottom: 0; box-shadow: inset 0 0 0 1.5px #f8fafc"></div>
+                        </div>
+                        <div>
+                            <div data-daynight class="h-1.5 rounded-full"></div>
+                            <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                        </div>
+                        <div id="icingCell" class="text-[11px] text-slate-400 min-h-[1rem]"></div>
+                        <div id="icingHour" class="text-[11px] text-slate-400 rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2"></div>
+                    </div>
+                </div>
 
                 <!-- Per-cause breakdown (collapsible) -->
                 <div class="pt-2 border-t border-slate-800/80">
@@ -363,27 +407,6 @@
                         <div id="factorDetail" class="text-xs text-slate-300 min-h-[2.5rem] rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2"></div>
                         <p class="text-[11px] text-slate-500" data-i18n="flightHint">Based on median values of the selected models · hover or tap a bar for details</p>
                         <div id="flightLegend" class="flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-slate-400"></div>
-                    </div>
-                </div>
-
-                <!-- Icing profile (experimental, collapsible): model levels × hours -->
-                <div id="icingProfileSection" class="hidden pt-2 border-t border-slate-800/80">
-                    <button type="button" id="btnIcingProfile" class="w-full flex items-center gap-2 py-1 text-left text-xs font-medium text-slate-400 hover:text-slate-200 transition" aria-expanded="false" aria-controls="icingProfileBody">
-                        <i id="icingProfileChevron" class="fa-solid fa-chevron-down text-[10px] transition-transform"></i>
-                        <i class="fa-solid fa-snowflake text-sky-300"></i><span data-i18n="icingProfileToggle">Icing profile</span>
-                        <span class="text-[9px] uppercase tracking-wider text-slate-500 border border-slate-700 rounded px-1" data-i18n="icingExperimental">experimental</span>
-                    </button>
-                    <div id="icingProfileBody" class="hidden space-y-2 pt-3">
-                        <div class="relative">
-                            <div id="icingProfileRows" class="rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
-                            <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
-                        </div>
-                        <div>
-                            <div data-daynight class="h-1.5 rounded-full"></div>
-                            <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
-                        </div>
-                        <div id="icingProfileDetail" class="text-[11px] text-slate-300 min-h-[1.25rem]"></div>
-                        <p class="text-[11px] text-slate-500" data-i18n="icingProfileHint">Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, grey no signs, hatched no data). The dashed line is the flight altitude.</p>
                     </div>
                 </div>
 
@@ -911,19 +934,19 @@
                 nowCloudClear: "Satellite now: no cloud at your location — forecast for this hour: low clouds {v}%.",
                 nowCaution: "The forecast is off right now — treat the next hours with caution.",
                 flightSplitTitle: "Split each hour by the share of members / models per verdict",
-                confLegend: "Forecast confidence ({what} agreeing):",
                 confWhatMembers: "members",
                 confWhatModels: "models",
-                confLevel_high: "high",
-                confLevel_medium: "medium",
-                confLevel_low: "low",
+                flightInfoTitle: "What the bar shows",
+                flightInfoColours: "Each cell is an hour: green suitable, yellow uncertain, red not suitable — the median of the selected models checked against your limits.",
+                flightInfoHatch: "Hatched: low confidence — fewer than 60 % of the {what} agree on one verdict. The exact share is in the hour's details.",
+                flightInfoBand: "The thin band under the bar: sky blue daylight, indigo night; dotted lines mark midnight.",
+                flightInfoSplit: "“Split by share” stacks each hour by the share of {what} per verdict: suitable at the bottom, then uncertain, then not suitable. Tap an hour to pin its details.",
                 conf_high: "high confidence",
                 conf_medium: "medium confidence",
                 conf_low: "low confidence",
                 confShare_members: "{pct} of members: {status}",
                 confShare_models: "{pct} of models: {status}",
                 confSplit: "suitable {good} · uncertain {marginal} · not suitable {bad}",
-                confByModel: "by model",
                 confCause: "{conf} — {cause} uncertain",
                 confCause_rain: "rain",
                 confCause_wind: "wind",
@@ -999,10 +1022,11 @@
                 icingPhaseDescent: "descent",
                 icingPartlyUnknown: "partly beyond the models' data",
                 icingFlightDesc: "{dur} at {h} m above takeoff, climb {c} m/s, descent {d} m/s",
-                icingDetailNote: "Experimental screening (DWD ICON, UK Met Office): sub-zero air near saturation (RH ≥ {rh} % over water), freezing fog, freezing rain and drizzle. Not a validated icing forecast. Assumes no ice protection, an unheated pitot tube and a fixed-wing climb (not a VTOL hover). In icing, propeller thrust and airspeed readings can be lost within 1–3 min and the ice stays on — keep out of icing layers rather than passing through.",
-                icingStripLegend: "Lower strip: icing (experimental) — red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead.",
-                icingProfileToggle: "Icing profile",
-                icingProfileHint: "Each row is a model level at its usual height above the ground here, each column an hour; colour: the worse of the two models (red potential icing, yellow marginal, grey no signs, hatched no data). The dashed line is the flight altitude.",
+                icingInfoTitle: "About the icing indicator",
+                icingInfoWhat: "What this shows: where two forecast models (DWD ICON, UK Met Office) have air below 0 °C that is nearly saturated, freezing fog, or freezing rain or drizzle, on a climb to your flight altitude, the cruise and the descent.",
+                icingInfoNot: "It is not an icing forecast: 'no icing signs' does not mean safe. It assumes a fixed-wing drone without ice protection. In icing, thrust and airspeed readings can be lost within 1–3 minutes and the ice stays on — stay out of icing layers rather than flying through them.",
+                icingInfoColours: "Colours: red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead. In the profile each row is a model level at its usual height here; the dashed line is your flight altitude.",
+                icingDetailsLink: "Icing details",
                 planIcing: "Icing signs {from}–{to}",
                 icingFzdz: "freezing drizzle from low stratus",
                 icingRangeM: "({from}–{to} m)",
@@ -1231,19 +1255,19 @@
                 nowCloudClear: "Супутник зараз: над локацією хмар немає — прогноз на цю годину: низька хмарність {v}%.",
                 nowCaution: "Прогноз зараз не збігається з дійсністю — до найближчих годин ставтеся обережно.",
                 flightSplitTitle: "Розділити кожну годину за часткою членів ансамблю / моделей для кожного висновку",
-                confLegend: "Впевненість прогнозу (згода {what}):",
                 confWhatMembers: "членів ансамблю",
                 confWhatModels: "моделей",
-                confLevel_high: "висока",
-                confLevel_medium: "середня",
-                confLevel_low: "низька",
+                flightInfoTitle: "Що показує смуга",
+                flightInfoColours: "Кожна клітинка — година: зелений — придатно, жовтий — невизначено, червоний — непридатно; це медіана вибраних моделей, перевірена за вашими межами.",
+                flightInfoHatch: "Штрихування: низька впевненість — менше 60 % {what} згодні щодо оцінки. Точна частка — у деталях години.",
+                flightInfoBand: "Тонка смужка під нею: блакитний — день, індиго — ніч; пунктир позначає північ.",
+                flightInfoSplit: "«Частки» ділять кожну годину за часткою {what} для кожної оцінки: знизу придатно, вище невизначено, згори непридатно. Торкніться години, щоб закріпити її деталі.",
                 conf_high: "висока впевненість",
                 conf_medium: "середня впевненість",
                 conf_low: "низька впевненість",
                 confShare_members: "{pct} членів ансамблю: {status}",
                 confShare_models: "{pct} моделей: {status}",
                 confSplit: "придатно {good} · невизначено {marginal} · непридатно {bad}",
-                confByModel: "за моделями",
                 confCause: "{conf} — невизначеність: {cause}",
                 confCause_rain: "опади",
                 confCause_wind: "вітер",
@@ -1319,10 +1343,11 @@
                 icingPhaseDescent: "зниження",
                 icingPartlyUnknown: "частково поза даними моделей",
                 icingFlightDesc: "{dur} на {h} м над точкою зльоту, набір {c} м/с, зниження {d} м/с",
-                icingDetailNote: "Експериментальна перевірка (DWD ICON, UK Met Office): повітря з від'ємною температурою, близьке до насичення (вологість ≥ {rh} % над водою), крижаний туман, крижаний дощ і мряка. Це не перевірений прогноз обледеніння. Припущення: без протиобледенювальної системи, ПВД без підігріву, набір висоти літаком (не зависання VTOL). В обледенінні тягу гвинта й показання швидкості можна втратити за 1–3 хв, а лід лишається — оминайте шари обледеніння, а не пролітайте крізь них.",
-                icingStripLegend: "Нижня смужка: обледеніння (експериментально) — червоний: можливе обледеніння, жовтий: межові умови, сірий: ознак немає, штрихування: немає даних; смуги: лише одна модель; блідо: понад 3 доби вперед.",
-                icingProfileToggle: "Профіль обледеніння",
-                icingProfileHint: "Кожен рядок — рівень моделі на його звичайній висоті над землею тут, кожен стовпчик — година; колір — гірший із двох моделей (червоний: можливе обледеніння, жовтий: межові умови, сірий: ознак немає, штрихування: немає даних). Пунктир — висота польоту.",
+                icingInfoTitle: "Про індикатор обледеніння",
+                icingInfoWhat: "Що це показує: де дві моделі прогнозу (DWD ICON, UK Met Office) мають повітря нижче 0 °C, майже насичене вологою, крижаний туман або крижаний дощ чи мряку — під час набору до вашої висоти польоту, у польоті на ній і під час зниження.",
+                icingInfoNot: "Це не прогноз обледеніння: «ознак обледеніння немає» не означає «безпечно». Розраховано на дрон літакового типу без протиобледенювальної системи. В обледенінні тягу й показання швидкості можна втратити за 1–3 хвилини, а лід лишається — тримайтеся поза шарами обледеніння, а не пролітайте крізь них.",
+                icingInfoColours: "Кольори: червоний — можливе обледеніння, жовтий — межові умови, сірий — ознак немає, штрихування — немає даних; смуги — лише одна модель; блідо — понад 3 доби вперед. У профілі кожен рядок — рівень моделі на його звичайній висоті тут; пунктир — ваша висота польоту.",
+                icingDetailsLink: "Деталі обледеніння",
                 planIcing: "Ознаки обледеніння {from}–{to}",
                 icingFzdz: "крижана мряка з низьких шаруватих хмар",
                 icingRangeM: "({from}–{to} м)",
@@ -1551,19 +1576,19 @@
                 nowCloudClear: "Satélite agora: sem nuvens no seu local — previsão para esta hora: nuvens baixas {v}%.",
                 nowCaution: "A previsão não confere com o momento — trate as próximas horas com cautela.",
                 flightSplitTitle: "Dividir cada hora pela fração de membros / modelos em cada avaliação",
-                confLegend: "Confiança da previsão ({what} de acordo):",
                 confWhatMembers: "membros",
                 confWhatModels: "modelos",
-                confLevel_high: "alta",
-                confLevel_medium: "média",
-                confLevel_low: "baixa",
+                flightInfoTitle: "O que a barra mostra",
+                flightInfoColours: "Cada célula é uma hora: verde adequado, amarelo incerto, vermelho inadequado — a mediana dos modelos selecionados comparada com os seus limites.",
+                flightInfoHatch: "Hachurado: confiança baixa — menos de 60 % dos {what} concordam num veredito. A fração exata está nos detalhes da hora.",
+                flightInfoBand: "A faixa fina abaixo da barra: azul-claro dia, índigo noite; as linhas pontilhadas marcam a meia-noite.",
+                flightInfoSplit: "“Dividir por fração” empilha cada hora pela fração dos {what} por veredito: adequado embaixo, depois incerto, depois inadequado. Toque numa hora para fixar os detalhes.",
                 conf_high: "confiança alta",
                 conf_medium: "confiança média",
                 conf_low: "confiança baixa",
                 confShare_members: "{pct} dos membros: {status}",
                 confShare_models: "{pct} dos modelos: {status}",
                 confSplit: "adequado {good} · incerto {marginal} · inadequado {bad}",
-                confByModel: "por modelo",
                 confCause: "{conf} — incerteza: {cause}",
                 confCause_rain: "chuva",
                 confCause_wind: "vento",
@@ -1639,10 +1664,11 @@
                 icingPhaseDescent: "descida",
                 icingPartlyUnknown: "em parte além dos dados dos modelos",
                 icingFlightDesc: "{dur} a {h} m acima da decolagem, subida {c} m/s, descida {d} m/s",
-                icingDetailNote: "Triagem experimental (DWD ICON, UK Met Office): ar abaixo de zero perto da saturação (UR ≥ {rh} % sobre a água), nevoeiro congelante, chuva e garoa congelantes. Não é uma previsão de gelo validada. Supõe sem proteção contra gelo, tubo de pitot sem aquecimento e subida de asa fixa (não um pairado VTOL). Em gelo, a tração da hélice e a leitura de velocidade podem se perder em 1–3 min e o gelo permanece — fique fora das camadas de gelo em vez de atravessá-las.",
-                icingStripLegend: "Faixa de baixo: gelo (experimental) — vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados; listrado: um só modelo; esmaecido: mais de 3 dias à frente.",
-                icingProfileToggle: "Perfil de gelo",
-                icingProfileHint: "Cada linha é um nível do modelo na sua altura habitual acima do solo aqui, cada coluna uma hora; cor: o pior dos dois modelos (vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados). A linha tracejada é a altitude de voo.",
+                icingInfoTitle: "Sobre o indicador de gelo",
+                icingInfoWhat: "O que isto mostra: onde dois modelos de previsão (DWD ICON, UK Met Office) têm ar abaixo de 0 °C quase saturado, nevoeiro congelante, ou chuva ou garoa congelante, na subida até a sua altitude de voo, no cruzeiro e na descida.",
+                icingInfoNot: "Não é uma previsão de gelo: “sem sinais de gelo” não quer dizer seguro. Supõe um drone de asa fixa sem proteção contra gelo. Em gelo, a tração e a leitura de velocidade podem se perder em 1–3 minutos e o gelo permanece — fique fora das camadas de gelo em vez de atravessá-las.",
+                icingInfoColours: "Cores: vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados; listrado: um só modelo; esmaecido: mais de 3 dias à frente. No perfil, cada linha é um nível do modelo na sua altura habitual aqui; a linha tracejada é a sua altitude de voo.",
+                icingDetailsLink: "Detalhes do gelo",
                 planIcing: "Sinais de gelo {from}–{to}",
                 icingFzdz: "garoa congelante de nuvens stratus baixas",
                 icingRangeM: "({from}–{to} m)",
@@ -2073,7 +2099,9 @@
             flightDetailsOpen: loadFromStorage('flysky_flight_details_open', false) === true,
             statsCollapsed: loadFromStorage('flysky_stats_collapsed', false) === true,
             plannerOpen: loadFromStorage('flysky_planner_open', true) !== false,
-            icingProfileOpen: loadFromStorage('flysky_icing_profile_open', false) === true,
+            // The icing section (strip; open: profile and hour details). The key is
+            // the earlier Icing profile's, so its open state carries over.
+            icingOpen: loadFromStorage('flysky_icing_profile_open', false) === true,
             // Main flight bar split by the share of members / models per verdict.
             flightSplit: loadFromStorage('flysky_flight_split', false) === true,
             flightRules: sanitizeFlightRules(loadFromStorage('flysky_flight_rules', null)),
@@ -2423,20 +2451,31 @@
             </div>`;
         }
 
-        // Flight conditions, hovered hour: the icing summary in one line.
-        function icingLineHtml(time) {
-            const hr = icingOn() ? icingHour(time) : null;
-            if (!hr || icingVerdictOn()) return '';
-            return `<span class="block mt-0.5 text-[11px]" style="color: ${icingInk(hr.state)}"><i class="fa-solid fa-snowflake mr-1"></i>${escapeHtml(`${t('icingTitle')}: ${icingSummary(hr)}`)}</span>`;
-        }
-
-        // Pinned hour (and the icing breakdown bar): each model's climb,
-        // cruise and descent, the layers, and what the indicator is.
-        function icingDetailHtml(time) {
+        // Flight conditions: the icing summary in one line (as on the "Can I fly
+        // now?" card); with `link`, "Icing details" opening the icing section on
+        // that hour (pinned hour, the breakdown's icing bar).
+        function icingSummaryHtml(time, link) {
             if (!icingOn()) return '';
             const hr = icingHour(time);
-            if (!hr) return `<div class="mt-1.5 text-[11px] text-slate-500"><i class="fa-solid fa-snowflake text-sky-300 mr-1"></i>${escapeHtml(icingStatusText())}</div>`;
+            const text = `${t('icingTitle')}: ${hr ? icingSummary(hr) : icingStatusText()}`;
+            const btn = link && ICING.result ? ` <button type="button" data-icing-details="${escapeHtml(time)}" class="ml-1 font-semibold text-cyan-400 hover:text-cyan-300 whitespace-nowrap transition">${escapeHtml(t('icingDetailsLink'))} <i class="fa-solid fa-angle-right text-[9px]"></i></button>` : '';
+            return `<div data-icing-line class="mt-1 text-[11px]" style="color: ${hr ? icingInk(hr.state) : '#94a3b8'}"><i class="fa-solid fa-snowflake mr-1"></i>${escapeHtml(text)}${btn}</div>`;
+        }
+
+        // Hovered hour: the summary, unless the verdict already counts icing.
+        function icingLineHtml(time) {
+            return icingOn() && icingHour(time) && !icingVerdictOn() ? icingSummaryHtml(time, false) : '';
+        }
+
+        // The icing section's hour: the flight it assumes, each model's climb,
+        // cruise and descent, and the layers.
+        function icingHourHtml(time) {
+            const hr = icingHour(time);
             const P = state.flightProfile;
+            const far = icingLead(time) > ICING_FAR_H ? ` <span class="font-normal text-slate-500">· ${escapeHtml(t('icingFar'))}</span>` : '';
+            const head = `<div class="text-slate-200"><span class="font-semibold">${escapeHtml(formatDayHour(time))}</span> <span class="font-semibold" style="color: ${hr ? icingInk(hr.state) : '#94a3b8'}">· ${escapeHtml(hr ? icingSummary(hr) : icingStatusText())}</span>${far}</div>
+                <div class="text-slate-500">${escapeHtml(t('icingFlightDesc', { dur: durationLabel(P.durationMin), h: P.heightM, c: P.climbMs.toLocaleString(currentLang), d: P.descentMs.toLocaleString(currentLang) }))}</div>`;
+            if (!hr) return head;
             const fmtMin = m => (Math.round(m * 10) / 10).toLocaleString(currentLang);
             const lines = Object.entries(hr.models).map(([id, m]) => {
                 const f = m.flight;
@@ -2461,46 +2500,48 @@
                     txt = parts.length ? parts.join(' · ') : t('icingState_' + f.state);
                     if (f.partlyUnknown) txt += ' · ' + t('icingPartlyUnknown');
                 }
-                return `<div><span class="font-semibold" style="color: ${icingInk(f.state)}">${escapeHtml(icingModelName(id))}</span>: ${escapeHtml(txt)}</div>`;
+                return `<div data-icing-model="${escapeHtml(id)}"><span class="font-semibold" style="color: ${icingInk(f.state)}">${escapeHtml(icingModelName(id))}</span>: ${escapeHtml(txt)}</div>`;
             });
             const layer = icingLayerText(hr);
-            return `<div class="mt-1.5 space-y-0.5 text-[11px] text-slate-400">
-                <div class="font-semibold text-slate-300"><i class="fa-solid fa-snowflake text-sky-300 mr-1"></i>${escapeHtml(t('icingTitle'))} <span class="font-normal text-slate-500">· ${escapeHtml(t('icingFlightDesc', { dur: durationLabel(P.durationMin), h: P.heightM, c: P.climbMs.toLocaleString(currentLang), d: P.descentMs.toLocaleString(currentLang) }))}</span></div>
-                ${lines.join('')}
-                ${layer ? `<div>${escapeHtml(layer)}</div>` : ''}
-                <div class="text-slate-500">${escapeHtml(t('icingDetailNote', { rh: P.icingRhRed }))}</div>
-            </div>`;
+            return `${head}<div class="mt-1 space-y-0.5">${lines.join('')}${layer ? `<div>${escapeHtml(layer)}</div>` : ''}</div>`;
         }
 
-        // Flight conditions: a thin strip of the icing state per hour.
-        function renderIcingStrip(hours) {
-            const el = document.getElementById('flightIcing'), legend = document.getElementById('flightIcingLegend');
+        // The hour the icing section details: the pinned hour (hour bar or the
+        // "Can I fly now?" card) or the hour last tapped in the strip or the
+        // profile, whichever came last; else the current hour.
+        let icingSel = null;
+
+        function icingSelIndex(hours) {
+            const i = icingSel ? hours.findIndex(h => h.time === icingSel) : -1;
+            return i < 0 ? 0 : i;
+        }
+
+        // Icing section (only with the indicator on and its data there): the
+        // strip, always; open, the profile and the selected hour's details.
+        function renderIcingSection(hours) {
+            const sec = document.getElementById('icingSection');
             const on = icingOn() && !!ICING.result && hours.length > 0;
-            el.classList.toggle('hidden', !on);
-            legend.classList.toggle('hidden', !on);
-            if (!on) { el.innerHTML = ''; return; }
-            el.innerHTML = hours.map((h, i) => {
+            sec.classList.toggle('hidden', !on);
+            const strip = document.getElementById('icingStrip');
+            if (!on) { strip.innerHTML = ''; return; }
+            const open = state.icingOpen;
+            document.getElementById('icingBody').classList.toggle('hidden', !open);
+            document.getElementById('btnIcing').setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById('icingChevron').style.transform = open ? 'rotate(180deg)' : '';
+            strip.innerHTML = hours.map((h, i) => {
                 const hr = icingHour(h.time);
                 const st = hr ? hr.state : 'unknown';
                 const one = hr && st !== 'unknown' && hr.combined.known < hr.combined.total;
-                return `<div data-flight-hour="${i}" class="flex-1 min-w-0" style="background: ${one ? ICING_ONE_MODEL + ', ' : ''}${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(`${formatDayHour(h.time)} · ${t('icingTitle')}: ${t('icingState_' + st)}`)}"></div>`;
+                return `<div data-icing-hour="${i}" class="flex-1 min-w-0" style="background: ${one ? ICING_ONE_MODEL + ', ' : ''}${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(`${formatDayHour(h.time)} · ${t('icingTitle')}: ${t('icingState_' + st)}`)}"></div>`;
             }).join('');
-            legend.innerHTML = `<i class="fa-solid fa-snowflake text-sky-300 mr-1"></i>${escapeHtml(t('icingStripLegend'))}`;
+            if (open) renderIcingProfile(hours);
+            renderIcingHour();
         }
 
         // Icing profile: one row per model level at its height above the ground
         // here (median over the window), one cell per hour, the worse state of
         // the models; a dashed line at the flight altitude.
         function renderIcingProfile(hours) {
-            const sec = document.getElementById('icingProfileSection');
-            const on = icingOn() && !!ICING.result && hours.length > 1;
-            sec.classList.toggle('hidden', !on);
-            if (!on) return;
-            const open = state.icingProfileOpen;
-            document.getElementById('icingProfileBody').classList.toggle('hidden', !open);
-            document.getElementById('btnIcingProfile').setAttribute('aria-expanded', open ? 'true' : 'false');
-            document.getElementById('icingProfileChevron').style.transform = open ? 'rotate(180deg)' : '';
-            if (!open) return;
             const r = ICING.result, models = r.models;
             const js = hours.map(h => ICING.index.get(h.time));
             const heights = new Map();
@@ -2526,12 +2567,49 @@
                         vals.push(`${icingModelName(m)} ${fmtC(l.t)} °C ${Math.round(l.rhw)} %`);
                     });
                     const tip = `${formatDayHour(h.time)} · ~${roundM(row.agl)} m (${row.p} hPa) · ${t('icingState_' + st)}${vals.length ? ' · ' + vals.join(' · ') : ''}`;
-                    return `<div data-icing-cell data-tip="${escapeHtml(tip)}" class="flex-1 min-w-0" style="background: ${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(tip)}"></div>`;
+                    return `<div data-icing-cell data-icing-hour="${i}" data-tip="${escapeHtml(tip)}" class="flex-1 min-w-0" style="background: ${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(tip)}"></div>`;
                 }).join('');
                 html += `<div class="relative"><div class="flex h-3.5">${cells}</div><span class="absolute left-0.5 top-0 z-20 px-1 rounded-sm bg-slate-950/75 text-[9px] leading-[14px] font-mono text-white pointer-events-none">~${roundM(row.agl)} m</span></div>`;
             });
             if (!marked) html += line;
-            document.getElementById('icingProfileRows').innerHTML = html;
+            document.getElementById('icingProfile').innerHTML = html;
+        }
+
+        // The selected (or, with `preview`, the hovered) hour: its details, its
+        // strip cell outlined and its profile column marked.
+        function renderIcingHour(preview) {
+            const hours = processed && processed.flight ? processed.flight.hours : [];
+            if (!state.icingOpen || !hours.length || document.getElementById('icingSection').classList.contains('hidden')) {
+                document.querySelectorAll('#icingStrip [data-selected]').forEach(c => c.removeAttribute('data-selected'));
+                return;
+            }
+            const sel = icingSelIndex(hours);
+            const i = preview ?? sel;
+            document.querySelectorAll('#icingStrip [data-icing-hour]').forEach(c => c.toggleAttribute('data-selected', Number(c.dataset.icingHour) === sel));
+            const mark = document.getElementById('icingProfileMark');
+            mark.style.left = `${(i / hours.length * 100).toFixed(3)}%`;
+            mark.style.width = `${(100 / hours.length).toFixed(3)}%`;
+            const el = document.getElementById('icingHour');
+            el.dataset.icingTime = hours[i].time;
+            el.innerHTML = icingHourHtml(hours[i].time);
+        }
+
+        function setIcingOpen(open) {
+            state.icingOpen = open;
+            saveToStorage('flysky_icing_profile_open', open);
+            renderIcingSection(processed && processed.flight ? processed.flight.hours : []);
+            // The axis needs a measurable width, which it only has once shown.
+            renderFlightAxis();
+            renderDayMarks();
+        }
+
+        // An hour from the strip, the profile or "Icing details": the section
+        // opens on it (and, from elsewhere in the card, comes into view).
+        function showIcingHour(time, scroll) {
+            icingSel = time;
+            if (!state.icingOpen) setIcingOpen(true);
+            else renderIcingHour();
+            if (scroll) document.getElementById('icingSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         // Planner: icing signs in a flyable slot (when they don't count in the
@@ -3569,45 +3647,48 @@
                 .reduce((a, b) => (FLIGHT_RANK[b] > FLIGHT_RANK[a] ? b : a), 'none');
         }
 
-        // Detail line for an hour: the overall verdict, or — when hovering a
-        // breakdown bar — that cause's verdict and only its values.
-        function flightHourText(h, factor) {
-            const status = factor ? factorStatus(h, factor) : h.status;
-            const st = FLIGHT_STATUS[status];
-            const keys = factor ? factor.checks : ['rain', 'wind', 'gust', 'aloft', 'cloud', 'vis'];
-            const parts = keys
+        // Details of an hour on the main bar, in lines: time · verdict · the
+        // "Icing risk" flag (· Map when pinned); the values, the decisive ones in
+        // the verdict's colour; the confidence.
+        function flightHourText(h, pinned) {
+            const st = FLIGHT_STATUS[h.status];
+            const parts = ['rain', 'wind', 'gust', 'aloft', 'cloud', 'vis']
                 .filter(k => h.values[k] !== null && h.values[k] !== undefined && Number.isFinite(h.values[k]))
                 .map(k => {
                     const txt = escapeHtml(flightFactorText(k, h.values[k]));
-                    const decisive = status !== 'good' && h.checks[k] === status;
+                    const decisive = h.status !== 'good' && h.checks[k] === h.status;
                     return decisive ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
                 });
             // Icing (verdict option): its state, no value.
-            const ih = h.checks.icing && (!factor || factor.key === 'icing') ? icingHour(h.time) : null;
+            const ih = h.checks.icing ? icingHour(h.time) : null;
             if (ih) {
                 const txt = escapeHtml(`${t('icingTitle')}: ${t('icingState_' + ih.state)}`);
-                parts.push(status !== 'good' && h.checks.icing === status ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt);
+                parts.push(h.status !== 'good' && h.checks.icing === h.status ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt);
             }
-            const label = factor ? `${factorLabel(factor)}: ${t(st.labelKey)}` : t(st.labelKey);
-            const strong = !factor && icingStrongAt(h.time);
-            const conf = !factor && h.agree ? ` <span class="text-slate-600">·</span> <span style="color: ${CONF_TEXT[h.agree.level]}">${escapeHtml(confText(h))}</span>` : '';
-            return `<span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
-                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(label)}</span>${strong ? `<span data-icing-flag="${strong}" class="mr-1.5 px-1.5 rounded font-semibold text-white" style="background: #d03b3bcc" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i> ${escapeHtml(t('icingFlag'))}</span>` : ''}
-                <span class="text-slate-400">${parts.join(' · ')}</span>${conf}`;
+            const strong = icingStrongAt(h.time);
+            const map = pinned ? ` <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}"
+                class="ml-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold align-middle transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>` : '';
+            return `<div data-hour-head><span class="font-semibold text-slate-100">${escapeHtml(formatDayHour(h.time))}</span>
+                <span class="mx-1.5 font-semibold" style="color: ${st.color}"><i class="fa-solid ${st.icon}"></i> ${escapeHtml(t(st.labelKey))}</span>${strong ? `<span data-icing-flag="${strong}" class="mr-1.5 px-1.5 rounded font-semibold text-white whitespace-nowrap" style="background: #d03b3bcc" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i> ${escapeHtml(t('icingFlag'))}</span>` : ''}${map}</div>
+                ${parts.length ? `<div data-hour-values class="mt-0.5 text-slate-400">${parts.join(' · ')}</div>` : ''}
+                ${h.agree ? `<div data-hour-conf class="mt-0.5" style="color: ${CONF_TEXT[h.agree.level]}">${escapeHtml(confText(h))}</div>` : ''}`;
         }
 
         // One cell per hour; a 2px gap wherever the status changes keeps
-        // neighbouring zones distinct without relying on color alone.
-        function flightCellsHtml(hours, statusOf) {
+        // neighbouring zones distinct without relying on color alone. On the
+        // main bar (`main`) low confidence is hatched (CSS, [data-low-conf]) and
+        // the title names the confidence.
+        function flightCellsHtml(hours, statusOf, main) {
             return hours.map((h, i) => {
                 const st = statusOf(h);
                 const gap = i > 0 && statusOf(hours[i - 1]) !== st ? 'margin-left: 2px;' : '';
-                return `<div data-flight-hour="${i}" class="flex-1 min-w-0 hover:brightness-125 transition" style="${gap} background: ${FLIGHT_STATUS[st].color}" title="${escapeHtml(formatDayHour(h.time) + ' · ' + t(FLIGHT_STATUS[st].labelKey))}"></div>`;
+                const low = main && h.agree && h.agree.level === 'low';
+                const title = formatDayHour(h.time) + ' · ' + t(FLIGHT_STATUS[st].labelKey) + (main && h.agree ? ' · ' + confText(h) : '');
+                return `<div data-flight-hour="${i}"${low ? ' data-low-conf' : ''} class="flex-1 min-w-0 hover:brightness-125 transition" style="${gap} background: ${FLIGHT_STATUS[st].color}" title="${escapeHtml(title)}"></div>`;
             }).join('');
         }
 
         // ---- Forecast confidence (see computeFlight)
-        const CONF_BG = { high: '#67e8f9', medium: '#0e7490', low: 'repeating-linear-gradient(135deg, #94a3b8 0 1.5px, #1e293b 1.5px 4px)' };
         const CONF_TEXT = { high: '#67e8f9', medium: '#22d3ee', low: '#94a3b8' };
 
         // The share of the largest group, named with that group's verdict
@@ -3615,13 +3696,6 @@
         function confText(h) {
             const a = h.agree;
             return a ? t(state.mode === 'ensemble' ? 'confShare_members' : 'confShare_models', { pct: formatPercent(a.conf * 100), status: t(FLIGHT_STATUS[a.top].labelKey).toLocaleLowerCase(currentLang) }) : '';
-        }
-
-        function confCellsHtml(hours) {
-            return hours.map((h, i) => {
-                const a = h.agree;
-                return `<div data-flight-hour="${i}" class="flex-1 min-w-0" style="background: ${a ? CONF_BG[a.level] : '#1e293b'}" title="${escapeHtml(formatDayHour(h.time) + (a ? ' · ' + confText(h) : ''))}"></div>`;
-            }).join('');
         }
 
         // Each hour stacked by share: suitable at the bottom, then uncertain,
@@ -3640,28 +3714,24 @@
             return t('confSplit', { good: formatPercent(a.shares.good * 100), marginal: formatPercent(a.shares.marginal * 100), bad: formatPercent(a.shares.bad * 100) });
         }
 
-        // Pinned hour: the split and each model's share.
+        // Pinned hour, its own block: the split, then on a line of its own each
+        // model's share of the largest group, labelled with that group's verdict.
         function confDetailHtml(h) {
             const a = h.agree;
             if (!a) return '';
-            const byModel = a.models.length > 1 ? ` <span class="text-slate-500">· ${escapeHtml(t(FLIGHT_STATUS[a.top].labelKey))} ${escapeHtml(t('confByModel'))}:</span> ${a.models.map(m =>
-                `<span class="whitespace-nowrap">${escapeHtml(modelName(m.model))} ${escapeHtml(formatPercent(m.share * 100))}</span>`).join(' · ')}` : '';
-            return `<span class="block mt-1 text-[11px] text-slate-400"><i class="fa-solid fa-signal mr-1 text-[9px]" style="color: ${CONF_TEXT[a.level]}"></i>${escapeHtml(confSplitText(a))}${byModel}</span>`;
+            const byModel = a.models.length > 1 ? `<div data-conf-models><span class="text-slate-500">${escapeHtml(t(FLIGHT_STATUS[a.top].labelKey))}:</span> ${a.models.map(m =>
+                `<span class="whitespace-nowrap">${escapeHtml(modelName(m.model))} ${escapeHtml(formatPercent(m.share * 100))}</span>`).join(' · ')}</div>` : '';
+            return `<div data-conf-split class="mt-1.5 text-[11px] text-slate-400"><div><i class="fa-solid fa-signal mr-1 text-[9px]" style="color: ${CONF_TEXT[a.level]}"></i>${escapeHtml(confSplitText(a))}</div>${byModel}</div>`;
         }
 
+        // The legend line (the hatch, only in the normal view: Split by share
+        // shows the shares themselves), the ⓘ panel's text and the split button.
         function renderConfidence(hours) {
             const has = hours.some(h => h.agree);
-            const strip = document.getElementById('flightConf');
-            strip.classList.toggle('hidden', !has);
-            strip.innerHTML = has ? confCellsHtml(hours) : '';
-            // The three levels stay together: if the line is too narrow they
-            // move under the label as one group; only if even that line is too
-            // narrow do they wrap — between levels, never inside one.
-            const sw = (lvl, range) => `<span class="inline-flex items-center gap-1 whitespace-nowrap"><span class="inline-block w-3 h-1.5 rounded-full" style="background: ${CONF_BG[lvl]}"></span>${escapeHtml(t('confLevel_' + lvl))} ${range}</span>`;
-            document.getElementById('flightConfLegend').innerHTML = has
-                ? `<span>${escapeHtml(t('confLegend', { what: t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels') }))}</span>
-                    <span class="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1">${sw('high', '≥ 80%')}${sw('medium', '60–80%')}${sw('low', '&lt; 60%')}</span>`
-                : '';
+            document.getElementById('flightHatchKey').classList.toggle('hidden', !has || state.flightSplit);
+            const what = t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels');
+            document.getElementById('flightInfo').innerHTML = ['flightInfoColours', 'flightInfoHatch', 'flightInfoBand', 'flightInfoSplit']
+                .map(k => `<p>${escapeHtml(t(k, { what }))}</p>`).join('');
             const btn = document.getElementById('btnFlightSplit');
             btn.classList.toggle('hidden', !has);
             btn.setAttribute('aria-pressed', state.flightSplit ? 'true' : 'false');
@@ -3692,8 +3762,7 @@
             const shown = hover || pinned;
             if (!shown) return flightSummaryHtml();
             if (shown !== pinned) return flightHourText(shown) + icingLineHtml(shown.time);
-            return `${flightHourText(shown)} <button type="button" data-flight-map="${escapeHtml(shown.time)}" title="${escapeHtml(t('flightOnMapTitle'))}"
-                class="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold align-middle transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>${confDetailHtml(shown)}${icingDetailHtml(shown.time)}`;
+            return flightHourText(shown, true) + confDetailHtml(shown) + icingSummaryHtml(shown.time, true);
         }
 
         function markMainPin() {
@@ -3934,6 +4003,9 @@
             renderNowCheck();
             markMainPin();
             document.getElementById('flightDetail').innerHTML = mainDetailHtml();
+            // The icing section follows a new pin.
+            if (mainPin) icingSel = mainPin;
+            renderIcingHour();
         }
 
         // Tap, or slide along the strip (pointer capture: the finger can
@@ -4009,9 +4081,8 @@
             const f = processed && processed.flight;
             const hours = f ? f.hours : [];
 
-            strip.innerHTML = state.flightSplit && hours.some(h => h.agree) ? splitCellsHtml(hours) : flightCellsHtml(hours, h => h.status);
+            strip.innerHTML = state.flightSplit && hours.some(h => h.agree) ? splitCellsHtml(hours) : flightCellsHtml(hours, h => h.status, true);
             renderConfidence(hours);
-            renderIcingStrip(hours);
             renderNowCheck();
             renderNow();
 
@@ -4030,7 +4101,7 @@
                 </div>`;
             }).join('');
             renderFlightDetailsPanel();
-            renderIcingProfile(hours);
+            renderIcingSection(hours);
             renderFlightAxis();
             renderPlanner();
             renderFlightSun();
@@ -4230,18 +4301,34 @@
                 renderFactorDetail();
             });
 
-            // Icing profile: open / fold (remembered); a cell's values on hover or tap.
-            document.getElementById('btnIcingProfile').addEventListener('click', () => {
-                state.icingProfileOpen = !state.icingProfileOpen;
-                saveToStorage('flysky_icing_profile_open', state.icingProfileOpen);
-                renderIcingProfile(processed && processed.flight ? processed.flight.hours : []);
-                renderFlightAxis();
-                renderDayMarks();
+            // Icing section: open / fold (remembered). A tap on the strip or the
+            // profile selects that hour (and opens the section); hovering previews
+            // it, and a profile cell's values show above the details.
+            document.getElementById('btnIcing').addEventListener('click', () => setIcingOpen(!state.icingOpen));
+            const icingSec = document.getElementById('icingSection');
+            const icingAt = e => {
+                const c = e.target.closest('#icingStrip [data-icing-hour], #icingProfile [data-icing-hour]');
+                return c && processed && processed.flight ? { c, i: Number(c.dataset.icingHour) } : null;
+            };
+            icingSec.addEventListener('mousemove', e => {
+                const p = icingAt(e);
+                if (!p) return;
+                if (p.c.dataset.tip) document.getElementById('icingCell').textContent = p.c.dataset.tip;
+                renderIcingHour(p.i);
             });
-            const icingRows = document.getElementById('icingProfileRows');
-            const showCell = e => { const c = e.target.closest('[data-icing-cell]'); if (c) document.getElementById('icingProfileDetail').textContent = c.dataset.tip; };
-            icingRows.addEventListener('mousemove', showCell);
-            icingRows.addEventListener('click', showCell);
+            icingSec.addEventListener('mouseleave', () => renderIcingHour());
+            icingSec.addEventListener('click', e => {
+                const p = icingAt(e);
+                if (!p || !processed.flight.hours[p.i]) return;
+                if (p.c.dataset.tip) document.getElementById('icingCell').textContent = p.c.dataset.tip;
+                showIcingHour(processed.flight.hours[p.i].time);
+            });
+            // "Icing details" (pinned hour, the breakdown's icing bar).
+            document.getElementById('flightCard').addEventListener('click', e => {
+                const b = e.target.closest('[data-icing-details]');
+                if (b) showIcingHour(b.dataset.icingDetails, true);
+            });
+            setupInfoPanels();
 
             document.getElementById('btnFlightDetails').addEventListener('click', () => {
                 state.flightDetailsOpen = !state.flightDetailsOpen;
@@ -4250,6 +4337,28 @@
                 // The axis needs a measurable width, which it only has once shown.
                 renderFlightAxis();
             });
+        }
+
+        // ⓘ buttons: each opens a small panel (one at a time); a second click
+        // or Escape closes it. Escape is taken in the capture phase so that,
+        // with the settings drawer open, the drawer alone closes.
+        function setInfoPanel(btn, open) {
+            document.querySelectorAll('[data-info-btn]').forEach(b => {
+                const on = open && b === btn;
+                b.setAttribute('aria-expanded', on ? 'true' : 'false');
+                document.getElementById(b.getAttribute('aria-controls')).classList.toggle('hidden', !on);
+            });
+        }
+
+        function setupInfoPanels() {
+            document.querySelectorAll('[data-info-btn]').forEach(btn => btn.addEventListener('click', () => setInfoPanel(btn, btn.getAttribute('aria-expanded') !== 'true')));
+            document.addEventListener('keydown', e => {
+                if (e.key !== 'Escape' || !document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) return;
+                const btn = document.querySelector('[data-info-btn][aria-expanded="true"]');
+                if (!btn) return;
+                setInfoPanel(btn, false);
+                btn.focus();
+            }, true);
         }
 
         function renderFlightDetailsPanel() {
@@ -4420,7 +4529,7 @@
             } else if (factor.key === 'vis') {
                 lines += statLine(t('paramVisibility'), P('visibility'), i, decisive('vis'));
             } else if (factor.key === 'icing') {
-                lines += icingDetailHtml(h.time);
+                lines += icingSummaryHtml(h.time, true);
             } else {
                 lines += statLine(t('paramLowClouds'), P('cloud_cover_low'), i, decisive('cloud'));
             }
