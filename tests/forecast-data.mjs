@@ -6,9 +6,9 @@
 // Models mode at the flight altitude (levels asked, interpolation, altitude changes, records
 // without the levels), Ensemble mode at 925 hPa.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
-const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+const ctx = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 // Rain and 30 m/s gusts stamped one hour ahead only (k = 1): they describe the hour from now.
@@ -81,7 +81,7 @@ await ctx.close();
 
 // ---- A model that fails is not asked on every trigger (Models mode, GEM always answers 400)
 {
-    const ctx2 = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    const ctx2 = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
     const p = await ctx2.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     // Every toast shown (they close after 10 s, so the container alone is not enough).
@@ -147,7 +147,7 @@ await ctx.close();
     held.after = reqs().length - n2; held.meta2 = await meta();
     await p.click('#btnRefresh'); await p.waitForTimeout(2500);
     held.refresh = reqs().length - n2;
-    ok('nothing saved, every model limited: the reason stays in the source line, automatic loads ask nothing, Refresh asks', held.asked === 1 && held.toastsOpen === 0 && /free limit reached for 3 model\(s\) \(Hourly/.test(held.meta) && held.after === 1 && held.meta2 === held.meta && held.refresh === 2, held);
+    ok('nothing saved, every model limited: the reason stays in the source line, automatic loads ask nothing, Refresh asks', held.asked === 1 && held.toastsOpen === 0 && /free limit reached for 3 model\(s\) \(Hourly/.test(held.meta) && /No saved forecast for this place yet; trying again in 30 min or with Refresh\./.test(held.meta) && !/last forecast stays/.test(held.meta) && held.after === 1 && held.meta2 === held.meta && held.refresh === 2, held);
     o.forecastLimit = null;
 
     ok('no page errors (failing model)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
@@ -159,7 +159,7 @@ await ctx.close();
 // 10 m/s, 925 hPa 800 m / 20 m/s. ECMWF IFS lacks 975 and 950 hPa; Météo-France's 975 hPa is
 // 11 m above a 179 m ground (inside the terrain, 50 m/s) and it lacks 950 hPa.
 {
-    const ctx3 = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    const ctx3 = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
     const p = await ctx3.newPage();
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     const LV = { 975: { s: 4, z: 380 }, 950: { s: 10, z: 560 }, 925: { s: 20, z: 800 } };
@@ -251,5 +251,53 @@ await ctx.close();
 
     ok('no page errors (wind aloft)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
     await ctx3.close();
+}
+// ---- Refresh while an automatic load runs: it waits for that load, then makes a forced request.
+{
+    const ctx4 = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    const p = await ctx4.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await routeAll(p, {});
+    const spans = [];   // [start, end] (Node time) of each forecast request, each held for 1.5 s
+    await p.route(u => /open-meteo\.com\/v1\/forecast\?|ensemble-api\.open-meteo\.com/.test(u.href) && u.href.includes('models=') && !u.href.includes('surface_pressure'), async route => {
+        const span = [Date.now(), 0]; spans.push(span);
+        await new Promise(r => setTimeout(r, 1500));
+        span[1] = Date.now();
+        return route.fallback();
+    });
+    await p.goto(BASE_URL);
+    await p.evaluate(() => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 })); });
+    await p.reload(); await p.waitForTimeout(700);   // the automatic load is running
+    const running = await p.evaluate(() => !!inflightLoad);
+    const first = spans.length, firstEnd = Math.min(...spans.map(x => x[1] || Infinity));
+    await p.evaluate(() => { loadForecast({ force: true }); });
+    await p.waitForTimeout(7000);
+    const later = spans.slice(first);
+    ok('Refresh during an automatic load: it waits for it, then asks again', running && first >= 1 && later.length >= 1 && later.every(x => x[0] >= Math.min(...spans.slice(0, first).map(y => y[1] || Infinity)) - 50), { running, first, total: spans.length, firstEnd, later });
+    ok('no page errors (Refresh during a load)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
+    await ctx4.close();
+}
+
+// ---- Without IndexedDB the records go to localStorage: this mode and place only, under about 1 MB.
+{
+    const ctx5 = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    await ctx5.addInitScript(() => { indexedDB.open = () => { throw new Error('no IndexedDB'); }; });
+    const p = await ctx5.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await routeAll(p, {});
+    await p.goto(BASE_URL);
+    await p.evaluate(() => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' })); });
+    await p.reload(); await p.waitForTimeout(5000);
+    const r = await p.evaluate(async () => {
+        const kyiv = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' }, lviv = { name: 'Lviv', latitude: 49.84, longitude: 24.03, country: 'Ukraine' };
+        const rec = (loc, model, n, at) => ({ key: modelRecordKey(state.mode, loc, model), mode: state.mode, model, fetchedAt: at, days: 8, vars: [], meta: { timezone: 'UTC', utcOffsetSeconds: 0, elevation: 1 }, hourly: { time: ['2026-01-01T00:00'], pad: 'x'.repeat(n) } });
+        // Another place (newest), two big records of this place and a small, newer one.
+        await modelRecordsPut([rec(lviv, 'lviv_a', 100, Date.now() + 9e6), rec(kyiv, 'old_a', 600000, 1000), rec(kyiv, 'old_b', 600000, 2000), rec(kyiv, 'small', 100, 3000)]);
+        const raw = localStorage.getItem(LEGACY_FORECAST_KEY), saved = JSON.parse(raw);
+        return { size: raw.length, models: saved.records.map(x => x.model), here: saved.records.every(x => x.key.startsWith(modelRecordKey(state.mode, kyiv, ''))) };
+    });
+    ok('no IndexedDB: localStorage keeps this place only, the newest records that fit in about 1 MB', r.here && r.size < 1050000 && r.models.includes('small') && r.models.includes('old_b') && !r.models.includes('old_a') && !r.models.includes('lviv_a'), r);
+    ok('no page errors (no IndexedDB)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
+    await ctx5.close();
 }
 await b.close();

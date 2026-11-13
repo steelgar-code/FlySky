@@ -185,7 +185,7 @@
         /* Values of the selected hour above each parameter chart: a fixed height
            (one line; two on a phone) so nothing moves between hours. */
         .chart-values { font-variant-numeric: tabular-nums; font-size: 11px; line-height: 16px; height: 16px; overflow: hidden; color: #cbd5e1; }
-        @media (max-width: 639px) { .chart-values { height: 32px; } }
+        @media (max-width: 639px) { .chart-values { height: 32px; } .chart-values.one-line { height: 16px; } }
         .chart-values:empty { display: none; }
         .chart-legend-val { display: inline-block; min-width: 3.4em; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 600; }
         /* Low confidence (under 60 % agreeing) on the main flight bar: a light
@@ -1183,6 +1183,7 @@
                 modelCostHigh: "Many members: fewer models keep you well under the limits.",
                 toastRateWait: "Open-Meteo's per-minute limit reached — trying again in a minute.",
                 toastRateLimited: "Open-Meteo's free limit reached for {n} model(s) ({reason}). The last forecast stays; try again later.",
+                heldBackRateLimited: "Open-Meteo's free limit reached for {n} model(s) ({reason}). No saved forecast for this place yet; trying again in 30 min or with Refresh.",
                 metaFailed: "{n} model(s) missing",
                 toastSearchError: "Location search failed",
                 toastGeoError: "Could not get your location",
@@ -1513,6 +1514,7 @@
                 modelCostHigh: "Багато членів ансамблю: менше моделей — далі від ліміту.",
                 toastRateWait: "Досягнуто похвилинного ліміту Open-Meteo — повтор за хвилину.",
                 toastRateLimited: "Досягнуто безплатного ліміту Open-Meteo для моделей: {n} ({reason}). Залишається останній прогноз; спробуйте пізніше.",
+                heldBackRateLimited: "Досягнуто безплатного ліміту Open-Meteo для моделей: {n} ({reason}). Збереженого прогнозу для цього місця ще немає; нова спроба за 30 хв або кнопкою «Оновити».",
                 metaFailed: "бракує моделей: {n}",
                 toastSearchError: "Помилка пошуку місця",
                 toastGeoError: "Не вдалося визначити місцезнаходження",
@@ -1843,6 +1845,7 @@
                 modelCostHigh: "Muitos membros: menos modelos mantêm você longe dos limites.",
                 toastRateWait: "Limite por minuto do Open-Meteo atingido — tentando de novo em um minuto.",
                 toastRateLimited: "Limite gratuito do Open-Meteo atingido para {n} modelo(s) ({reason}). A última previsão continua; tente mais tarde.",
+                heldBackRateLimited: "Limite gratuito do Open-Meteo atingido para {n} modelo(s) ({reason}). Ainda não há previsão salva para este local; nova tentativa em 30 min ou com Atualizar.",
                 metaFailed: "{n} modelo(s) faltando",
                 toastSearchError: "Falha na busca de local",
                 toastGeoError: "Não foi possível obter sua localização",
@@ -2734,6 +2737,8 @@
             });
         }
 
+        const STORAGE_RECORDS_MAX = 1000000;   // characters of JSON in the localStorage fallback
+
         function modelRecordKey(mode, loc, model) {
             return [MODEL_RECORD_TAG, mode, locationKey(loc), model].join('|');
         }
@@ -2768,12 +2773,28 @@
             return modelRecords.get(key);
         }
 
+        // Without IndexedDB: localStorage, which the other Fly apps share, so only
+        // the current mode and place, newest first, and at most about 1 MB of JSON.
+        function saveRecordsToStorage() {
+            const prefix = state.location ? modelRecordKey(state.mode, state.location, '') : '';
+            const recs = [...modelRecords.values()].filter(r => r.key.startsWith(prefix)).sort((a, b) => b.fetchedAt - a.fetchedAt).slice(0, 6);
+            const kept = [];
+            let size = 0;
+            for (const r of recs) {
+                size += JSON.stringify(r).length + 1;
+                if (size > STORAGE_RECORDS_MAX) break;
+                kept.push(r);
+            }
+            if (kept.length < recs.length) console.warn(`FlySky: kept ${kept.length} of ${recs.length} forecast records in local storage (size limit).`);
+            saveToStorage(LEGACY_FORECAST_KEY, { records: kept.reverse() });
+        }
+
         // Saves records; drops all but the newest FORECAST_KEEP, and anything
         // saved in an older shape.
         async function modelRecordsPut(records) {
             records.forEach(rememberRecord);
             const db = await openForecastDb();
-            if (!db) { saveToStorage(LEGACY_FORECAST_KEY, { records: [...modelRecords.values()].slice(-6) }); return; }
+            if (!db) { saveRecordsToStorage(); return; }
             const tx = db.transaction(FORECAST_STORE, 'readwrite');
             const store = tx.objectStore(FORECAST_STORE);
             records.forEach(r => store.put(r));
@@ -3226,6 +3247,11 @@
                 // ask for whatever it did not cover.
                 // (A new flight altitude may need other wind-aloft levels.)
                 if (inflightLoad.base === base && inflightLoad.days >= days) {
+                    // Refresh must end with a forced request: that load was not forced.
+                    if (force) {
+                        await inflightLoad.promise.catch(() => {});
+                        return forecastBase() === base ? loadForecast({ force: true }) : undefined;
+                    }
                     if (need.every(m => inflightLoad.need.includes(m)) && inflightLoad.vars === neededVars(mode).join()) return inflightLoad.promise;
                     await inflightLoad.promise.catch(() => {});
                     return forecastBase() === base ? loadForecast() : undefined;
@@ -4415,6 +4441,9 @@
             document.querySelectorAll('[data-info-btn]').forEach(btn => btn.addEventListener('click', () => setInfoPanel(btn, btn.getAttribute('aria-expanded') !== 'true')));
             document.addEventListener('keydown', e => {
                 if (e.key !== 'Escape' || !document.getElementById('settingsDrawer').classList.contains('-translate-x-full')) return;
+                // Escape in a field, or with the location search open, belongs to that.
+                if (e.target && e.target.closest && e.target.closest('input, textarea, select')) return;
+                if (!document.getElementById('searchPanel').classList.contains('hidden')) return;
                 const btn = document.querySelector('[data-info-btn][aria-expanded="true"]');
                 if (!btn) return;
                 setInfoPanel(btn, false);
@@ -5060,7 +5089,7 @@
         function heldBackReason() {
             const fails = selectedModels().map(m => modelFailures.get(modelRecordKey(state.mode, state.location, m))).filter(Boolean);
             const limited = fails.filter(f => f.rateLimited);
-            if (limited.length) return t('toastRateLimited', { n: limited.length, reason: limited[0].error });
+            if (limited.length) return t('heldBackRateLimited', { n: limited.length, reason: limited[0].error });
             return fails.length ? t('toastForecastError', { error: fails[0].error }) : '';
         }
 
@@ -5343,6 +5372,8 @@
         function renderChartValues(param) {
             const el = document.getElementById(`chartValues-${param.key}`);
             if (!el) return;
+            // Per model the line holds only the hour (the legend has the values): one line on phones too.
+            el.classList.toggle('one-line', perModelView());
             const data = processed ? processed.params[param.key] : null;
             const idx = chartSelected(param.key);
             const time = processed ? processed.times[idx] : null;

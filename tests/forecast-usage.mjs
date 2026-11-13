@@ -4,9 +4,9 @@
 // (the card carries no gauge), the meters updating after a request without reopening the menu,
 // Ukrainian, the map's side menu, and the card's footer row on a 390 px phone.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
-const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+const ctx = await newContext(b, { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 await routeAll(page, {});
@@ -114,7 +114,7 @@ await I(() => omRecord(100, 'f')); await I(() => renderOmUsage());
 ok('and they update with the log', (await I(() => document.querySelector('#drawerMap [role=meter]').getAttribute('aria-valuetext'))).startsWith('412 used'));
 
 // ---- A 390 px phone: the footer row of the card
-const phone = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+const phone = await newContext(b, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
 const p2 = await phone.newPage(); await routeAll(p2, {});
 await p2.goto(BASE_URL);
 await p2.evaluate(() => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 })); });

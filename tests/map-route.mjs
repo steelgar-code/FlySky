@@ -3,7 +3,7 @@
 // airspeed, wind triangle, ETA, return leg, the route tag on the map.
 // Also the map defaults for new users and the deeper zoom.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
 const ctxOpts = mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' };
@@ -11,7 +11,7 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
 
 // ---- new users: map defaults
 {
-    const ctx = await b.newContext(ctxOpts);
+    const ctx = await newContext(b, ctxOpts);
     const page = await ctx.newPage();
     await routeAll(page, {});
     await page.goto(BASE_URL);
@@ -31,7 +31,7 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
 // ---- earlier versions' wind height (a pressure level) carries over as the flight altitude;
 // the flight altitude is one setting in the forecast and the map side menus
 {
-    const ctx = await b.newContext(ctxOpts);
+    const ctx = await newContext(b, ctxOpts);
     const page = await ctx.newPage();
     await routeAll(page, {});
     await page.goto(BASE_URL);
@@ -53,7 +53,7 @@ const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukrain
     await ctx.close();
 }
 
-const ctx = await b.newContext(ctxOpts);
+const ctx = await newContext(b, ctxOpts);
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const opts = {};

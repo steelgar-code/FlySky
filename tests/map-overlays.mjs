@@ -1,11 +1,11 @@
 // Stacked overlays (fires, lightning) load only from the selected image forward.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const iso = ms => new Date(ms).toISOString().replace('.000Z', 'Z');
 
 async function open(settings) {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
+  const ctx = await newContext(b, { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   const { log } = await routeAll(page, {});

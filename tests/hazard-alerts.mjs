@@ -2,14 +2,14 @@
 // needed), "Show" on the map alert, and the map's time bar hiding when it has
 // nothing to show or the flight time calculator is open.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
 const ctxOpts = mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' };
 const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' };
 
 async function open(view, settings, opts = {}) {
-    const ctx = await b.newContext(ctxOpts);
+    const ctx = await newContext(b, ctxOpts);
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     const { log } = await routeAll(page, { rainCell: true, ...opts });
@@ -37,6 +37,7 @@ const I = (page, fn, arg) => page.evaluate(fn, arg);
     ok('read back: small images only, the last 40 min, 10 min apart', rain.every(r => r.w === 96) && JSON.stringify(ages) === '[0,10,20,30,40]', ages);
     ok('no map images for it', !log.getmap.some(g => /h40b/.test(g.layer) && g.w > 96));
     // Lightning (same spot in every image): steady.
+    await page.waitForFunction(() => { const e = document.querySelector('#hazardChips [data-hazard="lightning"]'); return e && !/measuring/.test(e.textContent); }, null, { timeout: 20000 }).catch(() => {});
     const li = (await page.textContent('#hazardChips [data-hazard="lightning"]')).replace(/\s+/g, ' ').trim();
     ok('lightning alert: movement read back → not getting closer', /not getting closer/.test(li), li);
     // Polling again does not read back again.
