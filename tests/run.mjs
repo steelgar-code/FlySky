@@ -30,12 +30,17 @@ const server = http.createServer((req, res) => {
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 const BASE_URL = `http://localhost:${server.address().port}/`;
 
+// One test time for the whole run: TEST_NOW from the environment, else today at 10:30 UTC.
+const day = new Date(); day.setUTCHours(10, 30, 0, 0);
+const TEST_NOW = process.env.TEST_NOW ? new Date(process.env.TEST_NOW).toISOString() : day.toISOString();
+console.log(`Test time ${TEST_NOW}`);
+
 let pass = 0, fail = 0;
 const failed = [];
 for (const suite of suites) {
     console.log(`\n=== ${suite}`);
     const out = await new Promise(resolve => {
-        const child = spawn(process.execPath, [path.join(here, suite)], { env: { ...process.env, BASE_URL }, cwd: here });
+        const child = spawn(process.execPath, [path.join(here, suite)], { env: { ...process.env, BASE_URL, TEST_NOW }, cwd: here });
         let text = '';
         child.stdout.on('data', d => { text += d; process.stdout.write(d); });
         child.stderr.on('data', d => { text += d; process.stderr.write(d); });

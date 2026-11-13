@@ -4,12 +4,12 @@
 // (desktop and a 390 px phone); the per-model legend carries each model's value; the default hour is
 // the "Can I fly now?" card's hour and follows its pin; the hour survives a chart rebuild; Ukrainian.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const errors = [];
 const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 };
 async function open(ctxOpts) {
-  const ctx = await b.newContext({ serviceWorkers: 'block', ...ctxOpts });
+  const ctx = await newContext(b, { serviceWorkers: 'block', ...ctxOpts });
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(e.message));
   await routeAll(page, {});
@@ -129,6 +129,13 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const ukFit = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => { const e = document.getElementById(`chartValues-${p.key}`); return [p.key, e.scrollHeight, e.clientHeight, e.innerText]; }).filter(r => !r[1] || r[1] > r[2] + 1));
   ok('phone, Ukrainian: every values line fits in the two lines', ukFit.length === 0, ukFit);
   await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
+  // Models mode: the range view keeps two lines, per model (hour only) is one line.
+  await page.evaluate(() => document.querySelector('[data-mode="deterministic"]').click()); await page.waitForTimeout(3500);
+  const hh = () => page.evaluate(() => document.getElementById('chartValues-wind_speed_10m').offsetHeight);
+  const hRange = await hh();
+  await page.evaluate(() => document.getElementById('btnMembers').click()); await page.waitForTimeout(800);
+  const hModel = await hh();
+  ok('phone: per-model values line one line high (16 px), range view two (32 px)', hModel === 16 && hRange === 32, { hRange, hModel });
   ok('no horizontal scroll from the values line', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && document.getElementById('chartWrap-precipitation').scrollWidth <= document.getElementById('chartWrap-precipitation').clientWidth + 1));
   await ctx.close();
 }

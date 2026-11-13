@@ -2,6 +2,7 @@
 // map tiles and a fake EUMETView WMS (shaped like GeoServer 1.3.0 output).
 import fs from 'fs';
 import { PNG } from 'pngjs';
+import { testNow } from './env.mjs';
 const nm = p => fs.readFileSync(new URL('../node_modules/' + p, import.meta.url));
 
 export function png(w, h, rgba) {
@@ -17,7 +18,7 @@ const floor = (ms, step) => Math.floor(ms / step) * step;
 
 export function makeWms(opts = {}) {
   // opts.now: pretend it is this time (ms), e.g. to get daytime images.
-  const now = opts.now ?? Date.now();
+  const now = opts.now ?? testNow();
   const s15 = 15 * 60e3, s10 = 10 * 60e3;
   const fogEnd = floor(now - 20 * 60e3, s15);
   const microTimes = []; for (let k = 0; k < 60; k++) microTimes.push(iso(fogEnd - k * s15 - (k % 7 === 3 ? 5 * 60e3 : 0)));
@@ -110,7 +111,7 @@ export async function routeAll(page, opts = {}) {
     if (url.includes('api.open-meteo.com/v1/forecast') && url.includes('past_days')) {
       const u = new URL(url);
       const lats = u.searchParams.get('latitude').split(','), lons = u.searchParams.get('longitude').split(',');
-      const start = Math.floor(Date.now() / 86400e3) * 86400e3 - 86400e3;
+      const start = Math.floor(testNow() / 86400e3) * 86400e3 - 86400e3;
       const series = (lat, lon) => { const time = [], c = [], v = [], pr = [], ws = [], wd = [], wg = [], ws9 = [], wd9 = [];
         for (let i = 0; i < 72; i++) { time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16)); c.push(85); v.push(400); pr.push(0.2);
           ws.push(+(3 + Math.abs(lat - 48) * 1.5).toFixed(1)); wd.push(225); wg.push(9.5); ws9.push(+(8 + Math.abs(lon - 30)).toFixed(1)); wd9.push(270);
@@ -156,11 +157,11 @@ export async function routeAll(page, opts = {}) {
       if (opts.icingFail) return route.fulfill({ status: 500, json: { error: true, reason: opts.icingFail } });
       const models = u.searchParams.get('models').split(','), vars = u.searchParams.get('hourly').split(',');
       const lats = u.searchParams.get('latitude').split(',').map(Number), lons = u.searchParams.get('longitude').split(',').map(Number);
-      const days = +(u.searchParams.get('forecast_days') || 8), start = Math.floor(Date.now() / 86400e3) * 86400e3;
+      const days = +(u.searchParams.get('forecast_days') || 8), start = Math.floor(testNow() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
       // The current hour's index: the app's (UTC+2, like the forecast mock) or UTC.
       const offset = gmt ? 0 : 7200;
-      const now = Math.floor((Date.now() + offset * 1000 - start) / 3600e3);
+      const now = Math.floor((testNow() + offset * 1000 - start) / 3600e3);
       const level = opts.icing || icingScenario, sfc = opts.icingSfc || icingSfcScenario;
       const one = (la, lo) => {
         const ground = opts.routeElevation ? opts.routeElevation(la, lo) : ICING_GROUND;
@@ -201,10 +202,10 @@ export async function routeAll(page, opts = {}) {
       const models = u.searchParams.get('models').split(','); const vars = u.searchParams.get('hourly').split(',');
       const mf = opts.forecastModelFail;
       if (mf && models.includes(mf.model)) return route.fulfill({ status: mf.status || 400, json: { error: true, reason: mf.reason } });
-      const days = +(u.searchParams.get('forecast_days') || 2); const start = Math.floor(Date.now() / 86400e3) * 86400e3;
+      const days = +(u.searchParams.get('forecast_days') || 2); const start = Math.floor(testNow() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < days * 24; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
       const hourly = { time };
-      const nowIdx = Math.floor((Date.now() + 7200e3 - start) / 3600e3);
+      const nowIdx = Math.floor((testNow() + 7200e3 - start) / 3600e3);
       models.forEach((m, mi) => {
         const suffix = models.length > 1 ? '_' + m : '';
         const n = ens ? opts.forecastMembers || 6 : 1;
@@ -240,9 +241,9 @@ export async function routeAll(page, opts = {}) {
       const asked = u.searchParams.get('hourly').split(',');
       const w = opts.routeWind || { speed: 6, from: 270 };
       log.routeReq = (log.routeReq || []).concat(u.searchParams.get('hourly'));
-      const start = Math.floor(Date.now() / 86400e3) * 86400e3;
+      const start = Math.floor(testNow() / 86400e3) * 86400e3;
       const time = []; for (let i = 0; i < 48; i++) time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16));
-      const one = v => v.startsWith('wind_speed_') ? time.map(x => w.speed + (w.ramp || 0) * Math.max(0, (Date.parse(x + 'Z') - Date.now()) / 3600e3))
+      const one = v => v.startsWith('wind_speed_') ? time.map(x => w.speed + (w.ramp || 0) * Math.max(0, (Date.parse(x + 'Z') - testNow()) / 3600e3))
         : v.startsWith('wind_direction_') ? time.map(() => w.from)
         : v.startsWith('geopotential_height_') ? time.map(() => STD_HEIGHT[parseInt(v.slice(20), 10)] ?? null) : time.map(() => null);
       const list = lats.map((la, i) => ({ latitude: +la, longitude: +lons[i], elevation: opts.routeElevation ? opts.routeElevation(+la, +lons[i]) : 179,

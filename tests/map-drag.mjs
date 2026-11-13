@@ -3,10 +3,10 @@
 // map settles (on a small grid, so tiny moves reuse it), and the notes /
 // readout never covering the crosshair.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
-const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, hasTouch: true, serviceWorkers: 'block' });
+const ctx = await newContext(b, mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, hasTouch: true, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const { log } = await routeAll(page, { rainCell: true });

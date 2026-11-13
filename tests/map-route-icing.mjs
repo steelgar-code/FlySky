@@ -4,7 +4,7 @@
 // tag's mark, one model only, freezing rain from the weather code, hilly ground (height above it),
 // no return flight, cached answers, the icing indicator off, Ukrainian.
 import { routeAll, icingSfcScenario } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
 const ctxOpts = mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' };
@@ -21,7 +21,7 @@ const opts = {
         return {};
     }
 };
-const ctx = await b.newContext(ctxOpts);
+const ctx = await newContext(b, ctxOpts);
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const { log } = await routeAll(page, opts);

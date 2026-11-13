@@ -4,13 +4,16 @@
 // the "Icing risk" flag, the fade beyond 3 days and one-model stripes, the Open-Meteo usage line,
 // failures and the stored copy, Ukrainian. The mock's icing scenario: lib/mock.mjs icingScenario().
 import { routeAll, icingSfcScenario } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext, pastHourChange } from './lib/env.mjs';
 const b = await launch();
+// These checks address the hours by their place in the data the mock stamps (k = hours from now), and the
+// suite takes about two minutes: with a full hour due inside that, start just after it instead.
+await pastHourChange(150000);
 const mobile = process.argv.includes('--mobile');
 const ctxOpts = mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' };
 const KYIV = { name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine', elevation: 179 };
 
-const ctx = await b.newContext(ctxOpts);
+const ctx = await newContext(b, ctxOpts);
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const opts = {};
@@ -266,7 +269,7 @@ await ctx.close();
 
 // ---- A failing icing request: said so, the forecast unaffected; the stored copy offline
 {
-    const ctx2 = await b.newContext(ctxOpts);
+    const ctx2 = await newContext(b, ctxOpts);
     const p2 = await ctx2.newPage();
     const o2 = { icingFail: 'boom' };
     const { log: log2 } = await routeAll(p2, o2);

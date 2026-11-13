@@ -1,11 +1,11 @@
 // Failure paths, day/night choice and mobile layout.
 import { routeAll, makeWms } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext, testNow } from './lib/env.mjs';
 const b = await launch();
 const iso = ms => new Date(ms).toISOString().replace('.000Z', 'Z');
 
 async function open(opts, ctxOpts = {}, before) {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block', ...ctxOpts });
+  const ctx = await newContext(b, { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block', ...ctxOpts });
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   if (before) await before(page);
@@ -74,7 +74,7 @@ async function open(opts, ctxOpts = {}, before) {
 
 // D. Leaflet fails to load → back to forecast with a toast
 {
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
+  const ctx = await newContext(b, { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await routeAll(page, { leafletFail: true });
   await page.goto(BASE_URL); await page.waitForTimeout(500);
@@ -85,7 +85,7 @@ async function open(opts, ctxOpts = {}, before) {
 
 // E. Daytime → Day Microphysics; night hint when user picks a day product at night
 {
-  const noon = new Date(); noon.setUTCHours(10, 0, 0, 0);
+  const noon = new Date(testNow()); noon.setUTCHours(10, 0, 0, 0);
   // Images from the same daytime as the page's clock.
   const { page, st, ctx } = await open({ now: noon.getTime(), auto: true }, {}, async p => { await p.clock.setFixedTime(noon); });
   let s = await st();

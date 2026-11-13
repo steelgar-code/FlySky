@@ -2,10 +2,10 @@
 // "Can I fly now?" tiles and summary cards opening their chart (at the hour in
 // question), and the back-to-top button.
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
-const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+const ctx = await newContext(b, mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 await routeAll(page, {});

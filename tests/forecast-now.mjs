@@ -3,10 +3,10 @@
 // confidence text naming its group ("90% of members: suitable"); the flight conditions card
 // (low-confidence hatch, the ⓘ panel, the pinned hour's lines, its height on a phone).
 import { routeAll } from './lib/mock.mjs';
-import { launch, BASE_URL, ok } from './lib/env.mjs';
+import { launch, BASE_URL, ok, newContext } from './lib/env.mjs';
 const b = await launch();
 const mobile = process.argv.includes('--mobile');
-const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+const ctx = await newContext(b, mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
 const forecastReqs = [];
@@ -152,7 +152,7 @@ ok('English again: the Models label is not overwritten by the static string', /^
 // 630 px (the hour bar, three strips, two legends and the pinned hour's ~20 lines; measured at
 // 8990e25 with the same steps); the whole card 2,004 px with the breakdown and the profile open.
 {
-  const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+  const ctx2 = await newContext(b, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const p2 = await ctx2.newPage();
   p2.on('pageerror', e => errors.push(e.message));
   await routeAll(p2, {});
@@ -249,6 +249,14 @@ ok('English again: the Models label is not overwritten by the static string', /^
   ok('with the settings drawer open, Escape closes the drawer only', !(await drawerOpen()) && (await panel()).open);
   await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
   ok('…the next Escape the panel', !(await panel()).open);
+  // Escape in the location search leaves an open ⓘ panel alone.
+  await p2.click('#btnFlightInfo'); await p2.waitForTimeout(200);
+  await J(() => setSearchPanel(true)); await p2.waitForTimeout(200);
+  const inField = await J(() => document.activeElement.id);
+  await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
+  ok('Escape in the search field: the ⓘ panel stays open', inField === 'searchInput' && (await panel()).open, [inField, await panel()]);
+  await J(() => { setSearchPanel(false); document.activeElement.blur(); }); await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
+  ok('…and with the search closed, Escape closes the panel again', !(await panel()).open);
 
   // The icing ⓘ: the owner's four paragraphs, English word for word.
   await p2.tap('#btnIcingInfo'); await p2.waitForTimeout(200);

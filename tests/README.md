@@ -14,6 +14,16 @@ npm run test:live      # also live-eumetsat.mjs (real EUMETView data)
 `run.mjs` serves the repository on a free local port, runs each suite with `BASE_URL` set,
 and prints `N passed, M failed` (exit code 1 on any failure or crash).
 
+Test time: `run.mjs` chooses one time for the whole run, today at 10:30 UTC unless `TEST_NOW` is set
+(e.g. `TEST_NOW=2026-11-13T20:59:30Z node run.mjs forecast-icing`), and passes it to every suite.
+`testNow()` in `lib/env.mjs` is that time plus the real time elapsed since the suite started; the mock
+stamps its data with it (a suite's own `now` option wins), and `newContext(browser, options)` (use it
+instead of `browser.newContext`) gives every page the same clock through `context.clock.install`, so
+time still flows and timers fire in real time. Each suite starts at the test time, so a full hour can pass
+inside a suite; `forecast-icing.mjs` addresses hours by their place in the stamped data, so it waits
+(`pastHourChange()`) until just after a full hour that is due within its two minutes. A suite run directly without `TEST_NOW` uses the real
+time. `live-eumetsat.mjs` talks to the real service and keeps the real clock.
+
 Environment:
 - `CHROMIUM_PATH` — browser executable to use (default: Playwright's own; `/opt/pw-browsers/chromium` if present).
 - `BASE_URL` — app URL when running a suite directly (`node map-layers.mjs`), default `http://localhost:8765/`.
@@ -55,7 +65,7 @@ Every external request is answered locally, so the suites run offline and are re
 | `forecast.mjs` | combined request, charts, flight bar, 72 h window, Models mode, thresholds + reset, planner, language, saved forecast |
 | `forecast-now.mjs` | "Can I fly now?" card (Map in the title row, one-line source line, Models button with the count and the names, the time zone on the sun line, Ukrainian), wind aloft as a factor, models in the side menu, 8 days asked once (no request on window switch), daily limit, the confidence legend line ("Confidence: medium 14 h · low 10 h" and the ⓘ), the confidence text naming its group ("90% of members: suitable" with an uncertain hour, "… of models: …", Ukrainian, the hour bar's titles); the flight conditions card on a 390 px phone with touch: the low-confidence hatch (on low hours only, none in *Split by share*), the confidence chart under the hour bar (one column per hour aligned with the bar's cells, height = share × 18 px, colours at 59 / 60 / 80 %, guide lines, day separators, nothing over the first column, the chart's aria-label and title, hover and tap on a column, the counts adding up to the window, kept in *Split by share*), the icing ⓘ's four paragraphs (English exact, Ukrainian and Portuguese), the ⓘ panel (touch, mouse, keyboard, Escape, one panel at a time, the settings drawer's Escape first), the pinned hour's lines (time · verdict · flag · Map, values, confidence, the pinned column without an outline, the split with "Uncertain: …" on its own line), the card's height against the old one, Ukrainian and Portuguese |
 | `forecast-scrub.mjs` | "Can I fly now?" hour scrubber: mouse and touch sliding (also off the strip), strip kept under the pointer, tap, ‹ › buttons, keyboard, card following the hour, shared pin with the flight bar, *Now*, *Map* |
-| `forecast-chart-values.mjs` | the values of the selected hour above each parameter chart instead of the tooltip: tooltip off, the card's hour by default, hover and tap selecting an hour (values matching the statistics, the hour and its highlighted points kept when the pointer leaves), precipitation chance, a fixed height between hours (one line on a desktop, two on a 390 px phone, also in Ukrainian), the per-model legend with a value per model, the flight bar's pin moving every chart, `gotoChart()`, a chart rebuild keeping the hour, Ukrainian and Portuguese labels |
+| `forecast-chart-values.mjs` | the values of the selected hour above each parameter chart instead of the tooltip: tooltip off, the card's hour by default, hover and tap selecting an hour (values matching the statistics, the hour and its highlighted points kept when the pointer leaves), precipitation chance, a fixed height between hours (one line on a desktop, two on a 390 px phone, also in Ukrainian; per model one line on the phone too), the per-model legend with a value per model, the flight bar's pin moving every chart, `gotoChart()`, a chart rebuild keeping the hour, Ukrainian and Portuguese labels |
 | `forecast-nav.mjs` | date / sunrise / sunset in the location card, card tiles and summary cards opening their chart at the hour in question (the chart's selected hour), back-to-top button |
 | `map-loading.mjs` | lazy loading (latest only; selected frame forward), frame marker on prev/next/play, basemaps, colour keys, precipitation |
 | `map-readout.mjs` | crosshair readout (colour match, rain rate, model line; rain and gusts from the stamp closing the image's hour), caching, no reads while playing, Set location, centre button |
