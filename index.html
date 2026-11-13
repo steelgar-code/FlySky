@@ -689,9 +689,11 @@
         // Weather parameters, one chart each. `unit` picks which unit setting
         // applies. Adding a new parameter only needs a new entry here plus its
         // translation keys.
-        // `vars` (optional) lists the API variables behind a chart per mode;
-        // several variables are pooled into one distribution. Without it the
-        // chart uses the variable named by `key`.
+        // `vars` (optional) lists the API variables behind a chart per mode
+        // (or a function giving them); several variables are pooled into one
+        // distribution. Without it the chart uses the variable named by `key`.
+        // `series` (optional, per mode) works one series per model out of
+        // those columns instead.
         const PARAMS = [
             { key: 'precipitation', unit: 'precip', icon: 'fa-cloud-rain', color: '56, 189, 248', titleKey: 'paramPrecipitation', probability: true, beginAtZero: true },
             { key: 'wind_speed_10m', unit: 'wind', icon: 'fa-wind', color: '45, 212, 191', titleKey: 'paramWindSpeed', beginAtZero: true },
@@ -700,28 +702,31 @@
             // The API reports visibility in meters; shown in km (`scale`).
             // Not every model provides it — those simply add no members.
             { key: 'visibility', unit: 'distance', icon: 'fa-eye', color: '251, 146, 60', titleKey: 'paramVisibility', beginAtZero: true, scale: 0.001 },
-            // Wind above the surface layer, where the drone actually flies:
-            // ensemble pools the 1000 hPa and 925 hPa levels, models mode uses
-            // 950 hPa. Heights above the ground over lowland Ukraine: 1000 hPa
-            // ≈ 0–100 m (often below the ground), 925 hPa ≈ 600 m, 950 hPa
-            // ≈ 400 m (docs/icing-forecast-handoff.md §4.1).
+            // Wind above the surface layer, where the drone actually flies.
+            // Models mode: the wind speed at the flight altitude above the
+            // ground (aloftVars(), aloftSeries()). Ensemble mode: 925 hPa,
+            // ≈ 600 m above lowland Ukraine (ensembleAloftAgl()); the ensemble
+            // API has no geopotential height to place it more exactly.
             { key: 'wind_aloft', unit: 'wind', icon: 'fa-arrow-up-wide-short', color: '244, 114, 182', beginAtZero: true,
               titleKey: { ensemble: 'paramWindAloftEns', deterministic: 'paramWindAloftDet' }, statTitleKey: 'statWindAloftTitle',
-              note: { ensemble: '1000/925 hPa', deterministic: '950 hPa' },
-              vars: { ensemble: ['wind_speed_1000hPa', 'wind_speed_925hPa'], deterministic: ['wind_speed_950hPa'] },
-              // With Members on, each level's member lines get their own color.
-              levels: {
-                  wind_speed_1000hPa: { color: '163, 230, 53', label: '≤ 100 m · 1000 hPa' },
-                  wind_speed_925hPa: { color: '96, 165, 250', label: '~600 m · 925 hPa' }
-              } }
+              titleVars: () => ({ h: state.mode === 'ensemble' ? ensembleAloftLabel() : state.flightProfile.heightM }),
+              note: { ensemble: '', deterministic: () => { const lv = windLevelsFor(state.flightProfile.heightM, forecastGround('deterministic')); return lv.length ? `${lv.join('/')} hPa` : ''; } },
+              vars: { ensemble: ['wind_speed_925hPa'], deterministic: () => aloftVars() },
+              series: { deterministic: (hourly, elevation) => aloftSeries(hourly, elevation) } }
         ];
 
         function paramVars(param, mode = state.mode) {
-            return param.vars ? param.vars[mode] : [param.key];
+            const v = param.vars ? param.vars[mode] : [param.key];
+            return typeof v === 'function' ? v() : v;
         }
 
         function paramTitle(param) {
-            return t(typeof param.titleKey === 'string' ? param.titleKey : param.titleKey[state.mode]);
+            return t(typeof param.titleKey === 'string' ? param.titleKey : param.titleKey[state.mode], param.titleVars ? param.titleVars() : undefined);
+        }
+
+        function paramNote(param) {
+            const n = param.note ? param.note[state.mode] : '';
+            return typeof n === 'function' ? n() : n || '';
         }
 
         // Every API variable the current mode requests, in PARAMS order.
@@ -1945,6 +1950,26 @@
         // Ukraine, 925 hPa ("~800 m", or '925' before that) ≈ 600 m.
         const LEGACY_WIND_HEIGHTS = { '10m': 10, '120m': 120, '500m': 400, '800m': 600, '925': 600, '1500m': 1500 };
 
+        // Wind at the flight altitude (the forecast's wind aloft in Models
+        // mode and map.js: wind arrows, flight time calculator). Standard-
+        // atmosphere heights (m above sea level) of the pressure levels;
+        // the real ones come with the data (geopotential height).
+        const STD_LEVEL_HEIGHT = { 1000: 110, 975: 320, 950: 540, 925: 760, 900: 990, 850: 1460, 800: 1950 };
+        const TYPICAL_GROUND = 150;   // m above sea level (lowland Ukraine): for choosing the levels
+        const LEVEL_REACH = 250;      // one level alone stands for a height this close to it
+        const MIN_AGL = 20;           // a level lower than this above the ground is inside the terrain
+
+        // Pressure levels asked for a height: the three whose standard-
+        // atmosphere height is nearest to it over the ground (typical ground
+        // unless given; none at 10 / 120 m).
+        function windLevelsFor(heightM, ground = TYPICAL_GROUND) {
+            if (heightM <= 120) return [];
+            const z = heightM + ground;
+            return Object.keys(STD_LEVEL_HEIGHT).map(Number)
+                .sort((a, b) => Math.abs(STD_LEVEL_HEIGHT[a] - z) - Math.abs(STD_LEVEL_HEIGHT[b] - z))
+                .slice(0, 3).sort((a, b) => b - a);
+        }
+
         // The rest of the profile is for the icing indicator (a flight from the
         // location: climb, cruise for the duration, descent) and its options.
         const CLIMB_RATES = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10];          // m/s, climb and descent
@@ -2605,6 +2630,7 @@
                 meta: first.meta,
                 times: first.hourly.time,
                 models: Object.fromEntries(have.map(([m, r]) => [m, r.hourly])),
+                elevations: Object.fromEntries(have.map(([m, r]) => [m, r.meta.elevation])),
                 errors
             };
         }
@@ -2729,10 +2755,48 @@
             return Math.max(FETCH_DAYS, Math.ceil((24 + state.window) / 24));
         }
 
+        // The ground at the forecast location (m above sea level): the
+        // elevation in a saved answer for it, else the location's own, else
+        // typical ground. It places the wind-aloft levels.
+        function forecastGround(mode = state.mode, loc = state.location) {
+            if (!loc) return TYPICAL_GROUND;
+            for (const md of [mode, ...Object.keys(MODES).filter(x => x !== mode)]) {
+                for (const m of state.modelsByMode[md]) {
+                    const r = modelRecords.get(modelRecordKey(md, loc, m));
+                    if (r && Number.isFinite(r.meta.elevation)) return r.meta.elevation;
+                }
+            }
+            return Number.isFinite(loc.elevation) ? loc.elevation : TYPICAL_GROUND;
+        }
+
+        // Models mode: the variables behind the wind at the flight altitude.
+        // 10 m and 120 m: the height level; higher up: speed and height of
+        // the three pressure levels around it (no direction: the speed is
+        // interpolated on its own).
+        function aloftVars(heightM = state.flightProfile.heightM) {
+            if (heightM <= 120) return [`wind_speed_${heightM}m`];
+            return windLevelsFor(heightM, forecastGround('deterministic')).flatMap(p => [`wind_speed_${p}hPa`, `geopotential_height_${p}hPa`]);
+        }
+
+        // Ensemble mode: 925 hPa's approximate height above the ground (its
+        // standard height minus the ground), and as shown: to 50 m.
+        function ensembleAloftAgl() {
+            return STD_LEVEL_HEIGHT[925] - forecastGround('ensemble');
+        }
+        function ensembleAloftLabel() {
+            return Math.max(0, Math.round(ensembleAloftAgl() / 50) * 50);
+        }
+
+        // The variables a mode asks for now (the wind-aloft levels follow the
+        // flight altitude), less those the API rejected.
+        function neededVars(mode) {
+            return apiVars(mode).filter(v => !unsupportedVars[mode].has(v));
+        }
+
         // Rough Open-Meteo cost of one forecast update, in "API calls": every
         // variable of every member (or model) counts 1/10 of a call.
         function forecastCost(mode = state.mode, models = state.modelsByMode[mode]) {
-            const vars = apiVars(mode).filter(v => !unsupportedVars[mode].has(v)).length;
+            const vars = neededVars(mode).length;
             const series = MODES[mode].models.filter(m => models.includes(m.id)).reduce((n, m) => n + (m.members || 1), 0);
             return Math.max(1, Math.ceil(series * vars / 10));
         }
@@ -2762,12 +2826,14 @@
         // retried; a rate-limit reply is retried once after a short pause.
         // Network errors (and aborts) are thrown to the caller.
         async function requestForecast(mode, models, days, signal) {
-            let vars = apiVars(mode).filter(v => !unsupportedVars[mode].has(v));
+            let vars = neededVars(mode);
             let rateRetried = false;
             for (;;) {
                 const res = await omFetch(buildForecastUrl(mode, models.join(','), vars, days), { cost: forecastCost(mode, models), signal });
                 const body = await res.json().catch(() => null);
-                if (res.ok && body && !body.error && body.hourly) return { data: body };
+                // The variables asked go with the answer: the response is
+                // split and the record judged by them.
+                if (res.ok && body && !body.error && body.hourly) return { data: body, vars };
                 const reason = (body && body.reason) || `HTTP ${res.status}`;
                 if (res.status === 429 || /too many|limit exceeded/i.test(reason)) {
                     // Free-use limits: per minute (600 calls), hour (5,000)
@@ -2819,10 +2885,11 @@
         // the column name itself (after the variable and optional member
         // part) and mapped back to the requested model: exact id, known
         // alias, prefix, then the order models were requested in (the API
-        // answers in that order). Returns the per-model responses plus the
-        // models no column could be attributed to.
-        function splitCombined(body, models) {
-            const varsByLength = apiVars('ensemble').concat(apiVars('deterministic')).sort((a, b) => b.length - a.length);
+        // answers in that order). `vars`: the variables that request asked
+        // for. Returns the per-model responses plus the models no column
+        // could be attributed to.
+        function splitCombined(body, models, vars) {
+            const varsByLength = vars.slice().sort((a, b) => b.length - a.length);
             const columns = [];     // { base, suffix, series }
             const suffixes = [];    // distinct response model names, in order of appearance
             Object.keys(body.hourly).forEach(k => {
@@ -2871,7 +2938,8 @@
                 try {
                     const r = await requestForecast(mode, models, days, signal);
                     if (r.data) {
-                        const split = splitCombined(r.data, models);
+                        const split = splitCombined(r.data, models, r.vars);
+                        split.results.forEach(x => { x.vars = r.vars; });
                         if (!split.missing.length) return split.results;
                         // Safety net: any model none of the columns could be matched to
                         // is fetched on its own rather than shown as failed.
@@ -2899,7 +2967,7 @@
                 if (limited) { results.push({ model, error: limited.error, rateLimited: true }); continue; }
                 try {
                     const r = await requestForecast(mode, [model], days, signal);
-                    results.push(r.data ? { model, data: r.data } : { model, error: r.error, rateLimited: r.rateLimited });
+                    results.push(r.data ? { model, data: r.data, vars: r.vars } : { model, error: r.error, rateLimited: r.rateLimited });
                 } catch (err) {
                     if (err.name === 'AbortError') throw err;
                     results.push({ model, error: err.message || String(err), network: true });
@@ -2923,7 +2991,16 @@
         const modelFailures = new Map();
 
         function recordStale(r, mode, days) {
-            return !r || r.days < days || Date.now() - r.fetchedAt >= FORECAST_MAX_AGE_MS[mode];
+            return !r || r.days < days || Date.now() - r.fetchedAt >= FORECAST_MAX_AGE_MS[mode] || !recordHasVars(r, mode);
+        }
+
+        // A record asked for every variable the mode needs now (the wind-
+        // aloft levels follow the flight altitude and the ground). Judged by
+        // the list asked, not by the columns that came back, or a variable
+        // the API leaves out would be asked for again and again. Records
+        // saved without the list (before it was kept) are read again once.
+        function recordHasVars(r, mode) {
+            return Array.isArray(r.vars) && neededVars(mode).every(v => r.vars.includes(v));
         }
 
         // "Cached forecast from …": a model's saved record is shown instead of
@@ -2976,8 +3053,9 @@
             if (inflightLoad) {
                 // The same place and mode already loading: wait for it, then
                 // ask for whatever it did not cover.
+                // (A new flight altitude may need other wind-aloft levels.)
                 if (inflightLoad.base === base && inflightLoad.days >= days) {
-                    if (need.every(m => inflightLoad.need.includes(m))) return inflightLoad.promise;
+                    if (need.every(m => inflightLoad.need.includes(m)) && inflightLoad.vars === neededVars(mode).join()) return inflightLoad.promise;
                     await inflightLoad.promise.catch(() => {});
                     return forecastBase() === base ? loadForecast() : undefined;
                 }
@@ -2985,7 +3063,7 @@
             }
             const controller = new AbortController();
             const promise = runForecastLoad(base, need, days, controller, force);
-            inflightLoad = { base, need, days, controller, promise };
+            inflightLoad = { base, need, days, vars: neededVars(mode).join(), controller, promise };
             try {
                 await promise;
             } finally {
@@ -3017,8 +3095,9 @@
             const failed = results.filter(r => r.error);
             const now = Date.now();
             const records = ok.map(r => ({
-                key: modelRecordKey(mode, loc, r.model), mode, model: r.model, fetchedAt: now, days,
-                meta: { timezone: r.data.timezone, timezoneAbbreviation: r.data.timezone_abbreviation, utcOffsetSeconds: r.data.utc_offset_seconds || 0 },
+                key: modelRecordKey(mode, loc, r.model), mode, model: r.model, fetchedAt: now, days, vars: r.vars,
+                // elevation: the ground the API used for the location (the wind-aloft levels' reference).
+                meta: { timezone: r.data.timezone, timezoneAbbreviation: r.data.timezone_abbreviation, utcOffsetSeconds: r.data.utc_offset_seconds || 0, elevation: Number.isFinite(r.data.elevation) ? r.data.elevation : null },
                 hourly: r.data.hourly
             }));
             records.forEach(rememberRecord);
@@ -3065,11 +3144,47 @@
         // for the control run, `wind_speed_10m_member01`, …); deterministic
         // responses hold a single `wind_speed_10m` series. Either way every
         // series whose key starts with the parameter name is treated as one
-        // member, and all members of all selected models are pooled.
+        // member, and all members of all selected models are pooled. A
+        // parameter with `series` (Models-mode wind aloft) has one computed
+        // series per model instead.
         // What a processed forecast was made from: the data and the first hour.
         function renderStamp(fc) {
             const hour = new Date(Date.now() + fc.meta.utcOffsetSeconds * 1000).toISOString().slice(0, 13);
-            return `${fc.key}|${fc.fetchedAt}|${hour}|${state.window}`;
+            return `${fc.key}|${fc.fetchedAt}|${hour}|${state.window}|${state.flightProfile.heightM}`;
+        }
+
+        // Models mode: a model's wind speed at the flight altitude above the
+        // ground (m/s, on its own time axis), the map's windAt() for the
+        // speed alone. 10 m and 120 m: the height level. Higher up: the speed
+        // interpolated in height between the pressure levels below and above
+        // it, or the nearer one alone within LEVEL_REACH; levels inside the
+        // terrain are left out (Open-Meteo extrapolates values there). Uses
+        // whichever levels are there: a model may lack some (null columns).
+        function aloftSeries(hourly, elevation) {
+            const H = state.flightProfile.heightM;
+            if (H <= 120) return hourly[`wind_speed_${H}m`];
+            const known = Number.isFinite(elevation);
+            const target = (known ? elevation : forecastGround('deterministic')) + H;
+            const levels = Object.keys(STD_LEVEL_HEIGHT).filter(p => hourly[`wind_speed_${p}hPa`] && hourly[`geopotential_height_${p}hPa`])
+                .map(p => ({ s: hourly[`wind_speed_${p}hPa`], z: hourly[`geopotential_height_${p}hPa`] }));
+            return hourly.time.map((_, i) => {
+                let lo = null, hi = null;
+                levels.forEach(l => {
+                    const s = l.s[i], z = l.z[i];
+                    if (!Number.isFinite(s) || !Number.isFinite(z) || (known && z - elevation < MIN_AGL)) return;
+                    if (z <= target) { if (!lo || z > lo.z) lo = { s, z }; }
+                    else if (!hi || z < hi.z) hi = { s, z };
+                });
+                if (lo && hi) return lo.s + (hi.s - lo.s) * (target - lo.z) / (hi.z - lo.z);
+                const one = [lo, hi].find(l => l && Math.abs(l.z - target) <= LEVEL_REACH);
+                return one ? one.s : null;
+            });
+        }
+
+        // Ensemble mode: 925 hPa inside the terrain (ground above ~740 m)
+        // gives no wind aloft, like a level inside the terrain in Models mode.
+        function paramLeftOut(param) {
+            return param.key === 'wind_aloft' && state.mode === 'ensemble' && ensembleAloftAgl() < MIN_AGL;
         }
 
         function processForecast() {
@@ -3091,18 +3206,26 @@
 
             PARAMS.forEach(param => {
                 const members = [];
+                // A computed parameter: one series per model from its columns.
+                const compute = param.series && param.series[state.mode];
                 Object.entries(fc.models).forEach(([modelId, hourly]) => {
+                    if (paramLeftOut(param)) return;
                     // Models normally share one time axis; realign if not.
                     const own = hourly.time || times;
                     const aligned = own.length === times.length && own[0] === times[0];
                     const index = aligned ? null : new Map(own.map((tm, i) => [tm, i]));
                     const own_vars = paramVars(param);
-                    Object.keys(hourly).forEach(k => {
-                        // Longest matching API variable, so e.g. "wind_speed_10m" never
-                        // claims a "wind_speed_1000hPa" column.
-                        const v = allVars.filter(x => k === x || k.startsWith(x + '_')).sort((a, b) => b.length - a.length)[0];
-                        if (!v || !own_vars.includes(v)) return;
-                        const series = hourly[k];
+                    // [column key, variable, series]: the matching columns, or
+                    // the computed series (named after the parameter).
+                    const columns = compute
+                        ? [[param.key, param.key, compute(hourly, fc.elevations ? fc.elevations[modelId] : null)]]
+                        : Object.keys(hourly).map(k => {
+                            // Longest matching API variable, so e.g. "wind_speed_10m" never
+                            // claims a "wind_speed_1000hPa" column.
+                            const v = allVars.filter(x => k === x || k.startsWith(x + '_')).sort((a, b) => b.length - a.length)[0];
+                            return [k, v, hourly[k]];
+                        }).filter(([, v]) => v && own_vars.includes(v));
+                    columns.forEach(([k, v, series]) => {
                         if (!Array.isArray(series)) return;
                         // Rain and gusts are stamped at the END of their hour
                         // (sum / maximum of the preceding hour): the hour
@@ -3157,8 +3280,8 @@
             const rain = statsOf('precipitation');
             const wind = statsOf('wind_speed_10m');
             const gust = statsOf('wind_gusts_10m');
-            // The wind-aloft chart's values (Ensemble: 1000 + 925 hPa pooled;
-            // Models: 950 hPa), with limits of their own.
+            // The wind-aloft chart's values (Ensemble: 925 hPa; Models: at the
+            // flight altitude), with limits of their own.
             const aloft = statsOf('wind_aloft');
             const cloud = statsOf('cloud_cover_low');
             const vis = statsOf('visibility');
@@ -3167,7 +3290,7 @@
             if (!rain) missing.push('paramPrecipitation');
             if (!wind) missing.push('paramWindSpeed');
             if (!gust) missing.push('paramWindGusts');
-            if (!aloft) missing.push(state.mode === 'ensemble' ? 'paramWindAloftEns' : 'paramWindAloftDet');
+            if (!aloft) missing.push('flightFactorWindAloft');
             if (!cloud) missing.push('paramLowClouds');
             if (!vis) missing.push('paramVisibility');
             // Icing (option): its check per hour; without its data, said so.
@@ -3222,8 +3345,8 @@
                 if (!p) return;
                 p.members.forEach(m => {
                     // "_member07" (or "" for a control run / single model) names
-                    // the member across variables; wind aloft pools two levels,
-                    // which take the stronger value.
+                    // the member across variables (a computed series is named
+                    // after its parameter: "" too).
                     const id = `${m.model}|${m.key.slice(m.variable.length)}`;
                     const ser = series[id] || (series[id] = { model: m.model });
                     ser[check] = ser[check] ? ser[check].map((v, i) => pick(fn, v, m.values[i])) : m.values.slice();
@@ -4895,12 +5018,6 @@
             return state.mode === 'deterministic' && state.showMembers;
         }
 
-        // The pressure level an ensemble member belongs to, for charts that
-        // pool several levels (wind aloft); null otherwise.
-        function memberLevel(param, member) {
-            return (state.mode === 'ensemble' && param.levels && param.levels[member.variable]) || null;
-        }
-
         function buildDatasets(param, data) {
             const c = param.color;
             if (perModelView()) {
@@ -4944,10 +5061,9 @@
                 // made the charts ~5× slower to draw, for no visible gain.
                 const straight = { spanGaps: true, pointRadius: 0, tension: 0 };
                 data.members.forEach(m => {
-                    const level = memberLevel(param, m);
                     datasets.push({
                         ...straight, label: 'member', data: m.values, fill: false,
-                        borderColor: level ? `rgba(${level.color}, 0.55)` : `rgba(${c}, 0.18)`, borderWidth: 1,
+                        borderColor: `rgba(${c}, 0.18)`, borderWidth: 1,
                         pointHoverRadius: 0, order: 3
                     });
                 });
@@ -5129,7 +5245,7 @@
                 const data = processed ? processed.params[param.key] : null;
                 const hasData = !!(data && data.members.length);
                 document.getElementById(`chartTitle-${param.key}`).textContent = paramTitle(param);
-                document.getElementById(`chartNote-${param.key}`).textContent = param.note ? param.note[state.mode] : '';
+                document.getElementById(`chartNote-${param.key}`).textContent = paramNote(param);
                 document.getElementById(`chartUnit-${param.key}`).textContent =
                     param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
@@ -5137,13 +5253,9 @@
                 const legend = document.getElementById(`chartLegend-${param.key}`);
                 const swatch = (color, text) =>
                     `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${color}"></span>${escapeHtml(text)}</span>`;
-                const levels = hasData && state.showMembers
-                    ? [...new Set(data.members.map(m => memberLevel(param, m)).filter(Boolean))] : [];
-                const showLegend = hasData && (perModelView() || levels.length > 0);
+                const showLegend = hasData && perModelView();
                 legend.classList.toggle('hidden', !showLegend);
-                legend.innerHTML = !showLegend ? '' : perModelView()
-                    ? data.members.map(m => swatch(modelColor(m.model), modelName(m.model))).join('')
-                    : levels.map(l => swatch(`rgb(${l.color})`, l.label)).join('');
+                legend.innerHTML = showLegend ? data.members.map(m => swatch(modelColor(m.model), modelName(m.model))).join('') : '';
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
                 const overlayText = state.loading ? t('loading') : hasData ? '' :
