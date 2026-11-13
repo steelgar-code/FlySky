@@ -61,9 +61,9 @@ ok('8 days requested', /forecast_days=8/.test(forecastReqs.at(-1)), forecastReqs
 for (const w of ['48', '72', '168', '24']) { await page.click(`#windowButtons [data-window="${w}"]`); await page.waitForTimeout(600); }
 ok('window switches: no new requests', forecastReqs.length === n0, forecastReqs.length - n0);
 
-// Confidence on the hour bar: one short legend line (the hatch key and the ⓘ), no strip or level legend
-const legend = await I(() => { const k = document.getElementById('flightHatchKey'); return { text: k.innerText.trim(), shown: !k.classList.contains('hidden'), h: k.parentElement.getBoundingClientRect().height, info: !!document.querySelector('#flightMain #btnFlightInfo'), gone: ['flightConf', 'flightConfLegend'].filter(id => document.getElementById(id)) }; });
-ok('confidence legend: one short line, "low confidence" and the ⓘ; no confidence strip', legend.shown && legend.text === 'low confidence' && legend.h < 30 && legend.info && !legend.gone.length, legend);
+// Confidence for every hour: the chart under the hour bar, one short legend line ("Confidence: high 18 h · …" and the ⓘ)
+const legend = await I(() => { const k = document.getElementById('flightConfCounts'); return { text: k.innerText.replace(/\s+/g, ' ').trim(), shown: !k.classList.contains('hidden'), h: k.parentElement.getBoundingClientRect().height, info: !!document.querySelector('#flightMain #btnFlightInfo'), chart: !document.getElementById('flightConf').classList.contains('hidden'), gone: ['flightHatchKey', 'flightConfLegend'].filter(id => document.getElementById(id)) }; });
+ok('confidence legend: one short line, "Confidence: … h · … h" and the ⓘ, the chart above it; no hatch key', legend.shown && /^Confidence: (high \d+ h)?( · )?(medium \d+ h)?( · )?(low \d+ h)?$/.test(legend.text) && legend.h < 30 && legend.info && legend.chart && !legend.gone.length, legend);
 
 // Daily limit: one request, no per-model retries, one toast, forecast kept
 opts.forecastLimit = { n: 99, reason: 'Daily API request limit exceeded. Please try again tomorrow.' };
@@ -169,14 +169,63 @@ ok('English again: the Models label is not overwritten by the static string', /^
   ok('a low-confidence hour carries the hatch, a medium / high one does not', lowC && highC && lowC.low && /repeating-linear-gradient/.test(lowC.img) && !highC.low && highC.img === 'none' && cells.every(c => c.low === (c.level === 'low')), { low: lowC, high: highC });
   await p2.tap('#btnFlightSplit'); await p2.waitForTimeout(300);
   cells = await hatch();
-  ok('Split by share: no hatch (the shares are drawn), no hatch key', cells.every(c => !c.low && !/repeating/.test(c.img)) && await J(() => document.getElementById('flightHatchKey').classList.contains('hidden')));
+  ok('Split by share: no hatch (the shares are drawn), no hatch swatch in the legend', cells.every(c => !c.low && !/repeating/.test(c.img)) && await J(() => !document.querySelector('#flightConfCounts [data-hatch-swatch]')));
+  // The confidence chart stays in Split by share, its columns under the split bar's cells.
+  const chartGeo = () => J(() => {
+    const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, w: r.width, h: r.height }; };
+    const cols = [...document.querySelectorAll('#flightConf [data-flight-hour]')], cells = [...document.querySelectorAll('#flightStrip [data-flight-hour]')];
+    return { n: cols.length, hours: processed.flight.hours.length, cells: cells.length, maxDl: Math.max(...cols.map((c, i) => Math.abs(box(c).l - box(cells[i]).l))), maxDw: Math.max(...cols.map((c, i) => Math.abs(box(c).w - box(cells[i]).w))),
+      shown: !document.getElementById('flightConf').classList.contains('hidden'), chartH: box(document.getElementById('flightConf')).h };
+  });
+  const splitGeo = await chartGeo();
+  ok('Split by share: the chart stays, one column per hour under the split cells (±1 px)', splitGeo.shown && splitGeo.n === splitGeo.hours && splitGeo.maxDl <= 1 && splitGeo.maxDw <= 1, splitGeo);
   await p2.tap('#btnFlightSplit'); await p2.waitForTimeout(300);
+
+  // Batch 1g: the confidence chart (18 px) under the hour bar, one column per hour.
+  const geo = await chartGeo();
+  ok('confidence chart: one column per hour, same left / width as the hour bar\'s cells (±1 px), 18 px high', geo.shown && geo.n === geo.hours && geo.n === geo.cells && geo.maxDl <= 1 && geo.maxDw <= 1 && Math.abs(geo.chartH - 18) <= 0.5, geo);
+  const colInfo = await J(() => processed.flight.hours.map((h, i) => {
+    const col = document.querySelector(`#flightConf [data-flight-hour="${i}"]`), bar = col.firstElementChild, a = h.agree;
+    return { i, conf: a && a.conf, level: a && a.level, bar: !!bar, h: bar ? bar.getBoundingClientRect().height : 0, bg: bar ? getComputedStyle(bar).backgroundColor : '', bottom: bar ? Math.round(col.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom) : 0 };
+  }));
+  const rgb = hex => `rgb(${[1, 3, 5].map(k => parseInt(hex.slice(k, k + 2), 16)).join(', ')})`;
+  const COL = { high: '#67e8f9', medium: '#0e7490', low: '#64748b' };
+  ok('confidence chart: a column\'s height is the hour\'s share × 18 px, drawn from the bottom', colInfo.every(c => c.bar && Math.abs(c.h - c.conf * 18) <= 0.6 && c.bottom === 0), colInfo.slice(0, 4));
+  ok('confidence chart: colours by level (high bright cyan, medium mid cyan, low slate), levels at 60 / 80 %', colInfo.every(c => c.bg === rgb(COL[c.level]) && c.level === (c.conf >= 0.8 ? 'high' : c.conf >= 0.6 ? 'medium' : 'low')) && new Set(colInfo.map(c => c.level)).size >= 2, colInfo.map(c => c.level).join(','));
+  // The colour function at the edges: 59 % low, 60 % medium, 80 % high (synthetic hours through the chart's own markup).
+  const edge = await J(() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position: fixed; left: 0; top: 0; width: 100px; display: flex';
+    host.innerHTML = confChartHtml([[0.59, 'low'], [0.6, 'medium'], [0.8, 'high']].map(([conf, level]) => ({ status: 'good', agree: { conf, level } })), false);
+    document.body.appendChild(host);
+    const r = [...host.children].map(c => getComputedStyle(c.firstElementChild).backgroundColor); host.remove(); return r;
+  });
+  ok('confidence chart: 59 % slate, 60 % mid cyan, 80 % bright cyan', edge.join('|') === [COL.low, COL.medium, COL.high].map(rgb).join('|'), edge);
+  const dash = await J(() => ({ lines: [...document.querySelectorAll('#flightConf > div')].filter(d => /dashed/.test(d.style.borderTop)).map(d => d.style.bottom), seps: document.querySelectorAll('#flightConf [data-day-seps] > div').length, barSeps: document.querySelectorAll('#flightMain .relative [data-day-seps] > div').length }));
+  ok('confidence chart: dashed guides at 60 % and 80 %, the day separators like the bar', dash.lines.join() === '60%,80%' && dash.seps > 0 && dash.seps === dash.barSeps, dash);
+  // No label covers the first columns; the chart is named for assistive technology and has a title.
+  const nm = await J(() => { const c = document.getElementById('flightConf'), col = document.querySelector('#flightConf [data-flight-hour="0"]'), r = col.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { top: !!el && el.closest('[data-flight-hour]') === col, role: c.getAttribute('role'), aria: c.getAttribute('aria-label'), counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), title: c.title, label: !!document.getElementById('flightConfLabel') }; });
+  ok('confidence chart: nothing covers the first column; role img, aria-label = the legend counts, a title', nm.top && nm.role === 'img' && nm.aria === nm.counts && /^Confidence: high|^Confidence: medium|^Confidence: low/.test(nm.aria) && nm.title === 'Confidence: how many members agree on each hour\'s verdict' && !nm.label, nm);
+  // Counts add up to the window.
+  const cnt = await J(() => ({ sum: [...document.querySelectorAll('#flightConfCounts [data-conf-count]')].reduce((a, e) => a + Number(e.innerText.match(/\d+/)[0]), 0), hours: processed.flight.hours.length, text: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim() }));
+  ok('legend counts add up to the window\'s hours', cnt.sum === cnt.hours && cnt.hours > 0, cnt);
+  // Hover previews the hour, a tap pins it (the hour bar's cell is marked).
+  const colBox = await J(() => { const r = document.querySelector('#flightConf [data-flight-hour="3"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await p2.mouse.move(colBox.x, colBox.y); await p2.waitForTimeout(200);
+  const prev = await J(() => ({ text: document.getElementById('flightDetail').innerText, want: formatDayHour(processed.flight.hours[3].time), pinned: document.querySelectorAll('#flightStrip [data-pinned]').length }));
+  ok('hover on a chart column previews that hour in the details (nothing pinned)', prev.text.includes(prev.want) && prev.pinned === 0, prev);
+  await p2.tap('#flightConf [data-flight-hour="3"]'); await p2.waitForTimeout(300);
+  const pinC = await J(() => ({ text: document.getElementById('flightDetail').innerText, want: formatDayHour(processed.flight.hours[3].time), pinned: [...document.querySelectorAll('#flightStrip [data-pinned]')].map(c => c.dataset.flightHour), chartPinned: [...document.querySelectorAll('#flightConf [data-pinned]')].map(c => c.dataset.flightHour) }));
+  ok('a tap on a chart column pins that hour: the hour bar\'s cell and the column are marked', pinC.text.includes(pinC.want) && pinC.pinned.join() === '3' && pinC.chartPinned.join() === '3', pinC);
+  await p2.tap('#flightConf [data-flight-hour="3"]'); await p2.waitForTimeout(300);
+  ok('…and a second tap unpins it', await J(() => !document.querySelector('#flightMain [data-pinned]')));
 
   // The ⓘ panel: touch, mouse, keyboard; Escape; the settings drawer keeps its own Escape.
   const panel = () => J(() => ({ open: !document.getElementById('flightInfo').classList.contains('hidden'), expanded: document.getElementById('btnFlightInfo').getAttribute('aria-expanded'), controls: document.getElementById('btnFlightInfo').getAttribute('aria-controls'), text: document.getElementById('flightInfo').innerText.replace(/\s*\n\s*/g, ' '), focus: document.activeElement && document.activeElement.id }));
   await p2.tap('#btnFlightInfo'); await p2.waitForTimeout(200);
   let pn = await panel();
-  ok('ⓘ by touch: the panel opens (aria-expanded, aria-controls) and explains colours, hatch, band and split', pn.open && pn.expanded === 'true' && pn.controls === 'flightInfo' && /green suitable, yellow uncertain, red not suitable/.test(pn.text) && /Hatched: low confidence — fewer than 60 % of the members agree/.test(pn.text) && /sky blue daylight, indigo night/.test(pn.text) && /“Split by share” stacks each hour/.test(pn.text), pn);
+  ok('ⓘ by touch: the panel opens (aria-expanded, aria-controls) and explains colours, hatch, the chart, band and split', pn.open && pn.expanded === 'true' && pn.controls === 'flightInfo' && /green suitable, yellow uncertain, red not suitable/.test(pn.text) && /Hatched: low confidence — fewer than 60 % of the members agree/.test(pn.text) && /sky blue daylight, indigo night/.test(pn.text) && /The small chart under the bar: how many of the members agree on the hour's largest verdict — taller is more certain; the dashed lines are 60 % and 80 %\./.test(pn.text) && /“Split by share” stacks each hour/.test(pn.text), pn);
   await p2.tap('#btnFlightInfo'); await p2.waitForTimeout(200);
   ok('ⓘ by touch: a second tap closes it', !(await panel()).open);
   await p2.click('#btnFlightInfo'); await p2.waitForTimeout(200);
@@ -197,6 +246,16 @@ ok('English again: the Models label is not overwritten by the static string', /^
   ok('with the settings drawer open, Escape closes the drawer only', !(await drawerOpen()) && (await panel()).open);
   await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
   ok('…the next Escape the panel', !(await panel()).open);
+
+  // The icing ⓘ: the owner's four paragraphs, English word for word.
+  await p2.tap('#btnIcingInfo'); await p2.waitForTimeout(200);
+  const ic = await J(() => [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent));
+  ok('icing ⓘ: the four paragraphs, English exactly', JSON.stringify(ic) === JSON.stringify([
+    'What this shows: Where DWD ICON and UK Met Office forecasts indicate sub-zero, near-saturated air, freezing fog, or freezing rain/drizzle during climb, cruise, and descent.',
+    'Important: This is a potential icing hazard screen, not an icing forecast or a safety assessment. “No signs” does not mean safe. It assumes a fixed-wing drone without ice protection. Ice can rapidly affect thrust and airspeed readings and remain on the aircraft. Avoid icing conditions.',
+    'Colours: Red = potential icing; yellow = marginal; grey = no signs detected; hatched = no data. Striped = only one model indicates a hazard. Faded = forecast is more than 3 days ahead.',
+    'Profile: Each row shows a model pressure level at its typical local altitude. The dashed line marks your selected flight altitude.']), ic);
+  await p2.tap('#btnIcingInfo'); await p2.waitForTimeout(200);
 
   // The pinned hour: time · verdict · flag · Map; values; confidence; the split, then the
   // models' shares on a line of their own named by the largest group's verdict; one icing line.
@@ -221,8 +280,9 @@ ok('English again: the Models label is not overwritten by the static string', /^
   // Three languages: the ⓘ text.
   for (const [lang, re] of [['uk', /Штрихування: низька впевненість — менше 60 % членів ансамблю згодні/], ['pt-BR', /Hachurado: confiança baixa — menos de 60 % dos membros concordam/]]) {
     await p2.selectOption('#langSelect', lang); await p2.waitForTimeout(600);
-    const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, key: document.getElementById('flightHatchKey').innerText.trim(), label: document.getElementById('btnFlightInfo').getAttribute('aria-label') }));
-    ok(`${lang}: the ⓘ panel, its label and the hatch key`, re.test(tx.info) && tx.key === (lang === 'uk' ? 'низька впевненість' : 'confiança baixa') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
+    const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), chart: document.getElementById('flightConf').title, label: document.getElementById('btnFlightInfo').getAttribute('aria-label'), icing: [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent.trim()) }));
+    ok(`${lang}: the ⓘ panel, its label, the chart label and the legend counts`, re.test(tx.info) && tx.counts.startsWith(lang === 'uk' ? 'Впевненість: ' : 'Confiança: ') && tx.chart.startsWith(lang === 'uk' ? 'Впевненість: скільки' : 'Confiança: quantos') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
+    ok(`${lang}: the icing note has four paragraphs, none empty`, tx.icing.length === 4 && tx.icing.every(x => x.length > 40) && (lang !== 'uk' || /^Важливо:/.test(tx.icing[1])), tx.icing);
   }
   await ctx2.close();
 }

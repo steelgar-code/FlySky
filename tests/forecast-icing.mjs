@@ -78,8 +78,8 @@ ok('icing strip: one cell per hour, red now, grey at +9 h, the state in its titl
 // The ⓘ: the short note (what it shows, what it is not, the colours) instead of the strip's legend and the long note.
 await page.click('#btnIcingInfo'); await page.waitForTimeout(200);
 const info = await I(() => ({ shown: !document.getElementById('icingInfo').classList.contains('hidden'), expanded: document.getElementById('btnIcingInfo').getAttribute('aria-expanded'), text: document.getElementById('icingInfo').innerText.replace(/\s*\n\s*/g, ' ') }));
-ok('ⓘ: what the indicator shows, that it is not an icing forecast, the platform it assumes', info.shown && info.expanded === 'true' && /two forecast models \(DWD ICON, UK Met Office\)/.test(info.text) && /It is not an icing forecast: 'no icing signs' does not mean safe/.test(info.text) && /fixed-wing drone without ice protection/.test(info.text) && /the ice stays on/.test(info.text), info);
-ok('ⓘ: the colours — red potential icing, yellow marginal, grey no signs, hatched no data; striped one model; faded beyond 3 days; the profile', /red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead/.test(info.text) && /the dashed line is your flight altitude/.test(info.text), info.text);
+ok('ⓘ: what the indicator shows, that it is not an icing forecast, the platform it assumes', info.shown && info.expanded === 'true' && /Where DWD ICON and UK Met Office forecasts indicate sub-zero, near-saturated air/.test(info.text) && /not an icing forecast or a safety assessment\. “No signs” does not mean safe/.test(info.text) && /fixed-wing drone without ice protection/.test(info.text) && /remain on the aircraft\. Avoid icing conditions/.test(info.text), info);
+ok('ⓘ: the colours — red potential icing, yellow marginal, grey no signs, hatched no data; striped one model; faded beyond 3 days; the profile', /Red = potential icing; yellow = marginal; grey = no signs detected; hatched = no data\. Striped = only one model indicates a hazard\. Faded = forecast is more than 3 days ahead/.test(info.text) && /Profile: Each row shows a model pressure level at its typical local altitude\. The dashed line marks your selected flight altitude/.test(info.text), info.text);
 await page.click('#btnIcingInfo'); await page.waitForTimeout(200);
 ok('ⓘ: a second click closes it', await I(() => document.getElementById('icingInfo').classList.contains('hidden') && document.getElementById('btnIcingInfo').getAttribute('aria-expanded') === 'false'));
 // More than 3 days ahead: faded; past UKMO's range (+100 h): one model only, striped.
@@ -225,10 +225,10 @@ r = await row();
 ok('Ukrainian row', /Обледеніння.*Можливе обледеніння на 400 м \(−4,0 °C, вологість 96 %\) · 2 з 2 моделей/.test(r) && /шар ~380–590 м/.test(r), r);
 const tr = () => I(() => { selectHour(2); const l = document.querySelector('#flightDetail [data-icing-details]'); return { info: document.getElementById('icingInfo').textContent.replace(/\s+/g, ' '), link: l ? l.textContent.trim() : '', title: document.getElementById('btnIcingInfo').getAttribute('aria-label') }; });
 let tx = await tr();
-ok('Ukrainian: the icing note, its ⓘ and "Icing details"', /Це не прогноз обледеніння: «ознак обледеніння немає» не означає «безпечно»/.test(tx.info) && tx.link === 'Деталі обледеніння' && tx.title === 'Про індикатор обледеніння', tx);
+ok('Ukrainian: the icing note, its ⓘ and "Icing details"', /це перевірка на можливу небезпеку обледеніння, а не прогноз обледеніння і не оцінка безпеки\. «Ознак немає» не означає «безпечно»/.test(tx.info) && tx.link === 'Деталі обледеніння' && tx.title === 'Про індикатор обледеніння', tx);
 await page.selectOption('#langSelect', 'pt-BR'); await page.waitForTimeout(600);
 tx = await tr();
-ok('Portuguese: the icing note, its ⓘ and "Icing details"', /Não é uma previsão de gelo: “sem sinais de gelo” não quer dizer seguro/.test(tx.info) && tx.link === 'Detalhes do gelo' && tx.title === 'Sobre o indicador de gelo', tx);
+ok('Portuguese: the icing note, its ⓘ and "Icing details"', /não uma previsão de gelo nem uma avaliação de segurança\. “Sem sinais” não significa seguro/.test(tx.info) && tx.link === 'Detalhes do gelo' && tx.title === 'Sobre o indicador de gelo', tx);
 await I(() => selectHour(0));
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(400);
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
