@@ -118,5 +118,32 @@ ok('Ukrainian: "80% моделей: придатно"', /80% моделей: п�
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
 opts.forecastMembers = null; opts.forecastValue = undefined;
 
+// Batch 1e: the Map button in the title row, the short source line, the Models button, the zone
+// on the sun line. A 390 px phone, another hour selected so that Now and Map are both there.
+await page.setViewportSize({ width: 390, height: 844 });
+await I(() => selectHour(2)); await page.waitForTimeout(500);
+const lay = await I(() => {
+  const lines = el => { const r = el.getBoundingClientRect(), lh = parseFloat(getComputedStyle(el).lineHeight) || 16; return Math.round(r.height / lh); };
+  const row = document.querySelector('#nowMain [data-flight-map]').closest('div'), verdict = document.querySelector('#nowMain [data-icing-flag], #nowMain span.rounded-xl').parentElement;
+  const rects = ['[data-now-back]', '[data-flight-map]', '[data-now-details]'].map(s => document.querySelector('#nowMain ' + s).getBoundingClientRect());
+  return { titleH: Math.round(row.getBoundingClientRect().height), tops: rects.map(r => Math.round((r.top + r.bottom) / 2 / 6)), order: rects[0].right <= rects[1].left + 1 && rects[1].right <= rects[2].left + 1,
+    verdictLines: new Set([...verdict.children].map(c => { const r = c.getBoundingClientRect(); return Math.round((r.top + r.bottom) / 2 / 12); })).size, mapInVerdict: !!verdict.querySelector('[data-flight-map]'), scroll: document.documentElement.scrollWidth };
+});
+ok('390 px: Now, Map, Details in one line of the title row, in that order', lay.order && Math.max(...lay.tops) - Math.min(...lay.tops) <= 1 && lay.titleH < 30 && lay.scroll <= 390, lay);
+ok('…and the verdict row has at most two lines, no Map in it', lay.verdictLines <= 2 && !lay.mapInVerdict, lay);
+const hourSel = await I(() => { const h = processed.flight.hours[nowIndex()].time; const orig = openMapAt; window.__mapAt = null; openMapAt = t => { window.__mapAt = t; orig(t); }; return h; });
+await page.click('#nowMain [data-flight-map]'); await page.waitForTimeout(800);
+ok('Map in the title row opens the map at the selected hour', await I(() => !document.getElementById('mapView').classList.contains('hidden')) && await I(() => window.__mapAt) === hourSel, { hourSel, at: await I(() => window.__mapAt) });
+await I(() => setView('forecast')); await page.waitForTimeout(500);
+const src = await I(() => { const m = document.getElementById('forecastMeta'); const b = document.getElementById('modelsButton'); return { text: m.innerText, lines: Math.round(m.getBoundingClientRect().height / parseFloat(getComputedStyle(m).lineHeight)), label: b.innerText, title: b.title, aria: b.getAttribute('aria-label'), names: modeModels().filter(x => state.forecast.models[x.id]).map(x => x.name), sun: document.getElementById('flightSun').innerText.replace(/\s+/g, ' ') }; });
+ok('source line: one line, "Updated <time>", no model name', src.lines === 1 && /^Updated (\d\d:\d\d|\w{3} \d\d:\d\d)$/.test(src.text) && !src.names.some(n => src.text.includes(n)), src);
+ok('Models button: the count, the title and the label list the models with data', src.names.length > 1 && src.label === `Models · ${src.names.length}` && src.title === src.names.join(', ') && src.aria.endsWith(src.names.join(', ')), src);
+ok('sun line ends with the time zone', /Sunset \d\d:\d\d · ?EET \(UTC\+2\)$|Sunset \d\d:\d\d\s*EET \(UTC\+2\)$/.test(src.sun), src.sun);
+await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(800);
+const srcUk = await I(() => ({ text: document.getElementById('forecastMeta').innerText, label: document.getElementById('modelsButton').innerText }));
+ok('Ukrainian: "Оновлено …" and "Моделі · N"', /^Оновлено \d\d:\d\d$|^Оновлено \S+ \d\d:\d\d$/.test(srcUk.text) && /^Моделі · \d+$/.test(srcUk.label), srcUk);
+await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
+ok('English again: the Models label is not overwritten by the static string', /^Models · \d+$/.test(await page.locator('#modelsButton').innerText()));
+
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await b.close();

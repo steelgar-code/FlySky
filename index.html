@@ -168,12 +168,10 @@
             border-radius: 2px;
         }
 
-        /* Open-Meteo use meters (side menus) and the gauge on the card. The mark is where map requests pause. */
+        /* Open-Meteo use meters (side menus). The mark is where map requests pause. */
         .om-bar { position: relative; height: 5px; border-radius: 9999px; background: #1e293b; }
         .om-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9999px; }
         .om-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #cbd5e1; opacity: 0.8; }
-        .om-gauge { display: flex; flex-direction: column; gap: 3px; width: 26px; flex-shrink: 0; }
-        .om-gauge .om-bar { height: 4px; }
 
         /* On/off switch (sr-only checkbox + this span), also used by map.js. */
         .fs-switch { position: relative; width: 34px; height: 20px; border-radius: 9999px; background: #334155; transition: background 0.15s; flex-shrink: 0; }
@@ -292,11 +290,8 @@
                 <!-- Data source; the model choice is in the side menu -->
                 <div class="flex items-start justify-between gap-2 pt-2 border-t border-slate-800/80">
                     <p id="forecastMeta" class="min-w-0 text-[11px] text-slate-500 font-mono"></p>
-                    <div class="shrink-0 flex items-center gap-1">
-                        <!-- Open-Meteo calls used (hour, day), drawn by renderOmUsage() -->
-                        <button type="button" id="omGauge" data-open-settings class="om-gauge-btn p-1.5 rounded-lg hover:bg-slate-800/70 transition"></button>
-                        <button type="button" data-open-settings class="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition"><i class="fa-solid fa-layer-group"></i><span data-i18n="modelsButton">Models</span></button>
-                    </div>
+                    <!-- The label (with the model count) and the title are set by renderMeta() -->
+                    <button type="button" id="modelsButton" data-open-settings class="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition"><i class="fa-solid fa-layer-group"></i><span id="modelsButtonLabel">Models</span></button>
                 </div>
             </section>
 
@@ -1024,7 +1019,6 @@
                 omMeterNums: "{used} used · {left} left of {max}",
                 omMeterPools: "ensemble {e} · forecast {f}",
                 omMeterNote: "This browser's own use of Open-Meteo's free allowance. The mark is where map requests pause. Others on the same connection count against the same limits, so what is really left can be less.",
-                omGaugeTitle: "Open-Meteo calls used by this browser, last hour: {h} of {hMax} · last 24 h: {d} of {dMax}",
                 omPaused: "paused to stay under Open-Meteo's free limit ({n} of {max} calls in the last {span})",
                 omSpan_hour: "hour",
                 omSpan_day: "24 h",
@@ -1123,8 +1117,8 @@
                 statPeakSub: "median peak · 10% chance above {hi} {unit}",
                 statPeakWhen: "at {when}",
                 statNoData: "No data from selected models",
-                forecastMeta: "Updated {time} · {models} · next {window}, local time ({tz})",
-                forecastMetaCached: "Cached forecast from {time} · {models}",
+                forecastMeta: "Updated {time}",
+                forecastMetaCached: "Cached forecast from {time}",
                 chartNoData: "Selected models don't provide this parameter here.",
                 chartNotInMode: "Not available from ensemble models — switch to Models mode.",
                 loading: "Loading forecast…",
@@ -1134,6 +1128,7 @@
                 toastFavRemoved: "Removed {name} from favorites",
                 toastForecastError: "Could not load forecast: {error}",
                 modelsButton: "Models",
+                modelsButtonCount: "Models · {n}",
                 modelsDrawerDesc: "For the mode chosen in the bottom bar (Ensemble or Models).",
                 modelCost: "One update ≈ {n} Open-Meteo calls of the free allowance (600 a minute, 10,000 a day); updated {every} or with Refresh.",
                 modelCostEveryEns: "every 3 h",
@@ -1344,7 +1339,6 @@
                 omMeterNums: "{used} використано · {left} залишилось із {max}",
                 omMeterPools: "ансамбль {e} · прогноз {f}",
                 omMeterNote: "Власне використання безплатного ліміту Open-Meteo цим браузером. Позначка — де запити карти призупиняються. Інші користувачі того самого з'єднання рахуються в ті самі ліміти, тож справжній залишок може бути меншим.",
-                omGaugeTitle: "Виклики Open-Meteo цим браузером, остання година: {h} з {hMax} · остання доба: {d} з {dMax}",
                 omPaused: "призупинено, щоб не перевищити безплатний ліміт Open-Meteo ({n} з {max} викликів за останню {span})",
                 omSpan_hour: "годину",
                 omSpan_day: "добу",
@@ -1443,8 +1437,8 @@
                 statPeakSub: "медіана піку · 10% ймовірність понад {hi} {unit}",
                 statPeakWhen: "о {when}",
                 statNoData: "Немає даних від вибраних моделей",
-                forecastMeta: "Оновлено {time} · {models} · наступні {window}, місцевий час ({tz})",
-                forecastMetaCached: "Збережений прогноз від {time} · {models}",
+                forecastMeta: "Оновлено {time}",
+                forecastMetaCached: "Збережений прогноз від {time}",
                 chartNoData: "Вибрані моделі не надають цей параметр для цього місця.",
                 chartNotInMode: "Недоступно для ансамблевих моделей — перейдіть у режим «Моделі».",
                 loading: "Завантаження прогнозу…",
@@ -1454,6 +1448,7 @@
                 toastFavRemoved: "{name} видалено з обраного",
                 toastForecastError: "Не вдалося завантажити прогноз: {error}",
                 modelsButton: "Моделі",
+                modelsButtonCount: "Моделі · {n}",
                 modelsDrawerDesc: "Для режиму, вибраного в нижній панелі (Ансамбль або Моделі).",
                 modelCost: "Одне оновлення ≈ {n} запитів Open-Meteo з безплатного ліміту (600 за хвилину, 10 000 за добу); оновлюється {every} або кнопкою «Оновити».",
                 modelCostEveryEns: "кожні 3 год",
@@ -1664,7 +1659,6 @@
                 omMeterNums: "{used} usadas · {left} restantes de {max}",
                 omMeterPools: "conjunto {e} · previsão {f}",
                 omMeterNote: "Uso próprio deste navegador do limite gratuito do Open-Meteo. A marca mostra onde os pedidos do mapa pausam. Outros na mesma conexão contam nos mesmos limites, então o que resta de verdade pode ser menos.",
-                omGaugeTitle: "Chamadas ao Open-Meteo deste navegador, última hora: {h} de {hMax} · últimas 24 h: {d} de {dMax}",
                 omPaused: "pausado para ficar abaixo do limite gratuito do Open-Meteo ({n} de {max} chamadas {span})",
                 omSpan_hour: "na última hora",
                 omSpan_day: "nas últimas 24 h",
@@ -1763,8 +1757,8 @@
                 statPeakSub: "pico mediano · 10% de chance acima de {hi} {unit}",
                 statPeakWhen: "em {when}",
                 statNoData: "Sem dados dos modelos selecionados",
-                forecastMeta: "Atualizado {time} · {models} · próximas {window}, hora local ({tz})",
-                forecastMetaCached: "Previsão salva de {time} · {models}",
+                forecastMeta: "Atualizado {time}",
+                forecastMetaCached: "Previsão salva de {time}",
                 chartNoData: "Os modelos selecionados não fornecem este parâmetro aqui.",
                 chartNotInMode: "Indisponível nos modelos de conjunto — mude para o modo Modelos.",
                 loading: "Carregando previsão…",
@@ -1774,6 +1768,7 @@
                 toastFavRemoved: "{name} removido dos favoritos",
                 toastForecastError: "Não foi possível carregar a previsão: {error}",
                 modelsButton: "Modelos",
+                modelsButtonCount: "Modelos · {n}",
                 modelsDrawerDesc: "Para o modo escolhido na barra inferior (Conjunto ou Modelos).",
                 modelCost: "Uma atualização ≈ {n} chamadas do limite gratuito do Open-Meteo (600 por minuto, 10.000 por dia); atualizado {every} ou com Atualizar.",
                 modelCostEveryEns: "a cada 3 h",
@@ -1985,14 +1980,6 @@
 
         function renderOmUsage() {
             document.querySelectorAll('[data-om-meters]').forEach(el => { el.innerHTML = omMetersHtml(); });
-            const gauge = document.getElementById('omGauge');
-            if (!gauge) return;
-            const [h, d] = omUsageView();
-            const n = v => Math.round(v).toLocaleString(currentLang);
-            const title = t('omGaugeTitle', { h: n(h.used), hMax: n(h.max), d: n(d.used), dMax: n(d.max) });
-            gauge.title = title;
-            gauge.setAttribute('aria-label', title);
-            gauge.innerHTML = `<span class="om-gauge" aria-hidden="true">${[h, d].map(m => `<span class="om-bar" data-om-share="${m.share.toFixed(4)}"><span class="om-fill" style="width: ${Math.min(100, m.share * 100).toFixed(1)}%; background: ${m.color}"></span></span>`).join('')}</span>`;
         }
 
         function isValidLocation(loc) {
@@ -3806,6 +3793,7 @@
                 <h3 class="min-w-0 font-semibold text-slate-200 text-sm flex items-center gap-2"><i class="fa-solid fa-plane-up text-emerald-400"></i><span class="truncate">${escapeHtml(isNow || !h ? t('nowTitle') : t('nowTitleAt'))}</span></h3>
                 <span class="shrink-0 flex items-center gap-2">
                     ${h && !isNow ? `<button type="button" data-now-back class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-semibold transition" title="${escapeHtml(t('nowBackTitle'))}" aria-label="${escapeHtml(t('nowBackTitle'))}"><i class="fa-solid fa-clock-rotate-left"></i><span class="hidden min-[400px]:inline">${escapeHtml(t('nowBack'))}</span></button>` : ''}
+                    ${h ? `<button type="button" data-flight-map="${escapeHtml(h.time)}" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition" title="${escapeHtml(t('flightOnMapTitle'))}" aria-label="${escapeHtml(t('flightOnMapTitle'))}"><i class="fa-solid fa-satellite"></i><span class="hidden min-[360px]:inline">${escapeHtml(t('flightOnMap'))}</span></button>` : ''}
                     ${h ? `<button type="button" data-now-details class="text-[11px] text-slate-400 hover:text-slate-200 transition">${escapeHtml(t('nowDetails'))} <i class="fa-solid fa-chevron-down text-[9px]"></i></button>` : ''}
                 </span>
             </div>`;
@@ -3819,9 +3807,9 @@
             const verdict = `<div class="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
                 <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-base font-bold border" style="color: ${st.color}; background: ${st.color}1f; border-color: ${st.color}66">
                     <i class="fa-solid ${st.icon}"></i>${escapeHtml(t(st.labelKey))}</span>
-                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(confText(h))}</span>` : ''}</span>
+                <!-- The flag follows the chip so that, on a phone, chip and flag share a line and the time takes the next one -->
                 ${strong ? `<span data-icing-flag="${strong}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold text-white" style="background: #d03b3b" title="${escapeHtml(t('icingFlagTitle_' + strong))}"><i class="fa-solid fa-snowflake"></i>${escapeHtml(t('icingFlag'))}</span>` : ''}
-                <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}" class="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold transition"><i class="fa-solid fa-satellite"></i>${escapeHtml(t('flightOnMap'))}</button>
+                <span class="text-xs text-slate-400"><span class="font-mono text-slate-300">${escapeHtml(isNow ? formatHour(h.time) : formatDayHour(h.time))}–${escapeHtml(formatHour(addHoursToLocal(h.time, 1)))}</span>${a ? ` · <span style="color: ${CONF_TEXT[a.level]}">${escapeHtml(confText(h))}</span>` : ''}</span>
             </div>`;
             const limiting = h.status === 'none' ? '' : h.status === 'good'
                 ? `<p class="text-xs text-slate-300">${escapeHtml(t('nowAllGood'))}</p>`
@@ -4308,14 +4296,23 @@
             const [y, m, d] = today.split('-').map(Number);
             const sun = sunTimes(Date.UTC(y, m - 1, d, 12) - offsetMs, loc.latitude, loc.longitude);
             const local = ms => new Date(ms + offsetMs).toISOString().slice(0, 16);
+            const zone = fc && fc.meta ? `<span data-flight-zone>${escapeHtml(zoneLabel(fc.meta))}</span>` : '';
             if (sun.polar) {
-                el.innerHTML = `<span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t(sun.polar === 'day' ? 'sunPolarDay' : 'sunPolarNight'))}</span>`;
+                el.innerHTML = `<span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t(sun.polar === 'day' ? 'sunPolarDay' : 'sunPolarNight'))}</span>${zone}`;
                 return;
             }
             el.innerHTML = `
                 <span class="text-slate-300 font-medium">${escapeHtml(formatTime(today + 'T00:00', { weekday: 'short', day: 'numeric', month: 'short' }))}</span>
                 <span><i class="fa-solid fa-sun text-amber-300 mr-1"></i>${escapeHtml(t('sunRise'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunrise)))}</span></span>
-                <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>`;
+                <span><i class="fa-solid fa-moon text-indigo-300 mr-1"></i>${escapeHtml(t('sunSet'))} <span class="font-mono text-slate-200">${escapeHtml(formatHour(local(sun.sunset)))}</span></span>${zone}`;
+        }
+
+        // "EET (UTC+2)", "UTC−3", "UTC+5:30": the place's zone from the forecast.
+        function zoneLabel(meta) {
+            const mins = Math.round((meta.utcOffsetSeconds || 0) / 60), a = Math.abs(mins);
+            const utc = 'UTC' + (mins < 0 ? '−' : '+') + Math.floor(a / 60) + (a % 60 ? ':' + String(a % 60).padStart(2, '0') : '');
+            const abbr = meta.timezoneAbbreviation || '';
+            return abbr && abbr !== utc ? `${abbr} (${utc})` : utc;
         }
 
         // ================= Day / night band & day separators =================
@@ -4899,17 +4896,26 @@
         function renderMeta() {
             const el = document.getElementById('forecastMeta');
             const fc = state.forecast;
+            const btn = document.getElementById('modelsButton');
+            el.style.color = '';
             if (!state.location || !fc || fc.key !== forecastKey()) {
                 el.textContent = state.loading ? t('loading') : state.location ? heldBackReason() : '';
+                document.getElementById('modelsButtonLabel').textContent = t('modelsButton');
+                btn.removeAttribute('title'); btn.removeAttribute('aria-label');
                 return;
             }
-            const time = dateFormat({ dateStyle: 'short', timeStyle: 'short' }).format(new Date(fc.fetchedAt));
-            const models = modeModels().filter(m => fc.models[m.id]).map(m => m.name).join(', ');
-            const tz = fc.meta.timezoneAbbreviation || fc.meta.timezone || 'UTC';
+            const names = modeModels().filter(m => fc.models[m.id]).map(m => m.name);
+            document.getElementById('modelsButtonLabel').textContent = names.length ? t('modelsButtonCount', { n: names.length }) : t('modelsButton');
+            if (names.length) { btn.title = names.join(', '); btn.setAttribute('aria-label', `${t('modelsButton')}: ${names.join(', ')}`); }
+            else { btn.removeAttribute('title'); btn.removeAttribute('aria-label'); }
+            // The update time in the location's clock, like the rest of the view.
+            const off = fc.meta.utcOffsetSeconds * 1000;
+            const local = new Date(fc.fetchedAt + off).toISOString().slice(0, 16);
+            const time = local.slice(0, 10) === new Date(Date.now() + off).toISOString().slice(0, 10) ? formatHour(local) : formatDayHour(local);
             const failed = Object.keys(fc.errors || {}).length;
-            el.textContent = (state.loading ? t('loading') :
-                state.forecastFromCache ? t('forecastMetaCached', { time, models }) :
-                t('forecastMeta', { time, models, window: windowLabel(state.window), tz })) + (failed && !state.loading ? ` · ${t('metaFailed', { n: failed })}` : '');
+            el.textContent = (state.loading ? t('loading') : t(state.forecastFromCache ? 'forecastMetaCached' : 'forecastMeta', { time })) + (failed && !state.loading ? ` · ${t('metaFailed', { n: failed })}` : '');
+            // Amber when the numbers need a caveat; the models are on the button.
+            el.style.color = !state.loading && (state.forecastFromCache || failed) ? '#fbbf24' : '';
         }
 
         function statCard({ title, icon, color, value, sub, extra, chart, hour }) {
