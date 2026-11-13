@@ -201,8 +201,12 @@ ok('English again: the Models label is not overwritten by the static string', /^
     const r = [...host.children].map(c => getComputedStyle(c.firstElementChild).backgroundColor); host.remove(); return r;
   });
   ok('confidence chart: 59 % slate, 60 % mid cyan, 80 % bright cyan', edge.join('|') === [COL.low, COL.medium, COL.high].map(rgb).join('|'), edge);
-  const dash = await J(() => ({ lines: [...document.querySelectorAll('#flightConf > div')].filter(d => /dashed/.test(d.style.borderTop)).map(d => d.style.bottom), label: document.getElementById('flightConfLabel').innerText, seps: document.querySelectorAll('#flightConf [data-day-seps] > div').length, barSeps: document.querySelectorAll('#flightMain .relative [data-day-seps] > div').length }));
-  ok('confidence chart: dashed guides at 60 % and 80 %, the label "Confidence" inside, the day separators like the bar', dash.lines.join() === '60%,80%' && dash.label === 'Confidence' && dash.seps > 0 && dash.seps === dash.barSeps, dash);
+  const dash = await J(() => ({ lines: [...document.querySelectorAll('#flightConf > div')].filter(d => /dashed/.test(d.style.borderTop)).map(d => d.style.bottom), seps: document.querySelectorAll('#flightConf [data-day-seps] > div').length, barSeps: document.querySelectorAll('#flightMain .relative [data-day-seps] > div').length }));
+  ok('confidence chart: dashed guides at 60 % and 80 %, the day separators like the bar', dash.lines.join() === '60%,80%' && dash.seps > 0 && dash.seps === dash.barSeps, dash);
+  // No label covers the first columns; the chart is named for assistive technology and has a title.
+  const nm = await J(() => { const c = document.getElementById('flightConf'), col = document.querySelector('#flightConf [data-flight-hour="0"]'), r = col.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { top: !!el && el.closest('[data-flight-hour]') === col, role: c.getAttribute('role'), aria: c.getAttribute('aria-label'), counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), title: c.title, label: !!document.getElementById('flightConfLabel') }; });
+  ok('confidence chart: nothing covers the first column; role img, aria-label = the legend counts, a title', nm.top && nm.role === 'img' && nm.aria === nm.counts && /^Confidence: high|^Confidence: medium|^Confidence: low/.test(nm.aria) && nm.title === 'Confidence: how many members agree on each hour\'s verdict' && !nm.label, nm);
   // Counts add up to the window.
   const cnt = await J(() => ({ sum: [...document.querySelectorAll('#flightConfCounts [data-conf-count]')].reduce((a, e) => a + Number(e.innerText.match(/\d+/)[0]), 0), hours: processed.flight.hours.length, text: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim() }));
   ok('legend counts add up to the window\'s hours', cnt.sum === cnt.hours && cnt.hours > 0, cnt);
@@ -276,8 +280,8 @@ ok('English again: the Models label is not overwritten by the static string', /^
   // Three languages: the ⓘ text.
   for (const [lang, re] of [['uk', /Штрихування: низька впевненість — менше 60 % членів ансамблю згодні/], ['pt-BR', /Hachurado: confiança baixa — menos de 60 % dos membros concordam/]]) {
     await p2.selectOption('#langSelect', lang); await p2.waitForTimeout(600);
-    const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), chart: document.getElementById('flightConfLabel').innerText, label: document.getElementById('btnFlightInfo').getAttribute('aria-label'), icing: [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent.trim()) }));
-    ok(`${lang}: the ⓘ panel, its label, the chart label and the legend counts`, re.test(tx.info) && tx.counts.startsWith(lang === 'uk' ? 'Впевненість: ' : 'Confiança: ') && tx.chart === (lang === 'uk' ? 'Впевненість' : 'Confiança') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
+    const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), chart: document.getElementById('flightConf').title, label: document.getElementById('btnFlightInfo').getAttribute('aria-label'), icing: [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent.trim()) }));
+    ok(`${lang}: the ⓘ panel, its label, the chart label and the legend counts`, re.test(tx.info) && tx.counts.startsWith(lang === 'uk' ? 'Впевненість: ' : 'Confiança: ') && tx.chart.startsWith(lang === 'uk' ? 'Впевненість: скільки' : 'Confiança: quantos') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
     ok(`${lang}: the icing note has four paragraphs, none empty`, tx.icing.length === 4 && tx.icing.every(x => x.length > 40) && (lang !== 'uk' || /^Важливо:/.test(tx.icing[1])), tx.icing);
   }
   await ctx2.close();

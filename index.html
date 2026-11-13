@@ -347,11 +347,10 @@
                         <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                     </div>
                     <!-- Confidence chart: one column per hour under the hour bar (same cells), 18 px high -->
-                    <div id="flightConf" class="hidden" style="position: relative; height: 18px; margin-top: 4px; border-radius: 4px; overflow: hidden; background: #020617; cursor: crosshair">
+                    <div id="flightConf" role="img" class="hidden" style="position: relative; height: 18px; margin-top: 4px; border-radius: 4px; overflow: hidden; background: #020617; cursor: crosshair">
                         <div id="flightConfCols" style="display: flex; height: 100%"></div>
                         <div style="position: absolute; left: 0; right: 0; bottom: 60%; border-top: 1px dashed rgba(148, 163, 184, 0.35); pointer-events: none"></div>
                         <div style="position: absolute; left: 0; right: 0; bottom: 80%; border-top: 1px dashed rgba(148, 163, 184, 0.35); pointer-events: none"></div>
-                        <span id="flightConfLabel" data-i18n="confLabel" style="position: absolute; left: 2px; top: 2px; z-index: 20; padding: 0 4px; border-radius: 2px; background: rgba(2, 6, 23, 0.75); color: #fff; font: 9px/14px ui-monospace, monospace; pointer-events: none">Confidence</span>
                         <div data-day-seps style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none"></div>
                     </div>
                     <div data-daynight class="h-1.5 mt-1 rounded-full"></div>
@@ -951,6 +950,7 @@
                 flightInfoBand: "The thin band under the bar: sky blue daylight, indigo night; dotted lines mark midnight.",
                 flightInfoSplit: "“Split by share” stacks each hour by the share of {what} per verdict: suitable at the bottom, then uncertain, then not suitable. Tap an hour to pin its details.",
                 confLabel: "Confidence",
+                confChartTitle: "Confidence: how many {what} agree on each hour's verdict",
                 confPart_high: "high {n} h",
                 confPart_medium: "medium {n} h",
                 confPart_low: "low {n} h",
@@ -1278,6 +1278,7 @@
                 flightInfoBand: "Тонка смужка під нею: блакитний — день, індиго — ніч; пунктир позначає північ.",
                 flightInfoSplit: "«Частки» ділять кожну годину за часткою {what} для кожної оцінки: знизу придатно, вище невизначено, згори непридатно. Торкніться години, щоб закріпити її деталі.",
                 confLabel: "Впевненість",
+                confChartTitle: "Впевненість: скільки {what} згодні щодо вердикту кожної години",
                 confPart_high: "висока {n} год",
                 confPart_medium: "середня {n} год",
                 confPart_low: "низька {n} год",
@@ -1605,6 +1606,7 @@
                 flightInfoBand: "A faixa fina abaixo da barra: azul-claro dia, índigo noite; as linhas pontilhadas marcam a meia-noite.",
                 flightInfoSplit: "“Dividir por fração” empilha cada hora pela fração dos {what} por veredito: adequado embaixo, depois incerto, depois inadequado. Toque numa hora para fixar os detalhes.",
                 confLabel: "Confiança",
+                confChartTitle: "Confiança: quantos dos {what} concordam no veredito de cada hora",
                 confPart_high: "alta {n} h",
                 confPart_medium: "média {n} h",
                 confPart_low: "baixa {n} h",
@@ -3780,6 +3782,10 @@
             counts.innerHTML = has ? escapeHtml(t('confLabel')) + ': ' + ['high', 'medium', 'low'].map(lv => ({ lv, n: hours.filter(h => h.agree && h.agree.level === lv).length })).filter(c => c.n)
                 .map(c => `<span data-conf-count="${c.lv}" class="whitespace-nowrap"><span class="legend-swatch"${c.lv === 'low' && !state.flightSplit ? ' data-hatch-swatch style="vertical-align: -1px"' : ` style="vertical-align: -1px; background: ${CONF_BAR[c.lv]}"`}></span> ${escapeHtml(t('confPart_' + c.lv, { n: c.n }))}</span>`).join(' · ') : '';
             const what = t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels');
+            // The chart's name: the legend's text, and what it shows on hover.
+            const chart = document.getElementById('flightConf');
+            chart.setAttribute('aria-label', counts.innerText.replace(/\s+/g, ' ').trim());
+            chart.title = t('confChartTitle', { what });
             document.getElementById('flightInfo').innerHTML = ['flightInfoColours', 'flightInfoHatch', 'flightInfoConf', 'flightInfoBand', 'flightInfoSplit']
                 .map(k => `<p>${escapeHtml(t(k, { what }))}</p>`).join('');
             const btn = document.getElementById('btnFlightSplit');
