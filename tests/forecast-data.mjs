@@ -1,8 +1,10 @@
 // Forecast data handling: rain and gusts describe the hour before their timestamp (shifted by
 // one hour), values always asked in m/s and mm and converted in the browser (a unit change asks
 // nothing), one saved record per model (removing a model asks nothing, adding one asks only for
-// it, quick model taps make one request), a cancelled request keeps its estimated cost, and a
-// model that fails is asked again only after 30 minutes or on Refresh.
+// it, quick model taps make one request), a cancelled request keeps its estimated cost, a
+// model that fails is asked again only after 30 minutes or on Refresh, and the wind aloft:
+// Models mode at the flight altitude (levels asked, interpolation, altitude changes, records
+// without the levels), Ensemble mode at 925 hPa.
 import { routeAll } from './lib/mock.mjs';
 import { launch, BASE_URL, ok } from './lib/env.mjs';
 const b = await launch();
@@ -150,5 +152,104 @@ await ctx.close();
 
     ok('no page errors (failing model)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
     await ctx2.close();
+}
+
+// ---- Wind aloft. Models mode: the speed at the flight altitude above the ground, from the
+// pressure levels around it. Levels (m above sea level): 975 hPa 380 m / 4 m/s, 950 hPa 560 m /
+// 10 m/s, 925 hPa 800 m / 20 m/s. ECMWF IFS lacks 975 and 950 hPa; Météo-France's 975 hPa is
+// 11 m above a 179 m ground (inside the terrain, 50 m/s) and it lacks 950 hPa.
+{
+    const ctx3 = await b.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+    const p = await ctx3.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    const LV = { 975: { s: 4, z: 380 }, 950: { s: 10, z: 560 }, 925: { s: 20, z: 800 } };
+    const levelValue = (v, m) => {
+        const x = v.match(/^(wind_speed|geopotential_height)_(\d+)hPa$/);
+        if (!x) return undefined;
+        const lv = +x[2], speed = x[1] === 'wind_speed';
+        if (m === 'ecmwf_ifs025' && (lv === 975 || lv === 950)) return null;
+        if (m === 'meteofrance_seamless' && lv === 975) return speed ? 50 : 190;
+        if (m === 'meteofrance_seamless' && lv === 950) return null;
+        return LV[lv] ? (speed ? LV[lv].s : LV[lv].z) : undefined;
+    };
+    const o = { forecastValue: (v, k, m) => (v === 'wind_speed_120m' ? 7.5 : v === 'wind_speed_10m' ? 4 : levelValue(v, m)) };
+    const { log: l3 } = await routeAll(p, o);
+    await p.goto(BASE_URL);
+    await p.evaluate(() => {
+        localStorage.clear();
+        localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Kyiv', latitude: 50.45, longitude: 30.52, country: 'Ukraine' }));
+        localStorage.setItem('flysky_mode', JSON.stringify('deterministic'));
+    });
+    await p.reload(); await p.waitForTimeout(5000);
+    const E = (fn, arg) => p.evaluate(fn, arg);
+    const reqs = () => (l3.forecastReq || []).filter(u => !u.includes('surface_pressure') && !u.includes('ensemble-api'));
+    const hourlyOf = u => new URL(u).searchParams.get('hourly').split(',');
+    const perModel = () => E(() => Object.fromEntries(processed.params.wind_aloft.members.map(m => [m.model, Math.round(m.values[0] * 1000) / 1000])));
+    const height = async m => { await E(m => setFlightHeight(m), m); await p.waitForTimeout(2000); };
+    const near = (a, b) => Math.abs(a - b) < 0.01;
+
+    const v0 = hourlyOf(reqs()[0]);
+    const levelVars = v0.filter(v => /hPa$/.test(v)).sort();
+    ok('Models request for 400 m: speed and height of 975, 950, 925 hPa, no direction', JSON.stringify(levelVars) === JSON.stringify(['geopotential_height_925hPa', 'geopotential_height_950hPa', 'geopotential_height_975hPa', 'wind_speed_925hPa', 'wind_speed_950hPa', 'wind_speed_975hPa']) && !v0.some(v => /direction/.test(v)), v0);
+    let pm = await perModel();
+    // 400 m over 179 m = 579 m: between 950 (560 m, 10) and 925 hPa (800 m, 20) → 10 + 10 × 19 / 240.
+    ok('interpolated in height between the levels below and above (10.79 m/s)', ['icon_seamless', 'ecmwf_aifs025_single', 'ukmo_seamless'].every(m => near(pm[m], 10 + 10 * 19 / 240)), pm);
+    ok('a model with only one level within reach (925 hPa, 221 m away) still counts', near(pm.ecmwf_ifs025, 20) && await E(() => processed.modelsWithData.has('ecmwf_ifs025')), pm);
+    ok('a level inside the terrain is left out (975 hPa 11 m above the ground)', near(pm.meteofrance_seamless, 20), pm);
+    ok('one wind-aloft series per model', await E(() => processed.params.wind_aloft.members.length) === 5);
+    ok('title "Wind at 400 m", levels as the note', await E(() => document.getElementById('chartTitle-wind_aloft').textContent) === 'Wind at 400 m' && await E(() => document.getElementById('chartNote-wind_aloft').textContent) === '975/950/925 hPa');
+    ok('the record keeps the variables asked and the ground', await E(() => [...modelRecords.values()].every(r => r.mode !== 'deterministic' || (Array.isArray(r.vars) && r.vars.includes('geopotential_height_950hPa') && r.meta.elevation === 179))));
+
+    let n3 = reqs().length;
+    await height(120);
+    ok('120 m: one request, the height level, no pressure level', reqs().length - n3 === 1 && hourlyOf(reqs().at(-1)).includes('wind_speed_120m') && !hourlyOf(reqs().at(-1)).some(v => /hPa/.test(v)), reqs().slice(n3).map(hourlyOf));
+    ok('120 m: the value of wind_speed_120m', Object.values(await perModel()).every(v => v === 7.5), await perModel());
+    n3 = reqs().length;
+    await height(10);
+    ok('10 m: nothing asked (the 10 m wind is there), the value of wind_speed_10m', reqs().length === n3 && Object.values(await perModel()).every(v => v === 4) && await E(() => document.getElementById('chartTitle-wind_aloft').textContent) === 'Wind at 10 m', { asked: reqs().length - n3, pm: await perModel() });
+    await height(400);
+    n3 = reqs().length;
+    await E(() => { modelRecords.forEach(r => { delete r.vars; }); return loadForecast(); });
+    await p.waitForTimeout(2000);
+    ok('a record saved without the list of variables is read again (once)', reqs().length - n3 === 1, reqs().length - n3);
+    n3 = reqs().length;
+    await E(() => loadForecast()); await p.waitForTimeout(500);
+    ok('…and then not again', reqs().length === n3);
+
+    // Over a 150 m ground 400 m and 500 m share 975 / 950 / 925 hPa; 1000 m does not.
+    o.forecastElevation = 150;
+    await E(() => selectLocation({ name: 'Lviv', latitude: 49.84, longitude: 24.03, country: 'Ukraine' }));
+    await p.waitForTimeout(3000);
+    pm = await perModel();
+    ok('400 m over 150 m: 550 m, between 975 (380 m, 4) and 950 hPa (560 m, 10)', near(pm.icon_seamless, 4 + 6 * 170 / 180), pm);
+    n3 = reqs().length;
+    await height(500);
+    pm = await perModel();
+    ok('400 → 500 m: same levels, nothing asked, the value changes (650 m: 13.75)', reqs().length === n3 && near(pm.icon_seamless, 10 + 10 * 90 / 240), { asked: reqs().length - n3, pm });
+    await height(1000);
+    const v1 = reqs().slice(n3).map(hourlyOf);
+    ok('500 → 1000 m: other levels, asked once (925, 900, 850 hPa)', v1.length === 1 && ['wind_speed_900hPa', 'geopotential_height_850hPa'].every(v => v1[0].includes(v)) && !v1[0].includes('wind_speed_975hPa'), v1);
+    await height(400); await p.waitForTimeout(500);
+
+    // Ensemble mode: 925 hPa only, named with its height above the ground (760 − 150 m ≈ 600 m).
+    await p.click('[data-mode="ensemble"]'); await p.waitForTimeout(3500);
+    const ens = (l3.forecastReq || []).filter(u => u.includes('ensemble-api')).at(-1);
+    const ev = hourlyOf(ens);
+    ok('Ensemble request: 925 hPa wind, no 1000 hPa', ev.includes('wind_speed_925hPa') && !ev.some(v => /1000hPa/.test(v)) && !ev.some(v => /geopotential/.test(v)), ev);
+    ok('Ensemble title names 925 hPa and its height: "Wind ~600 m (925 hPa)"', await E(() => document.getElementById('chartTitle-wind_aloft').textContent) === 'Wind ~600 m (925 hPa)', await E(() => document.getElementById('chartTitle-wind_aloft').textContent));
+    ok('Ensemble: no member-level legend', await E(() => document.getElementById('chartLegend-wind_aloft').classList.contains('hidden')));
+    const high = await E(() => {
+        const ground = g => { modelRecords.forEach(r => { r.meta.elevation = g; }); processForecast(); };
+        ground(700);
+        const title = paramTitle(PARAMS.find(x => x.key === 'wind_aloft'));
+        ground(750);
+        const out = { title, members: processed.params.wind_aloft.members.length, missing: processed.flight.missing.slice(), wind: processed.params.wind_speed_10m.members.length };
+        ground(150);
+        return out;
+    });
+    ok('Ensemble over 700 m ground: "~50 m"; over 750 m (925 hPa 10 m above it) the factor is left out', high.title === 'Wind ~50 m (925 hPa)' && high.members === 0 && high.missing.includes('flightFactorWindAloft') && high.wind > 0, high);
+
+    ok('no page errors (wind aloft)', !errs.filter(e => !/tailwind/.test(e)).length, errs.filter(e => !/tailwind/.test(e)));
+    await ctx3.close();
 }
 await b.close();

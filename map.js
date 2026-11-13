@@ -4,7 +4,9 @@
 // opened. Shares the page's globals: t(), translations, currentLang, state,
 // escapeHtml(), loadFromStorage(), saveToStorage(), sunAltitudeDeg(),
 // selectLocation(), locationKey(), showToast(), setView(), hazardEnabled(),
-// setHazardEnabled() — and window.FlySkyHazard (hazard.js) when loaded.
+// setHazardEnabled(), and for the wind at the flight altitude FLIGHT_HEIGHTS,
+// DEFAULT_FLIGHT_HEIGHT, STD_LEVEL_HEIGHT, TYPICAL_GROUND, LEVEL_REACH, MIN_AGL,
+// windLevelsFor() — and window.FlySkyHazard (hazard.js) when loaded.
 //
 // How it works
 //  - Layer names, time steps, styles and coverage are read from the service's
@@ -2277,25 +2279,14 @@
     // models' height levels; higher up from the three pressure levels around
     // that height (wind and geopotential height), interpolated at each point.
     // Levels inside the terrain are left out (Open-Meteo extrapolates values
-    // there), so over high ground a height may have no wind at all.
-    const STD_LEVEL_HEIGHT = { 1000: 110, 975: 320, 950: 540, 925: 760, 900: 990, 850: 1460, 800: 1950 };
-    const TYPICAL_GROUND = 150;   // m above sea level (lowland Ukraine): for choosing the levels
-    const LEVEL_REACH = 250;      // one level alone stands for a height this close to it
-    const MIN_AGL = 20;           // a level lower than this above the ground is inside the terrain
+    // there), so over high ground a height may have no wind at all. The
+    // level choice and its constants are index.html's (windLevelsFor(),
+    // STD_LEVEL_HEIGHT, TYPICAL_GROUND, LEVEL_REACH, MIN_AGL), shared with
+    // the forecast's wind aloft; the map always chooses over typical ground.
 
     function flightHeight() {
         const m = state.flightProfile && state.flightProfile.heightM;
         return FLIGHT_HEIGHTS.includes(m) ? m : DEFAULT_FLIGHT_HEIGHT;
-    }
-
-    // Pressure levels asked for a height: the three whose standard-atmosphere
-    // height is nearest to it over typical ground (none at 10 / 120 m).
-    function windLevelsFor(heightM) {
-        if (heightM <= 120) return [];
-        const z = heightM + TYPICAL_GROUND;
-        return Object.keys(STD_LEVEL_HEIGHT).map(Number)
-            .sort((a, b) => Math.abs(STD_LEVEL_HEIGHT[a] - z) - Math.abs(STD_LEVEL_HEIGHT[b] - z))
-            .slice(0, 3).sort((a, b) => b - a);
     }
 
     // Hourly variables for a height. Open-Meteo counts variables, but up to
@@ -3392,17 +3383,30 @@
         return null;
     }
 
+    // The model hours for an image time: the nearest timestamp (values at
+    // their time) and the one that closes the hour containing the image
+    // (rain and gusts: the sum / maximum of the hour before their stamp, so
+    // the hour from 14:00 is stamped 15:00).
+    function modelHours(tm) {
+        const ms = tm ?? Date.now();
+        return {
+            at: new Date(Math.round(ms / 3600e3) * 3600e3).toISOString().slice(0, 13),
+            closing: new Date((Math.floor(ms / 3600e3) + 1) * 3600e3).toISOString().slice(0, 13)
+        };
+    }
+
     // Each model against the satellite, an hour either side of the image:
     // [{ check, sat, agree: [names], disagree: [{ name, note }] }].
     function compareModels(res) {
         const m = res.model && res.model.status === 'fulfilled' ? res.model.value : null;
         if (!m || !m.ids.length) return [];
-        const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
+        const hours = modelHours(res.tm);
         const inch = state.precipUnit === 'inch';
         const mm = v => v;   // the data is in mm
         const fmtP = v => `${(inch ? v / 25.4 : v).toLocaleString(currentLang, { maximumFractionDigits: inch ? 2 : 1, minimumFractionDigits: inch ? 2 : 1 })} ${inch ? 'in' : 'mm'}`;
         const out = [];
         const around = (hr, v) => {
+            const target = v === 'precipitation' ? hours.closing : hours.at;
             const i = hr.time.findIndex(x => x.slice(0, 13) === target);
             if (i < 0 || !hr[v]) return null;
             const vals = [hr[v][i - 1], hr[v][i], hr[v][i + 1]].filter(Number.isFinite);
@@ -3634,20 +3638,23 @@
                 if (res.model.status === 'rejected') html = errText(res.model.reason);
                 else {
                     const hr = res.model.value.merged;
-                    const target = new Date(Math.round((res.tm ?? Date.now()) / 3600e3) * 3600e3).toISOString().slice(0, 13);
-                    const i = hr.time.findIndex(x => x.slice(0, 13) === target);
+                    const hours = modelHours(res.tm);
+                    const i = hr.time.findIndex(x => x.slice(0, 13) === hours.at);
+                    // Rain and gusts from the stamp closing the image's hour.
+                    const j = hr.time.findIndex(x => x.slice(0, 13) === hours.closing);
+                    const rain = j < 0 ? NaN : hr.precipitation[j] ?? NaN, gust = j < 0 ? NaN : hr.wind_gusts_10m[j] ?? NaN;
                     if (i < 0) html = h(t('mapProbeNoData'));
                     else {
                         const num = (v, d) => (Number.isFinite(v) ? v.toLocaleString(currentLang, { maximumFractionDigits: d, minimumFractionDigits: d }) : '–');
                         html = `<span class="text-slate-100">${h(t('mapProbeModelValues', {
                             c: num(hr.cloud_cover_low[i], 0), v: num(hr.visibility[i] / 1000, 1),
-                            p: num(hr.precipitation[i] / (state.precipUnit === 'inch' ? 25.4 : 1), state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
+                            p: num(rain / (state.precipUnit === 'inch' ? 25.4 : 1), state.precipUnit === 'inch' ? 2 : 1), u: state.precipUnit === 'inch' ? 'in' : 'mm'
                         }))}</span> <span class="text-slate-500">· ${h(fmtTime(Date.parse(hr.time[i] + 'Z')))}</span>`;
                         if (hr.wind_speed_10m && Number.isFinite(hr.wind_speed_10m[i])) {
                             const d = Math.round(hr.wind_direction_10m[i] / 45) % 8;
                             const digits = state.windUnit === 'kmh' || state.windUnit === 'mph' ? 0 : 1;
                             const toUnit = WIND_TO_MS[state.windUnit] || 1;   // the data is in m/s
-                            windHtml = `<span class="text-slate-100">${h(t('mapProbeWindValue', { dir: t('mapCompass')[d], w: num(hr.wind_speed_10m[i] / toUnit, digits), g: num(hr.wind_gusts_10m[i] / toUnit, digits), u: UNIT_LABELS.wind[state.windUnit] }))}</span>`;
+                            windHtml = `<span class="text-slate-100">${h(t('mapProbeWindValue', { dir: t('mapCompass')[d], w: num(hr.wind_speed_10m[i] / toUnit, digits), g: num(gust / toUnit, digits), u: UNIT_LABELS.wind[state.windUnit] }))}</span>`;
                         }
                     }
                 }

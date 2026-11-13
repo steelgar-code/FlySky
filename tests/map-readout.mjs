@@ -1,4 +1,5 @@
-// Crosshair point readout + centring on the forecast location.
+// Crosshair point readout (rain and gusts from the stamp closing the image's hour) + centring on
+// the forecast location.
 import { routeAll } from './lib/mock.mjs';
 import { launch, BASE_URL, ok } from './lib/env.mjs';
 const b = await launch();
@@ -6,7 +7,8 @@ const mobile = process.argv.includes('--mobile');
 const ctx = await b.newContext(mobile ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block' } : { viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', e => errors.push(e.message));
-const { log } = await routeAll(page, {});
+const opts = {};
+const { log } = await routeAll(page, opts);
 await page.goto(BASE_URL);
 await page.evaluate(() => { localStorage.setItem('flysky_last_location', JSON.stringify({ name: 'Lviv', latitude: 49.84, longitude: 24.03, country: 'Ukraine' })); localStorage.setItem('flysky_view', JSON.stringify('map')); localStorage.setItem('flysky_map_settings', JSON.stringify({ product: 'fog', productAt: Date.now() })); });
 await page.reload(); await page.waitForTimeout(3500);
@@ -71,6 +73,20 @@ ok('centre button returns to the location', Math.abs(c3[0] - target[0]) < 0.05 &
 await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(1200);
 ok('uk readout', /Теплий щільний туман/.test(await card()) && /низька хмарність 85%/.test(await card()), (await card()).slice(0, 200));
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(800);
+// Rain and gusts describe the hour before their timestamp: an image from 14:00–14:29 takes them
+// from the 15:00 stamp (the rounded hour would be 14:00). Each hour gets its own values here.
+opts.pointValue = (v, time) => { const hr = +time.slice(11, 13); return v === 'precipitation' ? hr / 10 : 10 + hr; };
+for (let k = 0; k < 8 && await page.evaluate(() => { const { R } = FlySkyMap._internals; return new Date(R.frames[R.index].t).getUTCMinutes() >= 30; }); k++) {
+  await page.click('[data-map-prev]'); await page.waitForTimeout(300);
+}
+await page.evaluate(() => FlySkyMap._internals.R.map.panBy([0, 250], { animate: false }));
+await page.waitForTimeout(1500);
+const f2 = await page.evaluate(() => { const { R } = FlySkyMap._internals; return R.frames[R.index].t; });
+const closing = new Date(f2).getUTCHours() + 1 === 24 ? 0 : new Date(f2).getUTCHours() + 1;
+const want = { p: (closing / 10).toFixed(1), g: (10 + closing).toFixed(1) };
+txt = await card();
+ok('rain and gusts from the stamp closing the image\'s hour', new Date(f2).getUTCMinutes() < 30 && txt.includes(`precip ${want.p} mm`) && txt.includes(`gusts ${want.g} m/s`), { image: new Date(f2).toISOString(), want, txt: txt.split('\n').filter(x => /precip|gusts/.test(x)) });
+opts.pointValue = undefined;
 await page.screenshot({ path: mobile ? 'probe_mobile.png' : 'probe_desktop.png' });
 console.log('errors', errors.filter(e => !/tailwind/.test(e)));
 await b.close();

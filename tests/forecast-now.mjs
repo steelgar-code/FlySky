@@ -73,14 +73,15 @@ ok('daily limit: one toast', toasts.filter(x => /limit/i.test(x)).length === 1, 
 ok('daily limit: forecast kept', await I(() => !!processed && state.forecastFromCache && document.querySelectorAll('#flightStrip [data-flight-hour]').length > 0));
 opts.forecastLimit = null;
 
-// Confidence with a factor some models lack: 8 models, wind aloft from 5 of them.
+// Confidence with a factor some models lack: 8 models, wind aloft from 5 of them (one series
+// per model, as in Models mode: the wind aloft is computed and named after its parameter).
 const conf = await page.evaluate(() => {
     const ms = Array.from({ length: 8 }, (_, k) => `m${k + 1}`);
-    const param = (variable, models, valueOf) => ({ members: models.map(m => ({ model: m, variable, key: `${variable}_${m}`, values: [valueOf(m)] })),
+    const param = (variable, models, valueOf) => ({ members: models.map(m => ({ model: m, variable, key: variable, values: [valueOf(m)] })),
         stats: { median: [models.map(valueOf).sort((x, y) => x - y)[Math.floor(models.length / 2)]] } });
     const run = (aloft, wind = () => 5) => {
         const save = state.windUnit; state.windUnit = 'ms';
-        const r = computeFlight({ times: ['2030-01-01T10:00'], params: { wind_speed_10m: param('wind_speed_10m', ms, wind), wind_aloft: param('wind_speed_950hPa', ms.slice(0, 5), aloft) } });
+        const r = computeFlight({ times: ['2030-01-01T10:00'], params: { wind_speed_10m: param('wind_speed_10m', ms, wind), wind_aloft: param('wind_aloft', ms.slice(0, 5), aloft) } });
         state.windUnit = save;
         const a = r.hours[0].agree;
         return { status: r.hours[0].status, top: a.top, conf: Math.round(a.conf * 1000) / 1000, level: a.level, aloft: Math.round(a.checkConf.aloft * 1000) / 1000 };
