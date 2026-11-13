@@ -113,7 +113,9 @@ export async function routeAll(page, opts = {}) {
       const start = Math.floor(Date.now() / 86400e3) * 86400e3 - 86400e3;
       const series = (lat, lon) => { const time = [], c = [], v = [], pr = [], ws = [], wd = [], wg = [], ws9 = [], wd9 = [];
         for (let i = 0; i < 72; i++) { time.push(new Date(start + i * 3600e3).toISOString().slice(0, 16)); c.push(85); v.push(400); pr.push(0.2);
-          ws.push(+(3 + Math.abs(lat - 48) * 1.5).toFixed(1)); wd.push(225); wg.push(9.5); ws9.push(+(8 + Math.abs(lon - 30)).toFixed(1)); wd9.push(270); }
+          ws.push(+(3 + Math.abs(lat - 48) * 1.5).toFixed(1)); wd.push(225); wg.push(9.5); ws9.push(+(8 + Math.abs(lon - 30)).toFixed(1)); wd9.push(270);
+          // opts.pointValue(variable, time) → a value for that timestamp (undefined: the default).
+          if (opts.pointValue) [['precipitation', pr], ['wind_gusts_10m', wg]].forEach(([n, a]) => { const x = opts.pointValue(n, time[i]); if (x !== undefined) a[i] = x; }); }
         return { time, cloud_cover_low: c, visibility: v, precipitation: pr, wind_speed_10m: ws, wind_direction_10m: wd, wind_gusts_10m: wg, wind_speed_925hPa: ws9, wind_direction_925hPa: wd9 }; };
       // Wind-arrow grid (no models: best_match); the crosshair readout names its models.
       if (lats.length > 1 || !u.searchParams.get('models')) {
@@ -190,6 +192,9 @@ export async function routeAll(page, opts = {}) {
       // timestamp's hours from the current hour. Logged in log.forecastReq.
       // opts.forecastModelFail = { model, reason, status }: any request naming that model fails
       // (so a combined request fails too). opts.forecastMembers: members per ensemble model (6).
+      // Pressure levels' geopotential height: their standard height (STD_HEIGHT, m above sea
+      // level) unless forecastValue says otherwise; null there: a level the model lacks.
+      // opts.forecastElevation: the ground in the answer (default 179 m).
       log.forecastReq = (log.forecastReq || []).concat(url);
       if (opts.forecastLimit && opts.forecastLimit.n > 0) { opts.forecastLimit.n--; return route.fulfill({ status: 429, json: { error: true, reason: opts.forecastLimit.reason } }); }
       const u = new URL(url); const ens = url.includes('ensemble-api');
@@ -216,13 +221,14 @@ export async function routeAll(page, opts = {}) {
               if (v === 'cloud_cover_low') return Math.round(45 + 40 * w);
               if (v === 'visibility') return Math.round(9000 + 7000 * w);
               if (/gust/.test(v)) return +(9 + 5 * w + (i % 24 > 11 && i % 24 < 17 ? 4 : 0)).toFixed(1);
+              if (v.startsWith('geopotential_height_')) return STD_HEIGHT[parseInt(v.slice(20), 10)] ?? null;
               // Wind aloft a bit above the 10 m wind (it is a flight factor of its own).
               return +(5 + 3 * w + (i % 24 > 11 && i % 24 < 17 ? 3 : 0) + (/hPa/.test(v) ? 2 : 0)).toFixed(1);
             });
           });
         }
       });
-      return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', timezone_abbreviation: 'EET', elevation: 179, hourly } });
+      return route.fulfill({ json: { latitude: +u.searchParams.get('latitude'), longitude: +u.searchParams.get('longitude'), utc_offset_seconds: 7200, timezone: 'Europe/Kyiv', timezone_abbreviation: 'EET', elevation: opts.forecastElevation ?? 179, hourly } });
     }
     if (url.includes('api.open-meteo.com/v1/forecast') && /hourly=wind_speed_/.test(url) && !url.includes('models=')) {
       // Flight time calculator: wind at the route's points, for any height asked.

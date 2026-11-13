@@ -1,5 +1,5 @@
 # FIXED-WING UAV ATMOSPHERIC ICING FORECASTING
-## Technical Handoff & Architecture Specification — v2.9 (FlySky integration)
+## Technical Handoff & Architecture Specification — v2.10 (FlySky integration)
 
 | Document status | Purpose | Intended use |
 |---|---|---|
@@ -11,6 +11,8 @@
 ---
 
 ## 0. Recent changes
+
+**v2.10 — wind aloft at the flight altitude** (§5.1, §14; plan batch 1c): the forecast's wind-aloft chart, tile and flight factor follow the flight altitude in Models mode — the wind speed at that height above the ground at the location: 10 m and 120 m from the height levels, higher up the speed of the three pressure levels around it interpolated in height with their geopotential height (6 variables, no direction; ≈ 2.5 calls more per update with the 5 default models). The level choice (`windLevelsFor()`, `STD_LEVEL_HEIGHT`, `TYPICAL_GROUND`, `LEVEL_REACH`, `MIN_AGL`) now lives in `index.html` and `map.js` uses it from there. Ensemble mode: 925 hPa only, titled with its height above the ground; 1000 hPa dropped (one variable less per member). O1 closed. Also the map readout's rain and gusts now come from the stamp that closes the image's hour.
 
 **v2.9 — precipitation timing** (§7.3): Open-Meteo's hourly precipitation and rain are sums over the hour *before* their timestamp. The surface cues of a departure hour i now read them at i + 1 (the forecast view shifts rain and gusts the same way). Found in the 2026-11 code review; `icing.js` `VERSION` 4.
 
@@ -227,8 +229,8 @@ The existing wind height setting (shared by wind arrows and calculator) becomes 
 - **Calculator:** a constant height above sea level from A (A's ground — the elevation of A's grid cell in the response — + the flight altitude; shown under the route: "400 m above A ≈ 579 m above sea level along the route"); wind from the same three levels, interpolated at that height at each route point. Where the ground rises to within 20 m of it the result is "Below the ground", saying how far along and how high (stage 2). Per-point heights above the ground and a 50 m warning come with the icing in stage 4 (§9).
 - **Migration** of the stored wind height (map settings `wind.level`, or the calculator's older `route.level`): `10m` → 10 m, `120m` → 120 m, `500m` (950 hPa) → 400 m, `800m` and the older `925` (925 hPa) → 600 m, `1500m` (850 hPa) → 1500 m; saved at once as `flysky_flight_profile`, and the map keeps no height of its own. New users start at 400 m (wind arrows then show ~400 m instead of 120 m).
 - **Where it is set:** forecast view's side menu, section *Flight profile* (with "≈ 579 m above sea level at Kyiv (ground 179 m)" when the location's elevation is known); the map side menu's wind block ("Above the ground"); the calculator ("Flight altitude above A"). One value (`state.flightProfile.heightM`, `setFlightHeight()`).
-- **Labels** (stage 2): the map's "~500 m", "~800 m", "~1500 m" are replaced by the setting; the forecast's wind-aloft labels are corrected to heights above the ground: "Wind ~400 m" (Models), "Wind up to ~600 m" (Ensemble), members "≤ 100 m · 1000 hPa" / "~600 m · 925 hPa".
-- The forecast tab's **wind-aloft factor** (1000+925 hPa pooled in Ensemble mode, 950 hPa in Models mode) is **not changed** in this work (O1).
+- **Labels** (stage 2, v2.10): the map's "~500 m", "~800 m", "~1500 m" are replaced by the setting. The forecast's wind aloft: "Wind at 400 m" in Models mode, with the pressure levels asked as the chart note ("975/950/925 hPa"; none at 10 m and 120 m); "Wind ~600 m (925 hPa)" in Ensemble mode — 925 hPa's standard height (760 m) minus the ground at the location, to 50 m. The member-level legend is gone (one level).
+- The forecast tab's **wind-aloft factor** (v2.10, O1 closed): in Models mode the wind speed at the flight altitude above the ground at the forecast location — the same levels and rules as the wind arrows, for the speed alone (speed and geopotential height, no direction), chosen around the ground in the forecast answer (`elevation`, saved with each model's record; before any answer the location's own elevation or 150 m). A model without levels near the height (ECMWF IFS has neither 975 nor 950 hPa) counts through the one level within 250 m, else has no wind aloft. Changing the altitude works it out again at once; a request goes out only when the saved records lack the levels. Ensemble mode: 925 hPa only (the ensemble API has no level heights); left out where it is less than 20 m above the ground.
 
 ### 5.2 Profile parameters and defaults
 
@@ -560,7 +562,7 @@ READMEs (en/uk/pt-BR) updated with each user-facing stage; `?v=` and service-wor
 
 ## 14. Open items
 
-- **O1** Wind-aloft factor in the forecast tab to follow the flight altitude (currently fixed levels).
+- **O1** ~~Wind-aloft factor in the forecast tab to follow the flight altitude~~ — done in v2.10 (Models mode at the flight altitude; Ensemble mode 925 hPa).
 - ~~**O2** Free altitude~~ → D4 (heights in metres; humidity still not interpolated).
 - ~~**O3** Two models in the route request~~ → D15.
 - **O4** Icing marks on the wind-arrow grid at the flight height (T, RH at three levels: 15 variables → 1.5 calls per point).

@@ -465,7 +465,7 @@
                     <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                         <i class="fa-solid fa-plane-up text-teal-400"></i><span data-i18n="flightProfileTitle">Flight profile</span>
                     </h3>
-                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="flightProfileDesc">A flight from the forecast location: climb, cruise, descent. The altitude (above the takeoff point) is also used by the map's wind arrows and the flight time calculator.</p>
+                    <p class="text-[11px] text-slate-500 mt-1" data-i18n="flightProfileDesc">A flight from the forecast location: climb, cruise, descent. The altitude (above the takeoff point) is also used by the wind aloft in Models mode, the map's wind arrows and the flight time calculator.</p>
                 </div>
                 <label class="flex items-center justify-between gap-3 text-sm text-slate-300">
                     <span data-i18n="flightHeightLabel">Flight altitude</span>
@@ -944,7 +944,7 @@
                 chartDrag: "Drag to reorder",
                 closeLabel: "Close",
                 flightProfileTitle: "Flight profile",
-                flightProfileDesc: "A flight from the forecast location: climb, cruise, descent. The altitude (above the takeoff point) is also used by the map's wind arrows and the flight time calculator.",
+                flightProfileDesc: "A flight from the forecast location: climb, cruise, descent. The altitude (above the takeoff point) is also used by the wind aloft in Models mode, the map's wind arrows and the flight time calculator.",
                 flightHeightLabel: "Flight altitude",
                 flightHeightOption: "{m} m",
                 flightHeightAsl: "≈ {asl} m above sea level at {place} (ground {elev} m).",
@@ -1086,8 +1086,8 @@
                 windowWeek: "1 week",
                 modelsCount: "{count} models",
                 paramLowClouds: "Low Cloud Cover",
-                paramWindAloftEns: "Wind up to ~600 m",
-                paramWindAloftDet: "Wind ~400 m",
+                paramWindAloftEns: "Wind ~{h} m (925 hPa)",
+                paramWindAloftDet: "Wind at {h} m",
                 statWindAloftTitle: "Peak Wind Aloft",
                 legendMinMaxEnsemble: "Min – max (all members)",
                 legendMinMaxModels: "Min – max (all models)",
@@ -1259,7 +1259,7 @@
                 chartDrag: "Перетягніть, щоб змінити порядок",
                 closeLabel: "Закрити",
                 flightProfileTitle: "Профіль польоту",
-                flightProfileDesc: "Політ від місця прогнозу: набір, політ, зниження. Висоту (над точкою зльоту) також використовують стрілки вітру на карті й калькулятор часу польоту.",
+                flightProfileDesc: "Політ від місця прогнозу: набір, політ, зниження. Висоту (над точкою зльоту) також використовують вітер на висоті в режимі «Моделі», стрілки вітру на карті й калькулятор часу польоту.",
                 flightHeightLabel: "Висота польоту",
                 flightHeightOption: "{m} м",
                 flightHeightAsl: "≈ {asl} м над рівнем моря ({place}: земля {elev} м).",
@@ -1401,8 +1401,8 @@
                 windowWeek: "1 тиждень",
                 modelsCount: "{count} моделей",
                 paramLowClouds: "Низька хмарність",
-                paramWindAloftEns: "Вітер до ~600 м",
-                paramWindAloftDet: "Вітер ~400 м",
+                paramWindAloftEns: "Вітер ~{h} м (925 гПа)",
+                paramWindAloftDet: "Вітер на {h} м",
                 statWindAloftTitle: "Макс. вітер на висоті",
                 legendMinMaxEnsemble: "Мін – макс (усі члени)",
                 legendMinMaxModels: "Мін – макс (усі моделі)",
@@ -1574,7 +1574,7 @@
                 chartDrag: "Arraste para reordenar",
                 closeLabel: "Fechar",
                 flightProfileTitle: "Perfil de voo",
-                flightProfileDesc: "Um voo a partir do local da previsão: subida, cruzeiro, descida. A altitude (acima do ponto de decolagem) também é usada pelas setas de vento do mapa e pela calculadora de tempo de voo.",
+                flightProfileDesc: "Um voo a partir do local da previsão: subida, cruzeiro, descida. A altitude (acima do ponto de decolagem) também é usada pelo vento em altitude no modo Modelos, pelas setas de vento do mapa e pela calculadora de tempo de voo.",
                 flightHeightLabel: "Altitude de voo",
                 flightHeightOption: "{m} m",
                 flightHeightAsl: "≈ {asl} m acima do nível do mar em {place} (solo {elev} m).",
@@ -1716,8 +1716,8 @@
                 windowWeek: "1 semana",
                 modelsCount: "{count} modelos",
                 paramLowClouds: "Nuvens baixas",
-                paramWindAloftEns: "Vento até ~600 m",
-                paramWindAloftDet: "Vento ~400 m",
+                paramWindAloftEns: "Vento ~{h} m (925 hPa)",
+                paramWindAloftDet: "Vento a {h} m",
                 statWindAloftTitle: "Vento máximo em altitude",
                 legendMinMaxEnsemble: "Mín – máx (todos os membros)",
                 legendMinMaxModels: "Mín – máx (todos os modelos)",
@@ -4590,8 +4590,8 @@
         }
 
         // Changes the flight profile (side menu here or on the map, the flight
-        // time calculator): saved, the map follows the altitude, the icing
-        // indicator is read again for it.
+        // time calculator): saved, the map and the forecast's wind aloft
+        // follow the altitude, the icing indicator is read again for it.
         function setFlightProfile(patch) {
             const before = state.flightProfile;
             const next = sanitizeFlightProfile({ ...before, ...patch });
@@ -4599,8 +4599,23 @@
             state.flightProfile = next;
             saveToStorage(FLIGHT_PROFILE_KEY, next);
             renderFlightProfile();
-            if (next.heightM !== before.heightM && window.FlySkyMap) window.FlySkyMap.onFlightHeight();
+            if (next.heightM !== before.heightM) {
+                if (window.FlySkyMap) window.FlySkyMap.onFlightHeight();
+                flightHeightChanged();
+            }
             icingProfileChanged();
+        }
+
+        // The wind aloft (Models mode) at the new altitude: worked out again
+        // at once from the saved records; loadForecast() asks only when they
+        // lack the levels it needs. On the map the drawing waits for the
+        // forecast view (forecastDirty) and so does the request: setView()
+        // loads on the way back.
+        function flightHeightChanged() {
+            if (!state.forecast) return;
+            processForecast();
+            renderAll();
+            if (currentView !== 'map') loadForecast();
         }
 
         // The shared flight altitude (also from the map's side menu and the
@@ -5762,7 +5777,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=24';
+        const MAP_JS = 'map.js?v=25';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
