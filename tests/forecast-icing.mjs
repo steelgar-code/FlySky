@@ -103,8 +103,8 @@ ok('planner: icing signs the hour before the slot count (a late or early take-of
 // ---- Flight profile settings (no new request: the same data, evaluated again)
 const climb2 = await I(() => icingHour(processed.flight.hours[0].time).models.icon_seamless.flight.climb.minutes.red);
 await drawer(true);
-const usage = await I(() => ({ text: document.getElementById('omUsage').innerText, h: omUsed(3600e3), d: omUsed(86400e3) }));
-ok('side menu: this browser\'s Open-Meteo use (last hour, last 24 h) with the free limits', /^This browser's Open-Meteo use: [\d,]+ calls in the last hour, [\d,]+ in the last 24 h \(free limits per connection: 600 a minute, 5,000 an hour, 10,000 a day\)\.$/.test(usage.text) && usage.h >= 5 && usage.d === usage.h, usage);
+const usage = await I(() => ({ text: document.querySelector('[data-om-meters] [role=meter]').getAttribute('aria-valuetext'), h: omUsed(3600e3), d: omUsed(86400e3), f: omUsed(3600e3, 'f'), e: omUsed(3600e3, 'e'), line: document.querySelector('[data-om-meters] [role=meter]').parentElement.querySelector('p').innerText }));
+ok('side menu: the usage meter counts the icing request (the forecast API) and the others', /^[\d,]+ used · [\d,]+ left of 5,000$/.test(usage.text) && usage.f >= 4 && usage.e > 0 && Math.abs(usage.h - usage.f - usage.e) < 1e-6 && usage.d === usage.h && usage.line.includes('forecast ' + Math.round(usage.f).toLocaleString('en')), usage);
 ok('flight profile: climb, descent, duration, icing switches and thresholds', await page.inputValue('#climbRateSelect') === '2' && await page.inputValue('#descentRateSelect') === '2' && await page.inputValue('#durationSelect') === '120' && await page.isChecked('#icingToggle') && !(await page.isChecked('#icingVerdictToggle')) && await page.inputValue('#icingRhRed') === '90');
 await page.selectOption('#climbRateSelect', '4'); await page.waitForTimeout(300);
 await page.selectOption('#durationSelect', '30'); await page.waitForTimeout(300);

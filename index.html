@@ -168,6 +168,13 @@
             border-radius: 2px;
         }
 
+        /* Open-Meteo use meters (side menus) and the gauge on the card. The mark is where map requests pause. */
+        .om-bar { position: relative; height: 5px; border-radius: 9999px; background: #1e293b; }
+        .om-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 9999px; }
+        .om-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #cbd5e1; opacity: 0.8; }
+        .om-gauge { display: flex; flex-direction: column; gap: 3px; width: 26px; flex-shrink: 0; }
+        .om-gauge .om-bar { height: 4px; }
+
         /* On/off switch (sr-only checkbox + this span), also used by map.js. */
         .fs-switch { position: relative; width: 34px; height: 20px; border-radius: 9999px; background: #334155; transition: background 0.15s; flex-shrink: 0; }
         .fs-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 9999px; background: #e2e8f0; transition: transform 0.15s; }
@@ -285,7 +292,11 @@
                 <!-- Data source; the model choice is in the side menu -->
                 <div class="flex items-start justify-between gap-2 pt-2 border-t border-slate-800/80">
                     <p id="forecastMeta" class="min-w-0 text-[11px] text-slate-500 font-mono"></p>
-                    <button type="button" data-open-settings class="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition"><i class="fa-solid fa-layer-group"></i><span data-i18n="modelsButton">Models</span></button>
+                    <div class="shrink-0 flex items-center gap-1">
+                        <!-- Open-Meteo calls used (hour, day), drawn by renderOmUsage() -->
+                        <button type="button" id="omGauge" data-open-settings class="om-gauge-btn p-1.5 rounded-lg hover:bg-slate-800/70 transition"></button>
+                        <button type="button" data-open-settings class="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-500 transition"><i class="fa-solid fa-layer-group"></i><span data-i18n="modelsButton">Models</span></button>
+                    </div>
                 </div>
             </section>
 
@@ -458,7 +469,7 @@
                 </div>
                 <div id="modelChips" class="flex flex-wrap gap-2"></div>
                 <p id="modelCost" class="text-[11px] text-slate-500"></p>
-                <p id="omUsage" class="text-[11px] text-slate-500"></p>
+                <div data-om-meters></div>
             </section>
             <section class="space-y-3">
                 <div>
@@ -1008,7 +1019,12 @@
                 icingFlagTitle_freezingPrecip: "Freezing rain or drizzle in the forecast. An unprotected UAV should stay out.",
                 icingFlagLine_cruise: "Icing: both models show potential icing at the flight altitude. The verdict above does not count it — an unprotected UAV should stay out.",
                 icingFlagLine_freezingPrecip: "Icing: freezing rain or drizzle in the forecast. The verdict above does not count it — an unprotected UAV should stay out.",
-                omUsage: "This browser's Open-Meteo use: {h} calls in the last hour, {d} in the last 24 h (free limits per connection: 600 a minute, 5,000 an hour, 10,000 a day).",
+                omMeterHour: "Last hour",
+                omMeterDay: "Last 24 h",
+                omMeterNums: "{used} used · {left} left of {max}",
+                omMeterPools: "ensemble {e} · forecast {f}",
+                omMeterNote: "This browser's own use of Open-Meteo's free allowance. The mark is where map requests pause. Others on the same connection count against the same limits, so what is really left can be less.",
+                omGaugeTitle: "Open-Meteo calls used by this browser, last hour: {h} of {hMax} · last 24 h: {d} of {dMax}",
                 omPaused: "paused to stay under Open-Meteo's free limit ({n} of {max} calls in the last {span})",
                 omSpan_hour: "hour",
                 omSpan_day: "24 h",
@@ -1323,7 +1339,12 @@
                 icingFlagTitle_freezingPrecip: "У прогнозі крижаний дощ чи мряка. БпЛА без захисту від обледеніння має триматися осторонь.",
                 icingFlagLine_cruise: "Обледеніння: обидві моделі показують можливе обледеніння на висоті польоту. Вердикт вище цього не враховує — БпЛА без захисту має триматися осторонь.",
                 icingFlagLine_freezingPrecip: "Обледеніння: у прогнозі крижаний дощ чи мряка. Вердикт вище цього не враховує — БпЛА без захисту має триматися осторонь.",
-                omUsage: "Використання Open-Meteo цим браузером: {h} викликів за останню годину, {d} за 24 год (безплатні ліміти на з'єднання: 600 за хвилину, 5 000 за годину, 10 000 на добу).",
+                omMeterHour: "Остання година",
+                omMeterDay: "Остання доба",
+                omMeterNums: "{used} використано · {left} залишилось із {max}",
+                omMeterPools: "ансамбль {e} · прогноз {f}",
+                omMeterNote: "Власне використання безплатного ліміту Open-Meteo цим браузером. Позначка — де запити карти призупиняються. Інші користувачі того самого з'єднання рахуються в ті самі ліміти, тож справжній залишок може бути меншим.",
+                omGaugeTitle: "Виклики Open-Meteo цим браузером, остання година: {h} з {hMax} · остання доба: {d} з {dMax}",
                 omPaused: "призупинено, щоб не перевищити безплатний ліміт Open-Meteo ({n} з {max} викликів за останню {span})",
                 omSpan_hour: "годину",
                 omSpan_day: "добу",
@@ -1638,7 +1659,12 @@
                 icingFlagTitle_freezingPrecip: "Chuva ou garoa congelante na previsão. Um VANT sem proteção deve ficar fora.",
                 icingFlagLine_cruise: "Gelo: os dois modelos mostram gelo possível na altitude de voo. O veredito acima não o considera — um VANT sem proteção deve ficar fora.",
                 icingFlagLine_freezingPrecip: "Gelo: chuva ou garoa congelante na previsão. O veredito acima não o considera — um VANT sem proteção deve ficar fora.",
-                omUsage: "Uso do Open-Meteo por este navegador: {h} chamadas na última hora, {d} nas últimas 24 h (limites gratuitos por conexão: 600 por minuto, 5.000 por hora, 10.000 por dia).",
+                omMeterHour: "Última hora",
+                omMeterDay: "Últimas 24 h",
+                omMeterNums: "{used} usadas · {left} restantes de {max}",
+                omMeterPools: "conjunto {e} · previsão {f}",
+                omMeterNote: "Uso próprio deste navegador do limite gratuito do Open-Meteo. A marca mostra onde os pedidos do mapa pausam. Outros na mesma conexão contam nos mesmos limites, então o que resta de verdade pode ser menos.",
+                omGaugeTitle: "Chamadas ao Open-Meteo deste navegador, última hora: {h} de {hMax} · últimas 24 h: {d} de {dMax}",
                 omPaused: "pausado para ficar abaixo do limite gratuito do Open-Meteo ({n} de {max} chamadas {span})",
                 omSpan_hour: "na última hora",
                 omSpan_day: "nas últimas 24 h",
@@ -1921,13 +1947,52 @@
             } catch (err) {
                 // A cancelled request has usually reached Open-Meteo and been
                 // counted: keep the estimate. Only a failed connection is free.
-                if (err.name !== 'AbortError') { entry[1] = 0; omSave(); }
+                if (err.name !== 'AbortError') { entry[1] = 0; omSave(); renderOmUsage(); }
                 throw err;
             }
             const c = parseFloat(res.headers.get('x-ratelimit-cost'));
             entry[1] = res.status === 429 ? 0 : Number.isFinite(c) ? Math.round(c * 100) / 100 : entry[1];
             omSave();
+            renderOmUsage();
             return res;
+        }
+
+        // The calls used and left, drawn in three places: the side menu and the
+        // map's side menu (omMetersHtml) and the gauge on the "Can I fly now?"
+        // card. Open-Meteo counts the two APIs apart, so each bar shows the
+        // fuller one. Only these are redrawn when the log changes.
+        function omUsageView() {
+            return [['hour', 3600e3, 'omMeterHour'], ['day', 86400e3, 'omMeterDay']].map(([span, ms, key]) => {
+                const max = OM_LIMITS[span], e = omUsed(ms, 'e'), f = omUsed(ms, 'f');
+                const used = Math.max(e, f), share = used / max;
+                const color = share >= OM_SOFT[span] ? FLIGHT_STATUS.bad.color : share >= 0.6 ? FLIGHT_STATUS.marginal.color : '#22d3ee';
+                return { span, key, max, e, f, used, share, color, soft: OM_SOFT[span], left: Math.max(0, max - used) };
+            });
+        }
+
+        function omMetersHtml() {
+            const n = v => Math.round(v).toLocaleString(currentLang);
+            return omUsageView().map(m => {
+                const nums = t('omMeterNums', { used: n(m.used), left: n(m.left), max: n(m.max) });
+                const label = t(m.key);
+                return `<div class="mt-2">
+                    <div class="flex items-baseline justify-between gap-2 text-[11px]"><span class="text-slate-300">${escapeHtml(label)}</span><span class="text-slate-400 font-mono text-[10px] text-right">${escapeHtml(nums)}</span></div>
+                    <div class="om-bar mt-1" role="meter" aria-label="${escapeHtml(label)}" aria-valuemin="0" aria-valuemax="${m.max}" aria-valuenow="${Math.min(m.max, Math.round(m.used))}" aria-valuetext="${escapeHtml(nums)}" data-om-share="${m.share.toFixed(4)}"><span class="om-fill" style="width: ${Math.min(100, m.share * 100).toFixed(1)}%; background: ${m.color}"></span><span class="om-mark" style="left: ${(m.soft * 100).toFixed(1)}%"></span></div>
+                    <p class="text-[10px] text-slate-500 mt-0.5 font-mono">${escapeHtml(t('omMeterPools', { e: n(m.e), f: n(m.f) }))}</p>
+                </div>`;
+            }).join('') + `<p class="text-[10px] text-slate-500 mt-2">${escapeHtml(t('omMeterNote'))}</p>`;
+        }
+
+        function renderOmUsage() {
+            document.querySelectorAll('[data-om-meters]').forEach(el => { el.innerHTML = omMetersHtml(); });
+            const gauge = document.getElementById('omGauge');
+            if (!gauge) return;
+            const [h, d] = omUsageView();
+            const n = v => Math.round(v).toLocaleString(currentLang);
+            const title = t('omGaugeTitle', { h: n(h.used), hMax: n(h.max), d: n(d.used), dMax: n(d.max) });
+            gauge.title = title;
+            gauge.setAttribute('aria-label', title);
+            gauge.innerHTML = `<span class="om-gauge" aria-hidden="true">${[h, d].map(m => `<span class="om-bar" data-om-share="${m.share.toFixed(4)}"><span class="om-fill" style="width: ${Math.min(100, m.share * 100).toFixed(1)}%; background: ${m.color}"></span></span>`).join('')}</span>`;
         }
 
         function isValidLocation(loc) {
@@ -4782,7 +4847,7 @@
             const cost = forecastCost();
             const costEl = document.getElementById('modelCost');
             costEl.innerHTML = `<i class="fa-solid fa-gauge-high mr-1 ${cost > 150 ? 'text-amber-400' : ''}"></i>${escapeHtml(t('modelCost', { n: cost, every: t(state.mode === 'ensemble' ? 'modelCostEveryEns' : 'modelCostEveryDet') }))}${cost > 150 ? ` <span class="text-amber-300">${escapeHtml(t('modelCostHigh'))}</span>` : ''}`;
-            document.getElementById('omUsage').textContent = t('omUsage', { h: Math.round(omUsed(3600e3)).toLocaleString(currentLang), d: Math.round(omUsed(86400e3)).toLocaleString(currentLang) });
+            renderOmUsage();
             document.getElementById('membersTotal').textContent = state.mode === 'ensemble'
                 ? t('membersTotal', { count: chosen.reduce((sum, m) => sum + m.members, 0) })
                 : t('modelsCount', { count: chosen.length });
@@ -5767,6 +5832,9 @@
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible' && currentView === 'forecast') loadForecast();
             });
+            // Old calls drop out of the hour and the day as time passes.
+            setInterval(() => { if (document.visibilityState === 'visible') renderOmUsage(); }, 60e3);
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') renderOmUsage(); });
             // Nearby-hazard alerts load once the forecast is on its way.
             if (hazardEnabled()) setTimeout(loadHazard, 1500);
         });
@@ -5777,7 +5845,7 @@
         const VIEW_KEY = 'flysky_view';
         const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
         const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-        const MAP_JS = 'map.js?v=25';
+        const MAP_JS = 'map.js?v=26';
         let currentView = loadFromStorage(VIEW_KEY, 'forecast') === 'map' ? 'map' : 'forecast';
         let mapAssetsPromise = null;
 
