@@ -6,7 +6,8 @@
 // selectLocation(), locationKey(), showToast(), setView(), hazardEnabled(),
 // setHazardEnabled(), and for the wind at the flight altitude FLIGHT_HEIGHTS,
 // DEFAULT_FLIGHT_HEIGHT, STD_LEVEL_HEIGHT, TYPICAL_GROUND, LEVEL_REACH, MIN_AGL,
-// windLevelsFor() — and window.FlySkyHazard (hazard.js) when loaded.
+// windLevelsFor(), omMetersHtml() (the Open-Meteo use meters; renderOmUsage()
+// redraws them) — and window.FlySkyHazard (hazard.js) when loaded.
 //
 // How it works
 //  - Layer names, time steps, styles and coverage are read from the service's
@@ -2754,7 +2755,8 @@
                 ${auto && layer ? `<p class="text-[10.5px] text-slate-400 mt-2"><i class="fa-solid fa-circle-half-stroke mr-1 text-slate-500"></i>${h(t('mapAutoNow', { name: t('mapProduct_' + shownProduct()) }))}</p>` : ''}
                 ${layer ? colourKeyHtml(layer) : ''}
                 <p class="text-[10px] text-slate-500 mt-2"><i class="fa-solid fa-circle-info mr-1"></i>${h(t('mapDisclaimer'))}</p>`)}
-            ${card('layers', 'fa-layer-group', t('mapOverlaysTitle'), layersSummary, `<div class="space-y-1.5">${overlayBlocks}${windBlock}${hazardBlock}</div>`)}
+            ${card('layers', 'fa-layer-group', t('mapOverlaysTitle'), layersSummary, `<div class="space-y-1.5">${overlayBlocks}${windBlock}${hazardBlock}</div>
+                <div class="mt-3 pt-2 border-t border-slate-800" data-om-meters>${omMetersHtml()}</div>`)}
             ${card('map', 'fa-map', t('mapBaseTitle'), h(baseName), `
                 ${seg('basemap', [['osmDark', h(t('mapBase_osmDark'))], ['osm', h(t('mapBase_osm'))], ['none', h(t('mapBase_none'))]], S.basemap)}
                 <div class="space-y-2.5 mt-3">
