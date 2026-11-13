@@ -61,39 +61,89 @@ fl = await flag(3);
 ok('flag: one model only → no flag (the row still says so)', fl.flag === null && !fl.line, fl);
 await at(0);
 
-// ---- Flight conditions: icing strip, hovered and pinned hour
-const strip = await I(() => { const cells = [...document.querySelectorAll('#flightIcing [data-flight-hour]')]; return { n: cells.length, hours: processed.flight.hours.length, c0: cells[0] && cells[0].style.background, c9: cells[9] && cells[9].style.background, legend: document.getElementById('flightIcingLegend').innerText }; });
-ok('icing strip: one cell per hour, red now, grey at +9 h, with its legend', strip.n === strip.hours && /rgb\(208, 59, 59\)/.test(strip.c0) && /rgb\(100, 116, 139\)/.test(strip.c9) && /Lower strip: icing \(experimental\) — red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead/.test(strip.legend), strip);
+// ---- The icing section above the breakdown: folded by default — its header and the strip, aligned with the hour bar
+const fold = await I(() => {
+    const sec = document.getElementById('icingSection'), strip = document.getElementById('icingStrip'), bar = document.getElementById('flightStrip');
+    const r = el => { const b = el.getBoundingClientRect(); return { left: Math.round(b.left), width: Math.round(b.width) }; };
+    const seps = el => el.parentElement.querySelector('[data-day-seps]').innerHTML;
+    return { shown: !sec.classList.contains('hidden') && strip.offsetHeight > 0, body: document.getElementById('icingBody').offsetHeight, expanded: document.getElementById('btnIcing').getAttribute('aria-expanded'),
+        header: document.getElementById('btnIcing').innerText.replace(/\s+/g, ' ').trim(), strip: r(strip), bar: r(bar), seps: seps(strip) === seps(bar) && /dotted/.test(seps(strip)),
+        aboveBreakdown: sec.compareDocumentPosition(document.getElementById('btnFlightDetails')) & Node.DOCUMENT_POSITION_FOLLOWING,
+        gone: ['flightIcing', 'flightIcingLegend', 'icingProfileSection'].filter(id => document.getElementById(id)) };
+});
+ok('icing section folded by default: the header, the strip, no profile', fold.shown && fold.body === 0 && fold.expanded === 'false' && /^Icing experimental$/i.test(fold.header) && !(await I(() => localStorage.getItem('flysky_icing_profile_open'))), fold);
+ok('icing strip aligned with the hour bar (same left and width, the same day separators), the section above the breakdown, the old strip / legend / profile gone', fold.strip.left === fold.bar.left && fold.strip.width === fold.bar.width && fold.seps && fold.aboveBreakdown && !fold.gone.length, fold);
+const strip = await I(() => { const cells = [...document.querySelectorAll('#icingStrip [data-icing-hour]')]; return { n: cells.length, hours: processed.flight.hours.length, c0: cells[0] && cells[0].style.background, c9: cells[9] && cells[9].style.background, title: cells[0] && cells[0].title }; });
+ok('icing strip: one cell per hour, red now, grey at +9 h, the state in its title', strip.n === strip.hours && /rgb\(208, 59, 59\)/.test(strip.c0) && /rgb\(100, 116, 139\)/.test(strip.c9) && /Icing: Potential icing$/.test(strip.title), strip);
+// The ⓘ: the short note (what it shows, what it is not, the colours) instead of the strip's legend and the long note.
+await page.click('#btnIcingInfo'); await page.waitForTimeout(200);
+const info = await I(() => ({ shown: !document.getElementById('icingInfo').classList.contains('hidden'), expanded: document.getElementById('btnIcingInfo').getAttribute('aria-expanded'), text: document.getElementById('icingInfo').innerText.replace(/\s*\n\s*/g, ' ') }));
+ok('ⓘ: what the indicator shows, that it is not an icing forecast, the platform it assumes', info.shown && info.expanded === 'true' && /two forecast models \(DWD ICON, UK Met Office\)/.test(info.text) && /It is not an icing forecast: 'no icing signs' does not mean safe/.test(info.text) && /fixed-wing drone without ice protection/.test(info.text) && /the ice stays on/.test(info.text), info);
+ok('ⓘ: the colours — red potential icing, yellow marginal, grey no signs, hatched no data; striped one model; faded beyond 3 days; the profile', /red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead/.test(info.text) && /the dashed line is your flight altitude/.test(info.text), info.text);
+await page.click('#btnIcingInfo'); await page.waitForTimeout(200);
+ok('ⓘ: a second click closes it', await I(() => document.getElementById('icingInfo').classList.contains('hidden') && document.getElementById('btnIcingInfo').getAttribute('aria-expanded') === 'false'));
 // More than 3 days ahead: faded; past UKMO's range (+100 h): one model only, striped.
 await page.click('#windowButtons [data-window="168"]'); await page.waitForTimeout(800);
-const far = await I(() => { const cells = [...document.querySelectorAll('#flightIcing [data-flight-hour]')]; const c = i => cells[i] && { bg: cells[i].style.background, op: cells[i].style.opacity }; return { n: cells.length, near: c(50), mid: c(80), one: c(120) }; });
+const far = await I(() => { const cells = [...document.querySelectorAll('#icingStrip [data-icing-hour]')]; const c = i => cells[i] && { bg: cells[i].style.background, op: cells[i].style.opacity }; return { n: cells.length, near: c(50), mid: c(80), one: c(120) }; });
 ok('1 week: cells beyond 3 days faded, past UKMO\'s range striped (one model only)', far.n >= 160 && !far.near.op && far.mid.op === '0.45' && !/repeating/.test(far.mid.bg) && /repeating-linear-gradient/.test(far.one.bg) && far.one.op === '0.45', far);
 r = await at(120);
 ok('+120 h: "beyond 3 days", one model named', /beyond 3 days: less reliable/.test(r) && /only DWD ICON forecasts this hour/.test(r), r);
 await page.click('#windowButtons [data-window="24"]'); await page.waitForTimeout(800);
 await at(0);
-await page.locator('#flightIcing [data-flight-hour="3"]').hover(); await page.waitForTimeout(200);
-ok('hovering the icing strip: the icing line for that hour', /Icing: Potential icing at 400 m .*DWD ICON only/.test(await page.locator('#flightDetail').innerText()));
-await page.locator('#flightIcing [data-flight-hour="0"]').click(); await page.waitForTimeout(300);
-const det = (await page.locator('#flightDetail').innerText()).replace(/\n/g, ' | ');
-ok('pinned hour: each model\'s climb, cruise and descent', /DWD ICON: climb: ≈ 1\.9 min in potential icing \(180–400 m\) · cruise: ≈ 120 min in potential icing at 400 m \(−4\.0 °C, RH 96 %\) · descent: ≈ 1\.9 min in potential icing \(180–400 m\)/.test(det) && /UK Met Office: climb: ≈ 1\.9 min/.test(det), det);
-ok('pinned hour: the flight described, what the indicator is not, the platform it assumes', /2 h at 400 m above takeoff, climb 2 m\/s, descent 2 m\/s/.test(det) && /Not a validated icing forecast/.test(det) && /no ice protection, an unheated pitot tube and a fixed-wing climb \(not a VTOL hover\)/.test(det) && /the ice stays on/.test(det), det);
-ok('pinned hour: the "Icing risk" flag next to the verdict', /(Suitable|Uncertain|Not suitable) Icing risk/.test(det) && await page.locator('#flightDetail [data-icing-flag="cruise"]').count() === 1, det);
-await page.locator('#flightIcing [data-flight-hour="0"]').click(); await page.waitForTimeout(200);
 
-// ---- Icing profile
-ok('icing profile folded by default', await page.isVisible('#btnIcingProfile') && !(await page.isVisible('#icingProfileRows')));
-await page.click('#btnIcingProfile'); await page.waitForTimeout(400);
+// ---- The hour bar: hovered and pinned hour (one icing line; the details are in the icing section)
+await page.locator('#flightStrip [data-flight-hour="3"]').hover(); await page.waitForTimeout(200);
+ok('hovering the hour bar: the icing line for that hour', /Icing: Potential icing at 400 m .*DWD ICON only/.test(await page.locator('#flightDetail').innerText()));
+await page.locator('#flightStrip [data-flight-hour="0"]').click(); await page.waitForTimeout(300);
+const det = (await page.locator('#flightDetail').innerText()).replace(/\n/g, ' | ');
+ok('pinned hour: the icing summary in one line with "Icing details", no per-model lines, no note', /Icing: Potential icing at 400 m \(−4\.0 °C, RH 96 %\) · 2 of 2 models Icing details/.test(det) && await page.locator('#flightDetail [data-icing-line]').count() === 1 && !/DWD ICON: climb|UK Met Office:|not an icing forecast|Not a validated/.test(det), det);
+ok('pinned hour: the "Icing risk" flag next to the verdict', /(Suitable|Uncertain|Not suitable) Icing risk/.test(det) && await page.locator('#flightDetail [data-icing-flag="cruise"]').count() === 1, det);
+await page.click('#flightDetail [data-icing-details]'); await page.waitForTimeout(900);
+const sec0 = await I(() => { const el = document.getElementById('icingHour'), sec = document.getElementById('icingSection').getBoundingClientRect(), v = document.getElementById('forecastView').getBoundingClientRect();
+    return { time: el.dataset.icingTime, want: processed.flight.hours[0].time, text: el.innerText.replace(/\n/g, ' | '), open: JSON.parse(localStorage.getItem('flysky_icing_profile_open')), inView: sec.top >= v.top - 1 && sec.top < v.bottom - 100, selected: [...document.querySelectorAll('#icingStrip [data-icing-hour]')].findIndex(c => c.hasAttribute('data-selected')) }; });
+ok('"Icing details": the section opens (remembered) on the pinned hour, in view', sec0.open === true && sec0.time === sec0.want && sec0.selected === 0 && sec0.inView, sec0);
+ok('icing section, selected hour: each model\'s climb, cruise and descent', /DWD ICON: climb: ≈ 1\.9 min in potential icing \(180–400 m\) · cruise: ≈ 120 min in potential icing at 400 m \(−4\.0 °C, RH 96 %\) · descent: ≈ 1\.9 min in potential icing \(180–400 m\)/.test(sec0.text) && /UK Met Office: climb: ≈ 1\.9 min/.test(sec0.text), sec0.text);
+ok('icing section, selected hour: the flight described, the summary, the layers', /2 h at 400 m above takeoff, climb 2 m\/s, descent 2 m\/s/.test(sec0.text) && /Potential icing at 400 m \(−4\.0 °C, RH 96 %\) · 2 of 2 models/.test(sec0.text) && /layer ~380–590 m \(−4\.0 °C\) · no signs below ~180 m · dry or warmer above ~810 m/.test(sec0.text), sec0.text);
+await page.locator('#flightStrip [data-flight-hour="0"]').click(); await page.waitForTimeout(200);
+
+// ---- Icing profile (open)
 const prof = await I(() => {
-    const rows = [...document.querySelectorAll('#icingProfileRows > div')];
+    const rows = [...document.querySelectorAll('#icingProfile > div')];
     const labels = rows.map(r => r.innerText.trim());
     const cellAt = (label, i) => { const r = rows.find(x => x.innerText.trim() === label); return r && r.querySelectorAll('[data-icing-cell]')[i].style.background; };
-    return { labels, red950: cellAt('~380 m', 0), dry950: cellAt('~380 m', 9), red975: cellAt('~180 m', 6), red900: cellAt('~800 m', 15), open: JSON.parse(localStorage.getItem('flysky_icing_profile_open')) };
+    return { labels, red950: cellAt('~380 m', 0), dry950: cellAt('~380 m', 9), red975: cellAt('~180 m', 6), red900: cellAt('~800 m', 15), open: document.getElementById('btnIcing').getAttribute('aria-expanded') };
 });
 ok('profile: model levels by height, the flight altitude line between ~590 and ~380 m', prof.labels.join(',') === '~1240 m,~800 m,~590 m,✈ 400 m,~380 m,~180 m', prof.labels);
-ok('profile: cells coloured by the worse model (layers at the expected hours and heights)', /208, 59, 59/.test(prof.red950) && /100, 116, 139/.test(prof.dry950) && /208, 59, 59/.test(prof.red975) && /208, 59, 59/.test(prof.red900) && prof.open === true, prof);
-await page.locator('#icingProfileRows [data-icing-cell]').first().hover(); await page.waitForTimeout(200);
-ok('profile: a cell\'s values per model', /~1240 m \(850 hPa\) · No icing signs in the forecast data · DWD ICON −10\.6 °C 60 % · UK Met Office −10\.6 °C 60 %/.test(await page.locator('#icingProfileDetail').innerText()), await page.locator('#icingProfileDetail').innerText());
+ok('profile: cells coloured by the worse model (layers at the expected hours and heights)', /208, 59, 59/.test(prof.red950) && /100, 116, 139/.test(prof.dry950) && /208, 59, 59/.test(prof.red975) && /208, 59, 59/.test(prof.red900) && prof.open === 'true', prof);
+await page.locator('#icingProfile [data-icing-cell]').first().hover(); await page.waitForTimeout(200);
+ok('profile: a cell\'s values per model', /~1240 m \(850 hPa\) · No icing signs in the forecast data · DWD ICON −10\.6 °C 60 % · UK Met Office −10\.6 °C 60 %/.test(await page.locator('#icingCell').innerText()), await page.locator('#icingCell').innerText());
+// Selected hour: a tap in the profile or the strip; a pin (hour bar or the "Can I fly now?" card) moves it too.
+const selAt = () => I(() => { const t = document.getElementById('icingHour').dataset.icingTime; return { i: processed.flight.hours.findIndex(h => h.time === t), strip: [...document.querySelectorAll('#icingStrip [data-icing-hour]')].findIndex(c => c.hasAttribute('data-selected')), text: document.getElementById('icingHour').innerText.replace(/\n/g, ' | ') }; });
+await page.locator('#icingProfile > div').nth(4).locator('[data-icing-cell]').nth(6).click(); await page.waitForTimeout(200);
+await page.mouse.move(5, 5); await page.waitForTimeout(200);
+let sel = await selAt();
+ok('a tap in the profile selects that hour (climb and descent only at +6 h)', sel.i === 6 && sel.strip === 6 && /DWD ICON: climb: ≈ \d/.test(sel.text) && !/cruise:/.test(sel.text), sel);
+await page.locator('#icingStrip [data-icing-hour="10"]').click(); await page.waitForTimeout(200);
+await page.mouse.move(5, 5); await page.waitForTimeout(200);
+sel = await selAt();
+ok('a tap in the strip selects that hour (+10 h: freezing fog)', sel.i === 10 && sel.strip === 10 && /freezing fog at the ground/.test(sel.text), sel);
+await I(() => selectHour(15)); await page.waitForTimeout(200);
+sel = await selAt();
+ok('the hour pinned on the "Can I fly now?" card is the one detailed (shared pin)', sel.i === 15 && sel.strip === 15, sel);
+await I(() => selectHour(0)); await page.waitForTimeout(200);
+// Folded again, "Icing details" from another pinned hour opens it on that hour; a tap on the folded strip opens it too.
+await page.click('#btnIcing'); await page.waitForTimeout(300);
+ok('folding the section: remembered, the strip stays', await I(() => JSON.parse(localStorage.getItem('flysky_icing_profile_open')) === false && document.getElementById('icingBody').offsetHeight === 0 && document.getElementById('icingStrip').offsetHeight > 0));
+await I(() => document.getElementById('forecastView').scrollTo(0, 0));
+await page.locator('#flightStrip [data-flight-hour="3"]').click(); await page.waitForTimeout(300);
+await page.click('#flightDetail [data-icing-details]'); await page.waitForTimeout(900);
+sel = await selAt();
+ok('"Icing details" on +3 h: the section opens on +3 h (one model)', await I(() => state.icingOpen) && sel.i === 3 && /DWD ICON: climb/.test(sel.text) && /UK Met Office: No icing signs/.test(sel.text), sel);
+await page.locator('#flightStrip [data-flight-hour="3"]').click(); await page.waitForTimeout(200);
+await page.click('#btnIcing'); await page.waitForTimeout(300);
+await page.locator('#icingStrip [data-icing-hour="9"]').click(); await page.waitForTimeout(300);
+sel = await selAt();
+ok('a tap on the folded strip opens the section on that hour', await I(() => state.icingOpen && document.getElementById('icingBody').offsetHeight > 0) && sel.i === 9, sel);
 
 // ---- Planner notes
 const notes = await I(() => { const hs = processed.flight.hours; return { red: icingSlotNote(hs, { start: 0, end: 4 }), next: icingSlotNote(hs, { start: 9, end: 9 }), above: icingSlotNote(hs, { start: 15, end: 16 }), none: icingSlotNote(hs, { start: 20, end: 20 }) }; });
@@ -127,7 +177,7 @@ await page.selectOption('#climbRateSelect', '2'); await page.selectOption('#dura
 
 // ---- Indicator off / on
 await page.locator('label:has(#icingToggle)').click(); await page.waitForTimeout(400);
-ok('indicator off: no row, strip or profile; the verdict option greyed', !(await row()) && await I(() => document.getElementById('flightIcing').classList.contains('hidden') && document.getElementById('icingProfileSection').classList.contains('hidden') && document.getElementById('icingVerdictToggle').disabled));
+ok('indicator off: no row, no icing section (strip, profile); the verdict option greyed', !(await row()) && await I(() => document.getElementById('icingSection').classList.contains('hidden') && document.getElementById('icingVerdictToggle').disabled));
 await page.click('#btnSettingsClose'); await page.waitForTimeout(300);
 await page.click('#btnRefresh'); await page.waitForTimeout(1500);
 ok('indicator off: Refresh asks no icing data', reqs() === 2);
@@ -143,6 +193,8 @@ const on = await I(() => { const hs = processed.flight.hours; const h = hs[0]; r
 ok('verdict option: icing red → not suitable, named as the cause', on.status === 'bad' && on.check === 'bad' && on.check9 === 'good' && on.reasons.includes('icing') && /Limited by icing/.test(on.limit), on);
 ok('verdict option: the flag stays, the "not counted" line goes', on.flag && !on.flagline, on);
 ok('verdict option: an Icing bar in the breakdown', on.bars === before.bars + 1 && await page.locator('#flightFactorBars [data-flight-bar="icing"]').count() === 1);
+const fd = await I(() => { renderFactorDetail({ key: 'icing', i: 0 }); const el = document.getElementById('factorDetail'); return { text: el.innerText.replace(/\n/g, ' | '), link: !!el.querySelector('[data-icing-details]') }; });
+ok('verdict option: the icing bar\'s detail is the one-line summary with "Icing details"', /Icing: Potential icing at 400 m \(−4\.0 °C, RH 96 %\) · 2 of 2 models/.test(fd.text) && fd.link && !/DWD ICON: climb/.test(fd.text), fd);
 ok('verdict option: confidence from the icing models, no extra members (Ensemble)', on.members === before.members && on.conf === 1, { before, on });
 await page.click('[data-mode="deterministic"]'); await page.waitForTimeout(3000);
 const det2 = await I(() => { const h = processed.flight.hours[0]; return { status: h.status, members: h.agree && h.agree.members, models: h.agree && h.agree.models.map(m => m.model), check: h.checks.icing }; });
@@ -171,6 +223,13 @@ ok('back to the default scenario', (await flag(0)).flag === 'cruise');
 await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(600);
 r = await row();
 ok('Ukrainian row', /Обледеніння.*Можливе обледеніння на 400 м \(−4,0 °C, вологість 96 %\) · 2 з 2 моделей/.test(r) && /шар ~380–590 м/.test(r), r);
+const tr = () => I(() => { selectHour(2); const l = document.querySelector('#flightDetail [data-icing-details]'); return { info: document.getElementById('icingInfo').textContent.replace(/\s+/g, ' '), link: l ? l.textContent.trim() : '', title: document.getElementById('btnIcingInfo').getAttribute('aria-label') }; });
+let tx = await tr();
+ok('Ukrainian: the icing note, its ⓘ and "Icing details"', /Це не прогноз обледеніння: «ознак обледеніння немає» не означає «безпечно»/.test(tx.info) && tx.link === 'Деталі обледеніння' && tx.title === 'Про індикатор обледеніння', tx);
+await page.selectOption('#langSelect', 'pt-BR'); await page.waitForTimeout(600);
+tx = await tr();
+ok('Portuguese: the icing note, its ⓘ and "Icing details"', /Não é uma previsão de gelo: “sem sinais de gelo” não quer dizer seguro/.test(tx.info) && tx.link === 'Detalhes do gelo' && tx.title === 'Sobre o indicador de gelo', tx);
+await I(() => selectHour(0));
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(400);
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
 await ctx.close();
@@ -184,7 +243,7 @@ await ctx.close();
     await p2.goto(BASE_URL);
     await p2.evaluate(k => { localStorage.clear(); localStorage.setItem('flysky_last_location', JSON.stringify(k)); }, KYIV);
     await p2.reload(); await p2.waitForTimeout(5000);
-    const r2 = await p2.evaluate(() => { const r = document.querySelector('[data-now-icing]'); return { row: r ? r.innerText.replace(/\s*\n\s*/g, ' ') : '', verdict: !!document.querySelector('#nowMain [data-flight-map]'), strip: document.getElementById('flightIcing').classList.contains('hidden') }; });
+    const r2 = await p2.evaluate(() => { const r = document.querySelector('[data-now-icing]'); return { row: r ? r.innerText.replace(/\s*\n\s*/g, ' ') : '', verdict: !!document.querySelector('#nowMain [data-flight-map]'), strip: document.getElementById('icingSection').classList.contains('hidden') }; });
     ok('icing request failing: "data unavailable (boom)", the forecast still shown', /Icing.*data unavailable \(boom\)/.test(r2.row) && r2.verdict && r2.strip, r2);
     // Now it works: read and stored; after a reload with the service failing, the stored copy (under an hour old) is used without asking.
     o2.icingFail = null;
