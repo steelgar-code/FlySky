@@ -181,7 +181,13 @@
         input:focus-visible + .fs-switch { outline: 2px solid #22d3ee; outline-offset: 2px; }
 
         /* Hour pinned on the main flight bar; hour the icing section details. */
-        #flightStrip [data-pinned], #flightConf [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        #flightStrip [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        /* Values of the selected hour above each parameter chart: a fixed height
+           (one line; two on a phone) so nothing moves between hours. */
+        .chart-values { font-variant-numeric: tabular-nums; font-size: 11px; line-height: 16px; height: 16px; overflow: hidden; color: #cbd5e1; }
+        @media (max-width: 639px) { .chart-values { height: 32px; } }
+        .chart-values:empty { display: none; }
+        .chart-legend-val { display: inline-block; min-width: 3.4em; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 600; }
         /* Low confidence (under 60 % agreeing) on the main flight bar: a light
            hatch over the hour's colour (inline background-color stays). */
         #flightStrip [data-low-conf], [data-hatch-swatch] { background-image: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0 1.5px, transparent 1.5px 5px) !important; }
@@ -1122,6 +1128,8 @@
                 tooltipRange80: "80% range",
                 tooltipRange50: "50% range",
                 tooltipMinMax: "Min – max",
+                chartValuesRange: "Range",
+                chartValuesChance: "Chance",
                 tooltipChance: "Chance of rain",
                 tooltipMembers: "Members",
                 statPrecipTitle: "Precipitation, {window}",
@@ -1450,6 +1458,8 @@
                 tooltipRange80: "Діапазон 80%",
                 tooltipRange50: "Діапазон 50%",
                 tooltipMinMax: "Мін – макс",
+                chartValuesRange: "Діапазон",
+                chartValuesChance: "Ймовірність",
                 tooltipChance: "Ймовірність опадів",
                 tooltipMembers: "Членів",
                 statPrecipTitle: "Опади за {window}",
@@ -1778,6 +1788,8 @@
                 tooltipRange80: "Faixa 80%",
                 tooltipRange50: "Faixa 50%",
                 tooltipMinMax: "Mín – máx",
+                chartValuesRange: "Faixa",
+                chartValuesChance: "Chance",
                 tooltipChance: "Chance de chuva",
                 tooltipMembers: "Membros",
                 statPrecipTitle: "Precipitação, {window}",
@@ -3677,22 +3689,23 @@
         }
 
         // Details of an hour on the main bar, in lines: time · verdict · the
-        // "Icing risk" flag (· Map when pinned); the values, the decisive ones in
-        // the verdict's colour; the confidence.
+        // "Icing risk" flag (· Map when pinned); the values, each in its own
+        // check's colour; the confidence.
         function flightHourText(h, pinned) {
             const st = FLIGHT_STATUS[h.status];
+            // Each value carries the colour of its own check, not the hour's.
+            const own = k => h.checks[k] === 'marginal' || h.checks[k] === 'bad' ? FLIGHT_STATUS[h.checks[k]].color : null;
             const parts = ['rain', 'wind', 'gust', 'aloft', 'cloud', 'vis']
                 .filter(k => h.values[k] !== null && h.values[k] !== undefined && Number.isFinite(h.values[k]))
                 .map(k => {
                     const txt = escapeHtml(flightFactorText(k, h.values[k]));
-                    const decisive = h.status !== 'good' && h.checks[k] === h.status;
-                    return decisive ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt;
+                    return own(k) ? `<span class="font-semibold" style="color: ${own(k)}">${txt}</span>` : txt;
                 });
             // Icing (verdict option): its state, no value.
             const ih = h.checks.icing ? icingHour(h.time) : null;
             if (ih) {
                 const txt = escapeHtml(`${t('icingTitle')}: ${t('icingState_' + ih.state)}`);
-                parts.push(h.status !== 'good' && h.checks.icing === h.status ? `<span class="font-semibold" style="color: ${st.color}">${txt}</span>` : txt);
+                parts.push(own('icing') ? `<span class="font-semibold" style="color: ${own('icing')}">${txt}</span>` : txt);
             }
             const strong = icingStrongAt(h.time);
             const map = pinned ? ` <button type="button" data-flight-map="${escapeHtml(h.time)}" title="${escapeHtml(t('flightOnMapTitle'))}"
@@ -4058,6 +4071,7 @@
             placeNowMarker();
             renderNowCheck();
             markMainPin();
+            followCardHour();
             document.getElementById('flightDetail').innerHTML = mainDetailHtml();
             // The icing section follows a new pin.
             if (mainPin) icingSel = mainPin;
@@ -4271,16 +4285,7 @@
             wrap.classList.add('ring-2', 'ring-cyan-500/70');
             clearTimeout(wrap._flash);
             wrap._flash = setTimeout(() => wrap.classList.remove('ring-2', 'ring-cyan-500/70'), 1600);
-            const chart = chartInstances[key];
-            if (!chart || !(hour >= 0)) return;
-            try {
-                const active = chart.data.datasets.map((d, di) => ({ datasetIndex: di, index: hour }))
-                    .filter(a => chart.isDatasetVisible(a.datasetIndex) && Number.isFinite(Number(chart.data.datasets[a.datasetIndex].data[hour])));
-                if (!active.length) return;
-                chart.setActiveElements(active);
-                chart.tooltip.setActiveElements(active, { x: chart.scales.x.getPixelForValue(hour), y: chart.chartArea.top });
-                chart.update('none');
-            } catch (err) { /* the chart just stays as it is */ }
+            if (hour >= 0) selectChartHour(key, hour);
         }
 
         function renderToTop() {
@@ -4566,7 +4571,8 @@
             if (!h) return `<span class="text-slate-500">${escapeHtml(t('factorDetailHint'))}</span>`;
             const status = factorStatus(h, factor);
             const st = FLIGHT_STATUS[status];
-            const decisive = k => status !== 'good' && status !== 'none' && h.checks[k] === status ? st.color : null;
+            // A value takes its own check's colour (the wind factor lists speed and gusts, which can differ).
+            const decisive = k => h.checks[k] === 'marginal' || h.checks[k] === 'bad' ? FLIGHT_STATUS[h.checks[k]].color : null;
             const P = key => PARAMS.find(p => p.key === key);
             let lines = '';
             if (factor.key === 'rain') {
@@ -5255,6 +5261,7 @@
                         <span data-chart-handle="${param.key}" draggable="true" class="hidden sm:flex w-7 h-7 items-center justify-center rounded-lg hover:bg-slate-800 hover:text-slate-200 cursor-grab active:cursor-grabbing transition" title="${escapeHtml(t('chartDrag'))}"><i class="fa-solid fa-grip-vertical text-xs"></i></span>
                     </span>
                 </div>
+                <div id="chartValues-${param.key}" class="chart-values" aria-live="off"></div>
                 <div id="chartLegend-${param.key}" class="hidden flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-300"></div>
                 <div class="chart-box h-64 sm:h-72 relative" data-chart-key="${param.key}">
                     <canvas id="chart-${param.key}"></canvas>
@@ -5322,23 +5329,100 @@
             return datasets;
         }
 
-        function tooltipLines(param, idx) {
-            if (!processed) return [];
-            const data = processed.params[param.key];
-            if (!data) return [];
-            const s = data.stats;
-            const u = unitLabel(param);
-            const f = v => formatValue(v, param);
-            const lines = [
-                `${t('tooltipMedian')}: ${f(s.median[idx])} ${u}`,
-                `${t('tooltipRange50')}: ${f(s.p25[idx])} – ${f(s.p75[idx])} ${u}`,
-                `${t('tooltipRange80')}: ${f(s.p10[idx])} – ${f(s.p90[idx])} ${u}`,
-                `${t('tooltipMinMax')}: ${f(s.min[idx])} – ${f(s.max[idx])} ${u}`
-            ];
-            if (param.probability && s.chance[idx] !== null) lines.push(`${t('tooltipChance')}: ${formatPercent(s.chance[idx])}`);
-            lines.push(`${t(state.mode === 'ensemble' ? 'tooltipMembers' : 'tooltipModels')}: ${s.count[idx]}`);
-            return lines;
+        // ---- Values of the selected hour, inline above each chart (no tooltip:
+        // on a phone it covered the chart). The hour comes from hovering or
+        // tapping the chart and stays when the pointer leaves; until then it
+        // is the card's hour. Kept across chart rebuilds.
+        const chartHour = {};
+
+        function chartSelected(key) {
+            const i = chartHour[key];
+            return Number.isInteger(i) && processed && i >= 0 && i < processed.times.length ? i : nowIndex();
         }
+
+        function renderChartValues(param) {
+            const el = document.getElementById(`chartValues-${param.key}`);
+            if (!el) return;
+            const data = processed ? processed.params[param.key] : null;
+            const idx = chartSelected(param.key);
+            const time = processed ? processed.times[idx] : null;
+            if (!data || !data.members.length || !time) { el.innerHTML = ''; return; }
+            const f = v => formatValue(v, param);
+            const head = `<span class="font-semibold text-slate-100 whitespace-nowrap">${escapeHtml(formatDayHour(time))}</span>`;
+            if (perModelView()) {
+                // The values are in the legend, after each model's name.
+                el.innerHTML = head;
+                data.members.forEach(m => {
+                    const v = document.querySelector(`#chartLegend-${param.key} [data-legend-model="${CSS.escape(m.model)}"]`);
+                    if (v) v.textContent = f(m.values[idx]);
+                });
+                return;
+            }
+            const s = data.stats;
+            const u = param.unit === 'precip' ? `${unitLabel(param)}/h` : unitLabel(param);
+            const seg = (label, value) => `<span class="whitespace-nowrap"><span class="text-slate-400">${escapeHtml(label)}</span> <span class="text-slate-100">${escapeHtml(value)}</span></span>`;
+            const segs = [
+                seg(t('tooltipMedian'), f(s.median[idx])),
+                seg(formatPercent(50), `${f(s.p25[idx])}–${f(s.p75[idx])}`),
+                seg(formatPercent(80), `${f(s.p10[idx])}–${f(s.p90[idx])}`),
+                seg(t('chartValuesRange'), `${f(s.min[idx])}–${f(s.max[idx])} ${u}`)
+            ];
+            if (param.probability && s.chance[idx] !== null) segs.push(seg(t('chartValuesChance'), formatPercent(s.chance[idx])));
+            segs.push(seg(t(state.mode === 'ensemble' ? 'tooltipMembers' : 'tooltipModels'), String(s.count[idx])));
+            el.innerHTML = `${head} <span class="text-slate-600">·</span> ${segs.join(' <span class="text-slate-600">·</span> ')}`;
+        }
+
+        // Shows the selected hour: values, highlighted points (the same ones
+        // the pointer highlights while hovering) and the vertical line.
+        function applyChartHour(key) {
+            const param = PARAMS.find(p => p.key === key);
+            if (param) renderChartValues(param);
+            const chart = chartInstances[key];
+            if (!chart) return;
+            const idx = chartSelected(key);
+            chart.$hour = idx;
+            try {
+                const active = chart.data.datasets.map((d, di) => ({ datasetIndex: di, index: idx }))
+                    .filter(a => chart.isDatasetVisible(a.datasetIndex) && Number.isFinite(Number(chart.data.datasets[a.datasetIndex].data[idx])));
+                chart.setActiveElements(active);
+                chart.draw();
+            } catch (err) { /* the chart just stays as it is */ }
+        }
+
+        function selectChartHour(key, idx) {
+            if (!(idx >= 0)) return;
+            chartHour[key] = idx;
+            applyChartHour(key);
+        }
+
+        // The card's hour changed: every chart follows it.
+        function followCardHour() {
+            PARAMS.forEach(p => { delete chartHour[p.key]; applyChartHour(p.key); });
+        }
+
+        function chartPointerHour(chart, key, e) {
+            const els = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+            if (els.length && els[0].index !== chartSelected(key)) selectChartHour(key, els[0].index);
+        }
+
+        // Thin vertical line at the selected hour.
+        const selectedHourPlugin = {
+            id: 'selectedHour',
+            afterDatasetsDraw(chart) {
+                if (!Number.isInteger(chart.$hour) || !chart.$times || chart.$hour >= chart.$times.length) return;
+                const { ctx, chartArea, scales } = chart;
+                const px = scales.x.getPixelForValue(chart.$hour);
+                if (!(px >= chartArea.left - 0.5 && px <= chartArea.right + 0.5)) return;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(226, 232, 240, 0.7)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(px, chartArea.top);
+                ctx.lineTo(px, chartArea.bottom);
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
 
         // ================= Chart panel order & sizing =================
         function orderedParamKeys() {
@@ -5502,11 +5586,11 @@
                 document.getElementById(`chartMembers-${param.key}`).textContent =
                     hasData ? countLabel(data.members.length) : '';
                 const legend = document.getElementById(`chartLegend-${param.key}`);
-                const swatch = (color, text) =>
-                    `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${color}"></span>${escapeHtml(text)}</span>`;
+                // Per-model view: each model's value for the selected hour after its name.
+                const modelItem = m => `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${modelColor(m.model)}"></span>${escapeHtml(modelName(m.model))}<span class="chart-legend-val" data-legend-model="${escapeHtml(m.model)}"></span></span>`;
                 const showLegend = hasData && perModelView();
                 legend.classList.toggle('hidden', !showLegend);
-                legend.innerHTML = showLegend ? data.members.map(m => swatch(modelColor(m.model), modelName(m.model))).join('') : '';
+                legend.innerHTML = showLegend ? data.members.map(modelItem).join('') : '';
 
                 const overlay = document.getElementById(`chartOverlay-${param.key}`);
                 const overlayText = state.loading ? t('loading') : hasData ? '' :
@@ -5516,6 +5600,7 @@
                     ? `${state.loading ? '<i class="fa-solid fa-circle-notch fa-spin text-cyan-400 mr-2"></i>' : ''}${escapeHtml(overlayText)}`
                     : '';
 
+                renderChartValues(param);
                 if (typeof Chart === 'undefined') return;
                 const times = processed ? processed.times : [];
                 const labels = times.map(formatHour);
@@ -5527,8 +5612,8 @@
                     chart.data.labels = labels;
                     chart.data.datasets = datasets;
                     chart.options.scales.yChance.display = !!param.probability && !perModelView();
-                    chart.options.plugins.tooltip.displayColors = perModelView();
                     chart.update('none');
+                    applyChartHour(param.key);
                     return;
                 }
                 try {
@@ -5536,40 +5621,18 @@
                     chart = new Chart(ctx, {
                         type: 'line',
                         data: { labels, datasets },
-                        plugins: [dayDividerPlugin],
+                        plugins: [dayDividerPlugin, selectedHourPlugin],
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             animation: false,
                             interaction: { mode: 'index', intersect: false },
+                            // Hover or tap selects the hour whose values are shown above the chart.
+                            onHover: (e, active, c) => chartPointerHour(c, param.key, e),
+                            onClick: (e, active, c) => chartPointerHour(c, param.key, e),
                             plugins: {
                                 legend: { display: false },
-                                tooltip: {
-                                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                    borderColor: 'rgba(51, 65, 85, 0.8)',
-                                    borderWidth: 1,
-                                    titleColor: '#e2e8f0',
-                                    bodyColor: '#cbd5e1',
-                                    padding: 10,
-                                    displayColors: perModelView(),
-                                    boxWidth: 10,
-                                    boxHeight: 10,
-                                    boxPadding: 4,
-                                    // Range view: only the median point drives
-                                    // the tooltip and its body is the full
-                                    // breakdown. Per-model view: one line per
-                                    // model, highest value first.
-                                    filter: item => item.dataset.label === (perModelView() ? 'model' : 'median'),
-                                    itemSort: (a, b) => (b.raw ?? -Infinity) - (a.raw ?? -Infinity),
-                                    callbacks: {
-                                        title: items => items.length ? formatDayHour(chart.$times[items[0].dataIndex]) : '',
-                                        label: item => perModelView()
-                                            ? `${item.dataset.modelName}: ${formatValue(item.raw, param)} ${unitLabel(param)}`
-                                            : null,
-                                        labelColor: item => ({ borderColor: item.dataset.borderColor, backgroundColor: item.dataset.borderColor, borderRadius: 2 }),
-                                        afterBody: items => items.length && !perModelView() ? tooltipLines(param, items[0].dataIndex) : []
-                                    }
-                                }
+                                tooltip: { enabled: false }
                             },
                             scales: {
                                 x: {
@@ -5598,6 +5661,9 @@
                     if (chartBoxObserver) chartBoxObserver.observe(ctx.canvas.parentNode);
                     // Fires when the browser gives back a canvas it had discarded.
                     ctx.canvas.addEventListener('contextrestored', rebuildChartsSoon);
+                    // The chart clears its highlighted points when the pointer leaves: the selected hour keeps them.
+                    ctx.canvas.addEventListener('mouseout', () => requestAnimationFrame(() => requestAnimationFrame(() => applyChartHour(param.key))));
+                    applyChartHour(param.key);
                 } catch (err) {
                     console.error('FlySky: chart initialization failed.', err);
                 }
