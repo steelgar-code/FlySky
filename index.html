@@ -181,7 +181,7 @@
         input:focus-visible + .fs-switch { outline: 2px solid #22d3ee; outline-offset: 2px; }
 
         /* Hour pinned on the main flight bar; hour the icing section details. */
-        #flightStrip [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
+        #flightStrip [data-pinned], #flightConf [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
         /* Low confidence (under 60 % agreeing) on the main flight bar: a light
            hatch over the hour's colour (inline background-color stays). */
         #flightStrip [data-low-conf], [data-hatch-swatch] { background-image: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0 1.5px, transparent 1.5px 5px) !important; }
@@ -346,11 +346,19 @@
                         <div id="flightStrip" data-flight-bar="all" class="flex h-5 rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                         <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                     </div>
+                    <!-- Confidence chart: one column per hour under the hour bar (same cells), 18 px high -->
+                    <div id="flightConf" class="hidden" style="position: relative; height: 18px; margin-top: 4px; border-radius: 4px; overflow: hidden; background: #020617; cursor: crosshair">
+                        <div id="flightConfCols" style="display: flex; height: 100%"></div>
+                        <div style="position: absolute; left: 0; right: 0; bottom: 60%; border-top: 1px dashed rgba(148, 163, 184, 0.35); pointer-events: none"></div>
+                        <div style="position: absolute; left: 0; right: 0; bottom: 80%; border-top: 1px dashed rgba(148, 163, 184, 0.35); pointer-events: none"></div>
+                        <span id="flightConfLabel" data-i18n="confLabel" style="position: absolute; left: 2px; top: 2px; z-index: 20; padding: 0 4px; border-radius: 2px; background: rgba(2, 6, 23, 0.75); color: #fff; font: 9px/14px ui-monospace, monospace; pointer-events: none">Confidence</span>
+                        <div data-day-seps style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none"></div>
+                    </div>
                     <div data-daynight class="h-1.5 mt-1 rounded-full"></div>
                     <div id="flightAxis" data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
-                    <!-- One short legend line; the ⓘ explains the colours, the hatch, the band and the split -->
+                    <!-- One short legend line: hours per confidence level; the ⓘ explains the colours, the hatch, the chart, the band and the split -->
                     <div class="flex items-center gap-2 text-[10px] text-slate-500">
-                        <span id="flightHatchKey" class="hidden inline-flex items-center gap-1"><span class="legend-swatch" data-hatch-swatch></span><span data-i18n="conf_low">low confidence</span></span>
+                        <span id="flightConfCounts" class="hidden"></span>
                         <button type="button" id="btnFlightInfo" class="info-btn" data-info-btn aria-expanded="false" aria-controls="flightInfo" data-i18n-title="flightInfoTitle" data-i18n-aria-label="flightInfoTitle" title="What the bar shows" aria-label="What the bar shows"><i class="fa-solid fa-circle-info"></i></button>
                     </div>
                     <div id="flightInfo" data-info-panel class="hidden mt-1 rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2 text-[11px] text-slate-400 space-y-1"></div>
@@ -371,6 +379,7 @@
                         <p data-i18n="icingInfoWhat"></p>
                         <p data-i18n="icingInfoNot"></p>
                         <p data-i18n="icingInfoColours"></p>
+                        <p data-i18n="icingInfoProfile"></p>
                     </div>
                     <div class="relative mt-1.5">
                         <div id="icingStrip" class="flex rounded-full overflow-hidden bg-slate-950 cursor-pointer" style="height: 10px"></div>
@@ -941,6 +950,11 @@
                 flightInfoHatch: "Hatched: low confidence — fewer than 60 % of the {what} agree on one verdict. The exact share is in the hour's details.",
                 flightInfoBand: "The thin band under the bar: sky blue daylight, indigo night; dotted lines mark midnight.",
                 flightInfoSplit: "“Split by share” stacks each hour by the share of {what} per verdict: suitable at the bottom, then uncertain, then not suitable. Tap an hour to pin its details.",
+                confLabel: "Confidence",
+                confPart_high: "high {n} h",
+                confPart_medium: "medium {n} h",
+                confPart_low: "low {n} h",
+                flightInfoConf: "The small chart under the bar: how many of the {what} agree on the hour's largest verdict — taller is more certain; the dashed lines are 60 % and 80 %.",
                 conf_high: "high confidence",
                 conf_medium: "medium confidence",
                 conf_low: "low confidence",
@@ -1023,9 +1037,10 @@
                 icingPartlyUnknown: "partly beyond the models' data",
                 icingFlightDesc: "{dur} at {h} m above takeoff, climb {c} m/s, descent {d} m/s",
                 icingInfoTitle: "About the icing indicator",
-                icingInfoWhat: "What this shows: where two forecast models (DWD ICON, UK Met Office) have air below 0 °C that is nearly saturated, freezing fog, or freezing rain or drizzle, on a climb to your flight altitude, the cruise and the descent.",
-                icingInfoNot: "It is not an icing forecast: 'no icing signs' does not mean safe. It assumes a fixed-wing drone without ice protection. In icing, thrust and airspeed readings can be lost within 1–3 minutes and the ice stays on — stay out of icing layers rather than flying through them.",
-                icingInfoColours: "Colours: red potential icing, yellow marginal, grey no signs, hatched no data; striped: one model only; faded: more than 3 days ahead. In the profile each row is a model level at its usual height here; the dashed line is your flight altitude.",
+                icingInfoWhat: "What this shows: Where DWD ICON and UK Met Office forecasts indicate sub-zero, near-saturated air, freezing fog, or freezing rain/drizzle during climb, cruise, and descent.",
+                icingInfoNot: "Important: This is a potential icing hazard screen, not an icing forecast or a safety assessment. “No signs” does not mean safe. It assumes a fixed-wing drone without ice protection. Ice can rapidly affect thrust and airspeed readings and remain on the aircraft. Avoid icing conditions.",
+                icingInfoColours: "Colours: Red = potential icing; yellow = marginal; grey = no signs detected; hatched = no data. Striped = only one model indicates a hazard. Faded = forecast is more than 3 days ahead.",
+                icingInfoProfile: "Profile: Each row shows a model pressure level at its typical local altitude. The dashed line marks your selected flight altitude.",
                 icingDetailsLink: "Icing details",
                 planIcing: "Icing signs {from}–{to}",
                 icingFzdz: "freezing drizzle from low stratus",
@@ -1262,6 +1277,11 @@
                 flightInfoHatch: "Штрихування: низька впевненість — менше 60 % {what} згодні щодо оцінки. Точна частка — у деталях години.",
                 flightInfoBand: "Тонка смужка під нею: блакитний — день, індиго — ніч; пунктир позначає північ.",
                 flightInfoSplit: "«Частки» ділять кожну годину за часткою {what} для кожної оцінки: знизу придатно, вище невизначено, згори непридатно. Торкніться години, щоб закріпити її деталі.",
+                confLabel: "Впевненість",
+                confPart_high: "висока {n} год",
+                confPart_medium: "середня {n} год",
+                confPart_low: "низька {n} год",
+                flightInfoConf: "Невеликий графік під смугою: скільки {what} згодні щодо найбільшої групи години — вищий стовпчик означає більшу певність; пунктир — 60 % і 80 %.",
                 conf_high: "висока впевненість",
                 conf_medium: "середня впевненість",
                 conf_low: "низька впевненість",
@@ -1344,9 +1364,10 @@
                 icingPartlyUnknown: "частково поза даними моделей",
                 icingFlightDesc: "{dur} на {h} м над точкою зльоту, набір {c} м/с, зниження {d} м/с",
                 icingInfoTitle: "Про індикатор обледеніння",
-                icingInfoWhat: "Що це показує: де дві моделі прогнозу (DWD ICON, UK Met Office) мають повітря нижче 0 °C, майже насичене вологою, крижаний туман або крижаний дощ чи мряку — під час набору до вашої висоти польоту, у польоті на ній і під час зниження.",
-                icingInfoNot: "Це не прогноз обледеніння: «ознак обледеніння немає» не означає «безпечно». Розраховано на дрон літакового типу без протиобледенювальної системи. В обледенінні тягу й показання швидкості можна втратити за 1–3 хвилини, а лід лишається — тримайтеся поза шарами обледеніння, а не пролітайте крізь них.",
-                icingInfoColours: "Кольори: червоний — можливе обледеніння, жовтий — межові умови, сірий — ознак немає, штрихування — немає даних; смуги — лише одна модель; блідо — понад 3 доби вперед. У профілі кожен рядок — рівень моделі на його звичайній висоті тут; пунктир — ваша висота польоту.",
+                icingInfoWhat: "Що це показує: де за прогнозами DWD ICON і UK Met Office повітря має температуру нижче нуля й майже насичене вологою, або є крижаний туман чи крижаний дощ або мряка — під час набору висоти, польоту на висоті та зниження.",
+                icingInfoNot: "Важливо: це перевірка на можливу небезпеку обледеніння, а не прогноз обледеніння і не оцінка безпеки. «Ознак немає» не означає «безпечно». Розраховано на дрон літакового типу без протиобледенювальної системи. Лід може швидко вплинути на тягу та показання швидкості й залишається на апараті. Уникайте умов обледеніння.",
+                icingInfoColours: "Кольори: червоний — можливе обледеніння; жовтий — межові умови; сірий — ознак не виявлено; штрихування — немає даних. Смуги — лише одна модель вказує на небезпеку. Блідо — прогноз на понад 3 доби вперед.",
+                icingInfoProfile: "Профіль: кожен рядок — рівень тиску моделі на його типовій місцевій висоті. Пунктир — вибрана вами висота польоту.",
                 icingDetailsLink: "Деталі обледеніння",
                 planIcing: "Ознаки обледеніння {from}–{to}",
                 icingFzdz: "крижана мряка з низьких шаруватих хмар",
@@ -1583,6 +1604,11 @@
                 flightInfoHatch: "Hachurado: confiança baixa — menos de 60 % dos {what} concordam num veredito. A fração exata está nos detalhes da hora.",
                 flightInfoBand: "A faixa fina abaixo da barra: azul-claro dia, índigo noite; as linhas pontilhadas marcam a meia-noite.",
                 flightInfoSplit: "“Dividir por fração” empilha cada hora pela fração dos {what} por veredito: adequado embaixo, depois incerto, depois inadequado. Toque numa hora para fixar os detalhes.",
+                confLabel: "Confiança",
+                confPart_high: "alta {n} h",
+                confPart_medium: "média {n} h",
+                confPart_low: "baixa {n} h",
+                flightInfoConf: "O gráfico pequeno sob a barra: quantos dos {what} concordam no maior veredito da hora — mais alto é mais certo; as linhas tracejadas marcam 60 % e 80 %.",
                 conf_high: "confiança alta",
                 conf_medium: "confiança média",
                 conf_low: "confiança baixa",
@@ -1665,9 +1691,10 @@
                 icingPartlyUnknown: "em parte além dos dados dos modelos",
                 icingFlightDesc: "{dur} a {h} m acima da decolagem, subida {c} m/s, descida {d} m/s",
                 icingInfoTitle: "Sobre o indicador de gelo",
-                icingInfoWhat: "O que isto mostra: onde dois modelos de previsão (DWD ICON, UK Met Office) têm ar abaixo de 0 °C quase saturado, nevoeiro congelante, ou chuva ou garoa congelante, na subida até a sua altitude de voo, no cruzeiro e na descida.",
-                icingInfoNot: "Não é uma previsão de gelo: “sem sinais de gelo” não quer dizer seguro. Supõe um drone de asa fixa sem proteção contra gelo. Em gelo, a tração e a leitura de velocidade podem se perder em 1–3 minutos e o gelo permanece — fique fora das camadas de gelo em vez de atravessá-las.",
-                icingInfoColours: "Cores: vermelho gelo possível, amarelo marginal, cinza sem sinais, hachurado sem dados; listrado: um só modelo; esmaecido: mais de 3 dias à frente. No perfil, cada linha é um nível do modelo na sua altura habitual aqui; a linha tracejada é a sua altitude de voo.",
+                icingInfoWhat: "O que isto mostra: onde as previsões DWD ICON e UK Met Office indicam ar abaixo de zero quase saturado, nevoeiro congelante, ou chuva ou garoa congelante durante a subida, o cruzeiro e a descida.",
+                icingInfoNot: "Importante: isto é uma triagem de possível perigo de gelo, não uma previsão de gelo nem uma avaliação de segurança. “Sem sinais” não significa seguro. Supõe um drone de asa fixa sem proteção contra gelo. O gelo pode afetar rapidamente a tração e as leituras de velocidade e permanece na aeronave. Evite condições de gelo.",
+                icingInfoColours: "Cores: vermelho = gelo possível; amarelo = marginal; cinza = sem sinais detectados; hachurado = sem dados. Listrado = só um modelo indica perigo. Esmaecido = previsão a mais de 3 dias.",
+                icingInfoProfile: "Perfil: cada linha mostra um nível de pressão do modelo na sua altitude local típica. A linha tracejada marca a sua altitude de voo selecionada.",
                 icingDetailsLink: "Detalhes do gelo",
                 planIcing: "Sinais de gelo {from}–{to}",
                 icingFzdz: "garoa congelante de nuvens stratus baixas",
@@ -3690,6 +3717,9 @@
 
         // ---- Forecast confidence (see computeFlight)
         const CONF_TEXT = { high: '#67e8f9', medium: '#22d3ee', low: '#94a3b8' };
+        // Colours of the confidence chart's columns (one hue, so it does not
+        // compete with the verdict colours).
+        const CONF_BAR = { high: '#67e8f9', medium: '#0e7490', low: '#64748b' };
 
         // The share of the largest group, named with that group's verdict
         // (it can differ from the hour's median verdict).
@@ -3724,13 +3754,33 @@
             return `<div data-conf-split class="mt-1.5 text-[11px] text-slate-400"><div><i class="fa-solid fa-signal mr-1 text-[9px]" style="color: ${CONF_TEXT[a.level]}"></i>${escapeHtml(confSplitText(a))}</div>${byModel}</div>`;
         }
 
-        // The legend line (the hatch, only in the normal view: Split by share
-        // shows the shares themselves), the ⓘ panel's text and the split button.
+        // The confidence chart: one column per hour, as high as the share
+        // agreeing on the hour's largest group. Its cells repeat the bar's
+        // margins (2 px where the verdict changes, 1 px in the split) so every
+        // column sits exactly under its hour; the cell carries data-flight-hour
+        // for hover and tap.
+        function confChartHtml(hours, split) {
+            return hours.map((h, i) => {
+                const a = h.agree;
+                const gap = i > 0 && (split || hours[i - 1].status !== h.status) ? (split ? 1 : 2) : 0;
+                const bar = a ? `<div style="position: absolute; left: 0; right: 0; bottom: 0; height: ${(a.conf * 100).toFixed(1)}%; background: ${CONF_BAR[a.level]}"></div>` : '';
+                return `<div data-flight-hour="${i}"${a ? ` data-conf-level="${a.level}"` : ''} class="hover:brightness-125 transition" style="position: relative; flex: 1 1 0; min-width: 0; margin-left: ${gap}px">${bar}</div>`;
+            }).join('');
+        }
+
+        // The legend line (hours per confidence level; the low one carries the
+        // hatch swatch in the normal view, Split by share shows the shares
+        // themselves), the chart, the ⓘ panel's text and the split button.
         function renderConfidence(hours) {
             const has = hours.some(h => h.agree);
-            document.getElementById('flightHatchKey').classList.toggle('hidden', !has || state.flightSplit);
+            document.getElementById('flightConf').classList.toggle('hidden', !has);
+            document.getElementById('flightConfCols').innerHTML = has ? confChartHtml(hours, state.flightSplit) : '';
+            const counts = document.getElementById('flightConfCounts');
+            counts.classList.toggle('hidden', !has);
+            counts.innerHTML = has ? escapeHtml(t('confLabel')) + ': ' + ['high', 'medium', 'low'].map(lv => ({ lv, n: hours.filter(h => h.agree && h.agree.level === lv).length })).filter(c => c.n)
+                .map(c => `<span data-conf-count="${c.lv}" class="whitespace-nowrap"><span class="legend-swatch"${c.lv === 'low' && !state.flightSplit ? ' data-hatch-swatch style="vertical-align: -1px"' : ` style="vertical-align: -1px; background: ${CONF_BAR[c.lv]}"`}></span> ${escapeHtml(t('confPart_' + c.lv, { n: c.n }))}</span>`).join(' · ') : '';
             const what = t(state.mode === 'ensemble' ? 'confWhatMembers' : 'confWhatModels');
-            document.getElementById('flightInfo').innerHTML = ['flightInfoColours', 'flightInfoHatch', 'flightInfoBand', 'flightInfoSplit']
+            document.getElementById('flightInfo').innerHTML = ['flightInfoColours', 'flightInfoHatch', 'flightInfoConf', 'flightInfoBand', 'flightInfoSplit']
                 .map(k => `<p>${escapeHtml(t(k, { what }))}</p>`).join('');
             const btn = document.getElementById('btnFlightSplit');
             btn.classList.toggle('hidden', !has);
@@ -3768,7 +3818,7 @@
         function markMainPin() {
             const hours = processed && processed.flight ? processed.flight.hours : [];
             const i = mainPin ? hours.findIndex(h => h.time === mainPin) : -1;
-            document.querySelectorAll('#flightStrip [data-flight-hour]').forEach(cell => cell.toggleAttribute('data-pinned', Number(cell.dataset.flightHour) === i));
+            document.querySelectorAll('#flightStrip [data-flight-hour], #flightConf [data-flight-hour]').forEach(cell => cell.toggleAttribute('data-pinned', Number(cell.dataset.flightHour) === i));
         }
 
         // Satellite map at a forecast hour (local time of the location).
