@@ -22,7 +22,8 @@ ok('date, sunrise and sunset in the location card', sun.inLoc && !sun.inFlight &
 
 // Chart in view: its top near the top of the scrolling forecast view.
 const inView = key => I(k => { const v = document.getElementById('forecastView').getBoundingClientRect(), w = document.getElementById(`chartWrap-${k}`).getBoundingClientRect(); return w.top >= v.top - 5 && w.top < v.bottom - 200; }, key);
-const tipAt = key => I(k => { const c = chartInstances[k]; const a = c && c.tooltip.getActiveElements(); return a && a.length ? a[0].index : -1; }, key);
+// The hour a chart shows: its selected hour (values line, vertical line, highlighted points).
+const tipAt = key => I(k => { const c = chartInstances[k]; const a = c && c.getActiveElements(); return a && a.length && c.$hour === a[0].index ? a[0].index : -1; }, key);
 const toTopShown = () => I(() => !document.getElementById('btnToTop').classList.contains('hidden'));
 
 ok('back-to-top hidden at the top', !(await toTopShown()));

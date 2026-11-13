@@ -218,6 +218,9 @@ ok('English again: the Models label is not overwritten by the static string', /^
   await p2.tap('#flightConf [data-flight-hour="3"]'); await p2.waitForTimeout(300);
   const pinC = await J(() => ({ text: document.getElementById('flightDetail').innerText, want: formatDayHour(processed.flight.hours[3].time), pinned: [...document.querySelectorAll('#flightStrip [data-pinned]')].map(c => c.dataset.flightHour), chartPinned: [...document.querySelectorAll('#flightConf [data-pinned]')].map(c => c.dataset.flightHour) }));
   ok('a tap on a chart column pins that hour: the hour bar\'s cell and the column are marked', pinC.text.includes(pinC.want) && pinC.pinned.join() === '3' && pinC.chartPinned.join() === '3', pinC);
+  // Batch 1h: the pinned column has no outline (its own colour and the bar's cell mark the hour); the bar's cell keeps it.
+  const outl = await J(() => ({ col: getComputedStyle(document.querySelector('#flightConf [data-pinned]')).boxShadow, cell: getComputedStyle(document.querySelector('#flightStrip [data-pinned]')).boxShadow }));
+  ok('confidence chart: the pinned column has no outline, the hour bar\'s cell keeps it', outl.col === 'none' && outl.cell !== 'none', outl);
   await p2.tap('#flightConf [data-flight-hour="3"]'); await p2.waitForTimeout(300);
   ok('…and a second tap unpins it', await J(() => !document.querySelector('#flightMain [data-pinned]')));
 

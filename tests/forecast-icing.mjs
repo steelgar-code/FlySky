@@ -35,6 +35,10 @@ await page.click('#windowButtons button:nth-child(4)'); await page.waitForTimeou
 await page.click('#windowButtons button:nth-child(3)'); await page.waitForTimeout(500);
 ok('window switch: no new icing request', reqs() === 1);
 
+// ---- Batch 1h: a new user (empty storage) has "Include icing in the flight verdict" off
+const nu = await I(() => ({ def: DEFAULT_FLIGHT_PROFILE.icingVerdict, on: state.flightProfile.icingVerdict, checked: document.getElementById('icingVerdictToggle').checked, bars: [...document.querySelectorAll('#flightFactorBars [data-flight-bar]')].map(e => e.dataset.flightBar), checks: [...new Set(processed.flight.hours.flatMap(h => Object.keys(h.checks)))], saved: localStorage.getItem('flysky_flight_profile') }));
+ok('new user: icing in the verdict is off, its switch unchecked, no icing bar, no icing check in any hour', nu.def === false && nu.on === false && !nu.checked && nu.bars.length === 5 && !nu.bars.includes('icing') && !nu.checks.includes('icing'), nu);
+
 // ---- "Can I fly now?" row: what, where, how many models; the layer line
 let r = await at(0);
 ok('now: potential icing at the flight altitude, both models', /Icing.*Potential icing at 400 m \(−4\.0 °C, RH 96 %\) · 2 of 2 models/.test(r), r);
@@ -173,6 +177,7 @@ await page.fill('#icingRhMarginal', '98'); await page.dispatchEvent('#icingRhMar
 ok('marginal above potential icing: refused with a note', /marginal below potential icing/.test(await page.locator('#icingThresholdsNote').innerText()) && await I(() => state.flightProfile.icingRhMarginal === 80));
 await page.click('#btnResetSettings'); await page.waitForTimeout(400);
 ok('reset to defaults: icing thresholds back to 90 / 80 %', await I(() => state.flightProfile.icingRhRed === 90 && state.flightProfile.icingRhMarginal === 80) && /Potential icing at 400 m/.test(await row()));
+ok('reset to defaults: icing in the verdict stays off', await I(() => state.flightProfile.icingVerdict === false && !document.getElementById('icingVerdictToggle').checked && !('icing' in processed.flight.hours[0].checks)));
 await page.selectOption('#climbRateSelect', '2'); await page.selectOption('#durationSelect', '120'); await page.waitForTimeout(300);
 
 // ---- Indicator off / on
@@ -195,18 +200,43 @@ ok('verdict option: the flag stays, the "not counted" line goes', on.flag && !on
 ok('verdict option: an Icing bar in the breakdown', on.bars === before.bars + 1 && await page.locator('#flightFactorBars [data-flight-bar="icing"]').count() === 1);
 const fd = await I(() => { renderFactorDetail({ key: 'icing', i: 0 }); const el = document.getElementById('factorDetail'); return { text: el.innerText.replace(/\n/g, ' | '), link: !!el.querySelector('[data-icing-details]') }; });
 ok('verdict option: the icing bar\'s detail is the one-line summary with "Icing details"', /Icing: Potential icing at 400 m \(−4\.0 °C, RH 96 %\) · 2 of 2 models/.test(fd.text) && fd.link && !/DWD ICON: climb/.test(fd.text), fd);
+// Batch 1h: each value in the hour's details takes its own check's colour — yellow rain / wind aloft / cloud next
+// to red icing — not the hour's verdict colour. (Rain: 1 of 10 members wet.)
+opts.forecastMembers = 10;
+opts.forecastValue = (v, k, m, member) => (v === 'precipitation' ? (k === 1 && member === 0 ? 2 : 0) : v === 'wind_speed_10m' ? 3 : /gust/.test(v) ? 4 : v.startsWith('wind_speed_') ? 10 : v === 'visibility' ? 20000 : v === 'cloud_cover_low' ? 50 : undefined);
+await page.click('#btnRefresh'); await page.waitForTimeout(3000);
+const hourValues = () => I(() => {
+  const h = processed.flight.hours[0], el = document.createElement('div'); el.innerHTML = flightHourText(h);
+  const spans = [...el.querySelectorAll('[data-hour-values] > span')].map(sp => ({ text: sp.textContent, color: sp.style.color, bold: sp.classList.contains('font-semibold') }));
+  return { status: h.status, checks: h.checks, spans, all: el.querySelector('[data-hour-values]').textContent };
+});
+const YEL = 'rgb(250, 178, 25)', RED = 'rgb(208, 59, 59)';
+let ov = await hourValues();
+ok('hour details, icing in the verdict: yellow rain and wind aloft keep the yellow, icing is red, all semibold',
+    ov.status === 'bad' && ov.checks.icing === 'bad' && ov.checks.rain === 'marginal' && ov.checks.aloft === 'marginal'
+    && ov.spans.length === 3 && ov.spans.every(sp => sp.bold) && ov.spans.slice(0, 2).every(sp => sp.color === YEL) && /^Icing/.test(ov.spans[2].text) && ov.spans[2].color === RED, ov);
+ok('hour details: values that are suitable stay plain', ov.checks.wind === 'good' && ov.checks.gust === 'good' && !ov.spans.some(sp => /wind \d|gusts/.test(sp.text)) && /wind 3\.0 m\/s/.test(ov.all), ov.all);
+const fdw = await I(() => { renderFactorDetail({ key: 'aloft', i: 0 }); return document.getElementById('factorDetail').innerHTML; });
+ok('breakdown detail of a yellow factor is yellow too', fdw.includes('color: rgb(250, 178, 25)') || fdw.includes('color: #fab219'), fdw.slice(0, 300));
 ok('verdict option: confidence from the icing models, no extra members (Ensemble)', on.members === before.members && on.conf === 1, { before, on });
 await page.click('[data-mode="deterministic"]'); await page.waitForTimeout(3000);
 const det2 = await I(() => { const h = processed.flight.hours[0]; return { status: h.status, members: h.agree && h.agree.members, models: h.agree && h.agree.models.map(m => m.model), check: h.checks.icing }; });
 ok('verdict option in Models mode: the same; the icing models add no models (5 stay 5)', det2.status === 'bad' && det2.check === 'bad' && det2.members === 5 && det2.models.length === 5, det2);
 await I(() => selectHour(3)); await page.waitForTimeout(200);
 const h3 = await I(() => { const h = processed.flight.hours[3]; return { check: h.checks.icing, conf: h.agree && h.agree.checkConf.icing }; });
+ov = await hourValues();
+ok('hour details in Models mode (rain red, wind aloft and cloud yellow, icing red): each value has its own colour',
+    ov.checks.rain === 'bad' && ov.checks.aloft === 'marginal' && ov.checks.cloud === 'marginal' && ov.spans.length === 4 && ov.spans.every(sp => sp.bold)
+    && ov.spans.map(sp => sp.color).join() === [RED, YEL, YEL, RED].join(), ov);
 ok('one of two icing models red: red check, confidence 50 % on icing', h3.check === 'bad' && Math.abs(h3.conf - 0.5) < 1e-9, h3);
 await page.click('[data-mode="ensemble"]'); await page.waitForTimeout(3000);
 await drawer(true);
 await page.locator('label:has(#icingVerdictToggle)').click(); await page.waitForTimeout(400);
 await drawer(false);
 ok('verdict option off again: no icing check', await I(() => !('icing' in processed.flight.hours[0].checks)));
+ov = await hourValues();
+ok('hour details, icing not in the verdict: the same yellow values, no icing part', ov.status === 'marginal' && ov.spans.length === 2 && ov.spans.every(sp => sp.bold && sp.color === YEL), ov);
+opts.forecastMembers = null; opts.forecastValue = undefined;
 await I(() => selectHour(0));
 
 // ---- Freezing drizzle from low stratus: precipitation from a saturated sub-zero layer under dry air → flagged
