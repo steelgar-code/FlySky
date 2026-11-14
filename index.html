@@ -194,6 +194,16 @@
         .space-y-4 > .chart-values + div[id^="chartLegend-"] { margin-top: 0; }
         .chart-values:empty { display: none; }
         .chart-legend-val { display: inline-block; min-width: 5.6em; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 600; }
+        /* Per-model legend: equal fixed columns (two on a 390 px phone), so the second column lines up.
+           Each item is one line: swatch, name (ellipsis only as a last resort), value right-aligned. */
+        .chart-legend:not(.hidden) { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); column-gap: 12px; row-gap: 4px; }
+        .chart-legend > span { display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; }
+        .chart-legend .legend-swatch { width: 10px; flex: none; }
+        .chart-legend-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .chart-legend .chart-legend-val { min-width: 0; margin-left: auto; text-align: right; flex: none; }
+        /* Wider screens: at most four columns (8 models = two even rows), with room between them so a
+           value is not read as the next model's. */
+        @media (min-width: 640px) { .chart-legend:not(.hidden) { grid-template-columns: repeat(auto-fill, minmax(190px, 220px)); column-gap: 32px; } }
         /* Low confidence (under 60 % agreeing) on the main flight bar: a light
            hatch over the hour's colour (inline background-color stays). */
         #flightStrip [data-low-conf], [data-hatch-swatch] { background-image: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0 1.5px, transparent 1.5px 5px) !important; }
@@ -5297,7 +5307,7 @@
                     </span>
                 </div>
                 <div id="chartValues-${param.key}" class="chart-values" aria-live="off"></div>
-                <div id="chartLegend-${param.key}" class="hidden flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-300"></div>
+                <div id="chartLegend-${param.key}" class="chart-legend hidden text-[11px] text-slate-300"></div>
                 <div class="chart-box h-64 sm:h-72 relative" data-chart-key="${param.key}">
                     <canvas id="chart-${param.key}"></canvas>
                     <div id="chartOverlay-${param.key}" class="hidden absolute inset-0 flex items-center justify-center text-xs text-slate-400 bg-slate-900/70 rounded-xl"></div>
@@ -5631,7 +5641,7 @@
                     hasData ? countLabel(data.members.length) : '';
                 const legend = document.getElementById(`chartLegend-${param.key}`);
                 // Per-model view: each model's value for the selected hour after its name.
-                const modelItem = m => `<span class="flex items-center gap-1.5"><span class="legend-swatch" style="height: 3px; background: ${modelColor(m.model)}"></span>${escapeHtml(modelName(m.model))}<span class="chart-legend-val" data-legend-model="${escapeHtml(m.model)}"></span></span>`;
+                const modelItem = m => `<span><span class="legend-swatch" style="height: 3px; background: ${modelColor(m.model)}"></span><span class="chart-legend-name" title="${escapeHtml(modelName(m.model))}">${escapeHtml(modelName(m.model))}</span><span class="chart-legend-val" data-legend-model="${escapeHtml(m.model)}"></span></span>`;
                 const showLegend = hasData && perModelView();
                 legend.classList.toggle('hidden', !showLegend);
                 legend.innerHTML = showLegend ? data.members.map(modelItem).join('') : '';

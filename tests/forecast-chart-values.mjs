@@ -146,6 +146,16 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const hModel = await hh();
   ok('phone: per-model values element the hour only (16 px), range view the hour and two lines (52 px)', hModel === 16 && hRange === 52, { hRange, hModel });
   ok('no horizontal scroll from the values line', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && document.getElementById('chartWrap-precipitation').scrollWidth <= document.getElementById('chartWrap-precipitation').clientWidth + 1));
+  // All 8 Models-mode models: the legend is two equal columns, the second lines up, no item wraps.
+  await page.evaluate(() => { state.modelsByMode.deterministic = MODES.deterministic.models.map(m => m.id); saveSettings(); });
+  await page.click('#btnRefresh'); await page.waitForTimeout(4000);
+  const cols = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length >= 8).map(p => {
+    const lg = document.getElementById(`chartLegend-${p.key}`), items = [...lg.children], r = items.map(e => e.getBoundingClientRect());
+    const lefts = [...new Set(r.map(x => Math.round(x.left)))], second = r.filter((x, i) => i % 2 === 1).map(x => x.left);
+    return { key: p.key, n: items.length, cols: getComputedStyle(lg).gridTemplateColumns.split(' ').length, lefts: lefts.length, aligned: Math.max(...second) - Math.min(...second) <= 1,
+      oneLine: items.every(e => e.getBoundingClientRect().height < 17), clipped: items.filter(e => e.querySelector('.chart-legend-name').scrollWidth > e.querySelector('.chart-legend-name').clientWidth).length };
+  }));
+  ok('phone, 8 models per model: the legend is two columns, the second column lines up, no item wraps or is cut', cols.length >= 2 && cols.every(c => c.n === 8 && c.cols === 2 && c.lefts === 2 && c.aligned && c.oneLine && !c.clipped), cols);
   await ctx.close();
 }
 ok('no page errors', !errors.filter(e => !/tailwind/.test(e)).length, errors.filter(e => !/tailwind/.test(e)));
