@@ -184,10 +184,16 @@
         #flightStrip [data-pinned], #icingStrip [data-selected] { box-shadow: inset 0 0 0 2px #f8fafc; }
         /* Values of the selected hour above each parameter chart: a fixed height
            (one line; two on a phone) so nothing moves between hours. */
-        .chart-values { font-variant-numeric: tabular-nums; font-size: 11px; line-height: 16px; height: 16px; overflow: hidden; color: #cbd5e1; }
-        @media (max-width: 639px) { .chart-values { height: 32px; } .chart-values.one-line { height: 16px; } }
+        .chart-values { font-variant-numeric: tabular-nums; font-size: 11px; line-height: 16px; height: 36px; overflow: hidden; color: #cbd5e1; }
+        .chart-values > div + div { margin-top: 4px; }
+        /* Phone: hour + two lines of values (three in Ukrainian and Portuguese precipitation, the longest). */
+        @media (max-width: 639px) { .chart-values { height: 52px; } html[lang="uk"] .chart-values, html[lang="pt-BR"] .chart-values { height: 68px; } }
+        /* Per model: the hour only, then the legend's rows 4 px below it, as far apart as the
+           rows are. The 4 px is the hour's bottom margin; the legend's own top margin is cleared. */
+        .chart-values.one-line, html[lang="uk"] .chart-values.one-line, html[lang="pt-BR"] .chart-values.one-line { height: 16px; margin-bottom: 4px; }
+        .space-y-4 > .chart-values + div[id^="chartLegend-"] { margin-top: 0; }
         .chart-values:empty { display: none; }
-        .chart-legend-val { display: inline-block; min-width: 3.4em; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 600; }
+        .chart-legend-val { display: inline-block; min-width: 5.6em; font-variant-numeric: tabular-nums; color: #f1f5f9; font-weight: 600; }
         /* Low confidence (under 60 % agreeing) on the main flight bar: a light
            hatch over the hour's colour (inline background-color stays). */
         #flightStrip [data-low-conf], [data-hatch-swatch] { background-image: repeating-linear-gradient(135deg, rgba(248, 250, 252, 0.5) 0 1.5px, transparent 1.5px 5px) !important; }
@@ -5369,38 +5375,45 @@
             return Number.isInteger(i) && processed && i >= 0 && i < processed.times.length ? i : nowIndex();
         }
 
+        // A value (or a lo–hi range) with its unit after it: "4.2 m/s", "52%", "0.4 mm/h".
+        function valueUnit(a, param, b) {
+            const u = param.unit === 'precip' ? `${unitLabel(param)}/h` : unitLabel(param);
+            const n = b === undefined ? formatValue(a, param) : `${formatValue(a, param)}–${formatValue(b, param)}`;
+            return param.unit === 'percent' ? `${n}${u}` : `${n} ${u}`;
+        }
+
         function renderChartValues(param) {
             const el = document.getElementById(`chartValues-${param.key}`);
             if (!el) return;
-            // Per model the line holds only the hour (the legend has the values): one line on phones too.
+            // Per model the element holds only the hour (the legend has the values); the range view
+            // has the hour on its own line and the values below it, 4 px apart like the legend's rows.
             el.classList.toggle('one-line', perModelView());
             const data = processed ? processed.params[param.key] : null;
             const idx = chartSelected(param.key);
             const time = processed ? processed.times[idx] : null;
             if (!data || !data.members.length || !time) { el.innerHTML = ''; return; }
             const f = v => formatValue(v, param);
-            const head = `<span class="font-semibold text-slate-100 whitespace-nowrap">${escapeHtml(formatDayHour(time))}</span>`;
+            const head = `<div class="font-semibold text-slate-100 whitespace-nowrap">${escapeHtml(formatDayHour(time))}</div>`;
             if (perModelView()) {
                 // The values are in the legend, after each model's name.
                 el.innerHTML = head;
                 data.members.forEach(m => {
                     const v = document.querySelector(`#chartLegend-${param.key} [data-legend-model="${CSS.escape(m.model)}"]`);
-                    if (v) v.textContent = f(m.values[idx]);
+                    if (v) v.textContent = valueUnit(m.values[idx], param);
                 });
                 return;
             }
             const s = data.stats;
-            const u = param.unit === 'precip' ? `${unitLabel(param)}/h` : unitLabel(param);
             const seg = (label, value) => `<span class="whitespace-nowrap"><span class="text-slate-400">${escapeHtml(label)}</span> <span class="text-slate-100">${escapeHtml(value)}</span></span>`;
             const segs = [
-                seg(t('tooltipMedian'), f(s.median[idx])),
-                seg(formatPercent(50), `${f(s.p25[idx])}–${f(s.p75[idx])}`),
-                seg(formatPercent(80), `${f(s.p10[idx])}–${f(s.p90[idx])}`),
-                seg(t('chartValuesRange'), `${f(s.min[idx])}–${f(s.max[idx])} ${u}`)
+                seg(t('tooltipMedian'), valueUnit(s.median[idx], param)),
+                seg(formatPercent(50), valueUnit(s.p25[idx], param, s.p75[idx])),
+                seg(formatPercent(80), valueUnit(s.p10[idx], param, s.p90[idx])),
+                seg(t('chartValuesRange'), valueUnit(s.min[idx], param, s.max[idx]))
             ];
             if (param.probability && s.chance[idx] !== null) segs.push(seg(t('chartValuesChance'), formatPercent(s.chance[idx])));
             segs.push(seg(t(state.mode === 'ensemble' ? 'tooltipMembers' : 'tooltipModels'), String(s.count[idx])));
-            el.innerHTML = `${head} <span class="text-slate-600">·</span> ${segs.join(' <span class="text-slate-600">·</span> ')}`;
+            el.innerHTML = `${head}<div>${segs.join(' <span class="text-slate-600">·</span> ')}</div>`;
         }
 
         // Shows the selected hour: values, highlighted points (the same ones
@@ -5613,7 +5626,7 @@
                 document.getElementById(`chartTitle-${param.key}`).textContent = paramTitle(param);
                 document.getElementById(`chartNote-${param.key}`).textContent = paramNote(param);
                 document.getElementById(`chartUnit-${param.key}`).textContent =
-                    param.unit === 'precip' ? `${unitLabel(param)} / h` : unitLabel(param);
+                    param.unit === 'precip' ? `${unitLabel(param)}/h` : unitLabel(param);
                 document.getElementById(`chartMembers-${param.key}`).textContent =
                     hasData ? countLabel(data.members.length) : '';
                 const legend = document.getElementById(`chartLegend-${param.key}`);

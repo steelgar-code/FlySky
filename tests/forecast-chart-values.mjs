@@ -55,12 +55,16 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   // Fixed height between hours.
   const heights = [];
   for (const i of [0, 5, 10, 47]) { const p = await at(page, W, i); await page.mouse.move(p.x, p.y, { steps: 2 }); await page.waitForTimeout(200); heights.push((await shown(page, W)).h); }
-  ok('the values line has the same height at hours 0, 5, 10 and 47 (one line on a desktop)', new Set(heights).size === 1 && heights[0] === 16, heights);
+  ok('the values line has the same height at hours 0, 5, 10 and 47 (the hour, then one line of values, on a desktop)', new Set(heights).size === 1 && heights[0] === 36, heights);
   // Precipitation: chance of rain too.
   const pk = 'precipitation';
   const pp = await at(page, pk, 20); await page.mouse.move(pp.x, pp.y, { steps: 3 }); await page.waitForTimeout(250);
   s = await shown(page, pk); const wp = await want(page, pk, 20);
   ok('precipitation: the chance of rain as well', s.hour === 20 && fits(s.text, wp) && wp.chance !== null && s.text.includes(`Chance ${wp.chance}`), { s, wp });
+  // Hour on its own line above the values; every value has its unit, spelled without inner spaces.
+  const lay = await page.evaluate(([w, p]) => [w, p].map(k => { const [h, v] = document.getElementById(`chartValues-${k}`).children; return { hour: h.innerText, hb: h.getBoundingClientRect().bottom, vt: v.getBoundingClientRect().top, vals: v.innerText.replace(/\s+/g, ' '), title: document.getElementById(`chartUnit-${k}`).textContent }; }), [W, pk]);
+  ok('range view: the hour on its own line above the values, 4 px apart', lay.every(l => /\d\d:\d\d$/.test(l.hour) && !l.vals.includes(l.hour) && Math.round(l.vt - l.hb) === 4), lay);
+  ok('range view: each value has its unit: "m/s" on wind, "mm/h" on precipitation (also the chart title)', /^Median [\d.]+ m\/s · 50% [\d.]+–[\d.]+ m\/s · 80% [\d.]+–[\d.]+ m\/s · Range [\d.]+–[\d.]+ m\/s · Members \d+$/.test(lay[0].vals) && /^Median [\d.]+ mm\/h · 50% [\d.]+–[\d.]+ mm\/h · 80% [\d.]+–[\d.]+ mm\/h · Range [\d.]+–[\d.]+ mm\/h · Chance \d+% · Members \d+$/.test(lay[1].vals) && lay[1].title === 'mm/h', lay);
   // The card's hour moves the charts.
   await page.locator('#flightStrip').scrollIntoViewIfNeeded();
   await page.click('#flightStrip [data-flight-hour="7"]'); await page.waitForTimeout(400);
@@ -95,12 +99,17 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const leg = await page.evaluate(k => {
     const c = chartInstances[k], p = PARAMS.find(x => x.key === k), data = processed.params[k], i = c.$hour;
     const items = [...document.querySelectorAll(`#chartLegend-${k} [data-legend-model]`)];
-    return { i, hidden: document.getElementById(`chartLegend-${k}`).classList.contains('hidden'), n: items.length, models: data.members.length, ok: items.every((el, j) => el.textContent === formatValue(data.members[j].values[i], p)),
+    return { i, hidden: document.getElementById(`chartLegend-${k}`).classList.contains('hidden'), n: items.length, models: data.members.length, ok: items.every((el, j) => el.textContent === valueUnit(data.members[j].values[i], p)),
       names: items.map(el => el.parentNode.innerText.trim()), widths: items.map(el => Math.round(el.getBoundingClientRect().width)), min: items.every(el => el.getBoundingClientRect().width >= 3 * parseFloat(getComputedStyle(el).fontSize)),
+      units: items.map(el => el.textContent),
+      gap: Math.round(document.getElementById(`chartLegend-${k}`).getBoundingClientRect().top - document.getElementById(`chartValues-${k}`).getBoundingClientRect().bottom),
+      rowGap: parseFloat(getComputedStyle(document.getElementById(`chartLegend-${k}`)).rowGap),
       values: document.getElementById(`chartValues-${k}`).innerText.replace(/\s+/g, ' ').trim(), want: formatDayHour(processed.times[i]) };
   }, W);
   ok('Models mode, per model: a value after each model\'s name in the legend, the hour above', leg.i === 9 && !leg.hidden && leg.n === leg.models && leg.n >= 2 && leg.ok && leg.values === leg.want && leg.min && /\d/.test(leg.names[0]), leg);
   ok('per model: no range values', !/Median|range/i.test(leg.values));
+  ok('per model: each legend value has its unit, "m/s" on the wind chart', leg.units.length === leg.n && leg.units.every(v => /^\d+(\.\d)? m\/s$/.test(v)), leg.units);
+  ok('per model: the gap from the hour to the legend is the legend\'s row gap (4 px)', leg.gap === 4 && leg.rowGap === 4, { gap: leg.gap, rowGap: leg.rowGap });
   // Legend values do not move the layout from hour to hour.
   const lw = [];
   for (const i of [3, 9, 30]) { const p = await at(page, W, i); await page.mouse.move(p.x, p.y, { steps: 2 }); await page.waitForTimeout(200); lw.push(await page.evaluate(k => [document.getElementById(`chartLegend-${k}`).offsetHeight, ...[...document.querySelectorAll(`#chartLegend-${k} > span`)].map(e => Math.round(e.getBoundingClientRect().width))].join(), W)); }
@@ -119,15 +128,15 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   heights.push(s.h);
   ok('tap on hour 5 (touch): its values match the statistics', s.hour === 5 && fits(s.text, await want(page, W, 5)), { s, w: await want(page, W, 5) });
   for (const i of [0, 10, 40]) { const q = await at(page, W, i); await page.touchscreen.tap(q.x, q.y); await page.waitForTimeout(300); const t = await shown(page, W); heights.push(t.h); if (i === 10) ok('tap on hour 10', t.hour === 10 && fits(t.text, await want(page, W, 10)), t); }
-  ok('phone: the values line has the same height at hours 5, 0, 10, 40 (two lines reserved)', new Set(heights).size === 1 && heights[0] === 32, heights);
+  ok('phone: the values line has the same height at hours 5, 0, 10, 40 (the hour and two lines reserved)', new Set(heights).size === 1 && heights[0] === 52, heights);
   const fit = await page.evaluate(() => PARAMS.map(p => { const e = document.getElementById(`chartValues-${p.key}`); return [p.key, e.scrollHeight <= e.clientHeight + 1]; }).filter(([, f]) => !f));
-  ok('phone: the text of every chart fits in the reserved two lines', fit.length === 0, fit);
+  ok('phone: the text of every chart fits in the reserved lines', fit.length === 0, fit);
   const pq = await at(page, 'precipitation', 30); await page.touchscreen.tap(pq.x, pq.y); await page.waitForTimeout(300);
   ok('phone: the precipitation line (with the chance) fits too', await page.evaluate(() => { const e = document.getElementById('chartValues-precipitation'); return /Chance \d/.test(e.innerText) && e.scrollHeight <= e.clientHeight + 1; }));
   await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(700);
   const pu = await at(page, 'precipitation', 30); await page.touchscreen.tap(pu.x, pu.y); await page.waitForTimeout(300);
   const ukFit = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => { const e = document.getElementById(`chartValues-${p.key}`); return [p.key, e.scrollHeight, e.clientHeight, e.innerText]; }).filter(r => !r[1] || r[1] > r[2] + 1));
-  ok('phone, Ukrainian: every values line fits in the two lines', ukFit.length === 0, ukFit);
+  ok('phone, Ukrainian: every values line fits in the reserved lines (three of values for precipitation)', ukFit.length === 0, ukFit);
   await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
   // Models mode: the range view keeps two lines, per model (hour only) is one line.
   await page.evaluate(() => document.querySelector('[data-mode="deterministic"]').click()); await page.waitForTimeout(3500);
@@ -135,7 +144,7 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const hRange = await hh();
   await page.evaluate(() => document.getElementById('btnMembers').click()); await page.waitForTimeout(800);
   const hModel = await hh();
-  ok('phone: per-model values line one line high (16 px), range view two (32 px)', hModel === 16 && hRange === 32, { hRange, hModel });
+  ok('phone: per-model values element the hour only (16 px), range view the hour and two lines (52 px)', hModel === 16 && hRange === 52, { hRange, hModel });
   ok('no horizontal scroll from the values line', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1 && document.getElementById('chartWrap-precipitation').scrollWidth <= document.getElementById('chartWrap-precipitation').clientWidth + 1));
   await ctx.close();
 }
