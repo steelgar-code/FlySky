@@ -296,12 +296,12 @@ const blk = await I(() => {
     return { after: after(b), profBefore: !!(prof.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING), box: b.contains(document.getElementById('icingTempBox')), band: !!b.querySelector('[data-daynight]'), axisTicks: b.querySelectorAll('[data-flight-axis] > *').length, bandBg: !!b.querySelector('[data-daynight]').style.background, gap: Math.round(b.getBoundingClientRect().top - h.getBoundingClientRect().bottom), heading: b.querySelector('#icingTempHeading').textContent };
 });
 ok('chart block: after the selected hour\'s details, with its heading, its own day / night band and axis, space above', blk.after && blk.profBefore && blk.box && blk.band && blk.bandBg && blk.axisTicks > 0 && blk.gap >= 16 && blk.heading === 'Temperature 2 m', blk);
-const prof = await I(() => {
+const profBand = await I(() => {
     const p = document.getElementById('icingProfile').parentElement, band = p.nextElementSibling, h = document.getElementById('icingHour');
     const bd = band && band.querySelector('[data-daynight]'), ax = band && band.querySelector('[data-flight-axis]');
     return { band: !!bd && !!bd.style.background, axis: !!ax, labels: ax ? ax.children.length : 0, before: !!band && !!(band.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING), pairs: document.querySelectorAll('#icingBody [data-daynight]').length };
 });
-ok('profile: followed by its own day / night band and axis (with hour labels) before the selected hour\'s details; the temperature block has a second pair', prof.band && prof.axis && prof.labels > 0 && prof.before && prof.pairs === 2, prof);
+ok('profile: followed by its own day / night band and axis (with hour labels) before the selected hour\'s details; the temperature block has a second pair', profBand.band && profBand.axis && profBand.labels > 0 && profBand.before && profBand.pairs === 2, profBand);
 const icons = await I(() => { const g = [...document.querySelectorAll('#icingTemp [data-icing-temp-item]')]; const f = (cls, word) => { const i = document.querySelector('#icingTemp .' + cls); const grp = i && i.closest('[data-icing-temp-item]'); return !!grp && g.includes(grp) && grp.style.whiteSpace === 'nowrap' && grp.textContent.includes(word) && /°C/.test(grp.textContent); }; return { n: g.length, min: f('fa-temperature-arrow-down', 'min'), max: f('fa-temperature-arrow-up', 'max') }; });
 ok('summary line: the min and max icons, each in the same nowrap group as its value', icons.n === 3 && icons.min && icons.max, icons);
 await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(600);
