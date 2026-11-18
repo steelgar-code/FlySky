@@ -213,6 +213,9 @@
         .info-btn:hover, .info-btn[aria-expanded="true"] { color: #67e8f9; }
         .info-btn:focus-visible { outline: 2px solid #22d3ee; outline-offset: 0; }
         #icingCell:empty { display: none; }
+        /* Temperature chart in the icing section: its box and canvas have fixed sizes here (Tailwind differs in the tests). */
+        #icingTempBox { height: 110px; }
+        #icingTempBox canvas { width: 100% !important; height: 100% !important; display: block; cursor: crosshair; }
         #nowStrip { touch-action: pan-y; cursor: ew-resize; -webkit-user-select: none; user-select: none; }
         #nowStrip:focus { outline: none; }
         #nowStrip:focus-visible #nowMarker { border-color: #22d3ee; }
@@ -401,16 +404,24 @@
                         <p data-i18n="icingInfoNot"></p>
                         <p data-i18n="icingInfoColours"></p>
                         <p data-i18n="icingInfoProfile"></p>
+                        <p data-i18n="icingInfoTemp"></p>
                     </div>
                     <div class="relative mt-1.5">
                         <div id="icingStrip" class="flex rounded-full overflow-hidden bg-slate-950 cursor-pointer" style="height: 10px"></div>
                         <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                     </div>
+                    <!-- 2 m temperature (both models averaged): always visible, also folded -->
+                    <div id="icingTemp" class="hidden mt-1.5 text-[11px] text-slate-400"></div>
                     <div id="icingBody" class="hidden space-y-2 pt-3">
                         <div class="relative">
                             <div id="icingProfile" class="rounded-md overflow-hidden bg-slate-950 cursor-crosshair"></div>
                             <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                             <div id="icingProfileMark" class="absolute pointer-events-none" style="top: 0; bottom: 0; box-shadow: inset 0 0 0 1.5px #f8fafc"></div>
+                        </div>
+                        <!-- Temperature chart: same width as the hour bar (hour i is the i-th of n cells) -->
+                        <div id="icingTempBox" class="hidden relative rounded-md bg-slate-950" data-chart-key="icingTemp">
+                            <canvas id="chart-icingTemp" role="img"></canvas>
+                            <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                         </div>
                         <div>
                             <div data-daynight class="h-1.5 rounded-full"></div>
@@ -1063,6 +1074,13 @@
                 icingInfoNot: "Important: This is a potential icing hazard screen, not an icing forecast or a safety assessment. “No signs” does not mean safe. It assumes a fixed-wing drone without ice protection. Ice can rapidly affect thrust and airspeed readings and remain on the aircraft. Avoid icing conditions.",
                 icingInfoColours: "Colours: Red = potential icing; yellow = marginal; grey = no signs detected; hatched = no data. Striped = only one model indicates a hazard. Faded = forecast is more than 3 days ahead.",
                 icingInfoProfile: "Profile: Each row shows a model pressure level at its typical local altitude. The dashed line marks your selected flight altitude.",
+                icingInfoTemp: "Temperature: at 2 m above the ground, the average of the two models.",
+                icingTempTitle: "Temperature 2 m",
+                icingTempNow: "{v} now",
+                icingTempMin: "min {v} {at}",
+                icingTempMax: "max {v} {at}",
+                icingTempHour: "2 m temperature {v}",
+                icingTempChart: "2 m temperature over the forecast window",
                 icingDetailsLink: "Icing details",
                 planIcing: "Icing signs {from}–{to}",
                 icingFzdz: "freezing drizzle from low stratus",
@@ -1394,6 +1412,13 @@
                 icingInfoNot: "Важливо: це перевірка на можливу небезпеку обледеніння, а не прогноз обледеніння і не оцінка безпеки. «Ознак немає» не означає «безпечно». Розраховано на дрон літакового типу без протиобледенювальної системи. Лід може швидко вплинути на тягу та показання швидкості й залишається на апараті. Уникайте умов обледеніння.",
                 icingInfoColours: "Кольори: червоний — можливе обледеніння; жовтий — межові умови; сірий — ознак не виявлено; штрихування — немає даних. Смуги — лише одна модель вказує на небезпеку. Блідо — прогноз на понад 3 доби вперед.",
                 icingInfoProfile: "Профіль: кожен рядок — рівень тиску моделі на його типовій місцевій висоті. Пунктир — вибрана вами висота польоту.",
+                icingInfoTemp: "Температура: на висоті 2 м над землею, середнє двох моделей.",
+                icingTempTitle: "Температура 2 м",
+                icingTempNow: "{v} зараз",
+                icingTempMin: "мін {v} {at}",
+                icingTempMax: "макс {v} {at}",
+                icingTempHour: "Температура на 2 м {v}",
+                icingTempChart: "Температура на 2 м у вікні прогнозу",
                 icingDetailsLink: "Деталі обледеніння",
                 planIcing: "Ознаки обледеніння {from}–{to}",
                 icingFzdz: "крижана мряка з низьких шаруватих хмар",
@@ -1725,6 +1750,13 @@
                 icingInfoNot: "Importante: isto é uma triagem de possível perigo de gelo, não uma previsão de gelo nem uma avaliação de segurança. “Sem sinais” não significa seguro. Supõe um drone de asa fixa sem proteção contra gelo. O gelo pode afetar rapidamente a tração e as leituras de velocidade e permanece na aeronave. Evite condições de gelo.",
                 icingInfoColours: "Cores: vermelho = gelo possível; amarelo = marginal; cinza = sem sinais detectados; hachurado = sem dados. Listrado = só um modelo indica perigo. Esmaecido = previsão a mais de 3 dias.",
                 icingInfoProfile: "Perfil: cada linha mostra um nível de pressão do modelo na sua altitude local típica. A linha tracejada marca a sua altitude de voo selecionada.",
+                icingInfoTemp: "Temperatura: a 2 m acima do solo, a média dos dois modelos.",
+                icingTempTitle: "Temperatura a 2 m",
+                icingTempNow: "{v} agora",
+                icingTempMin: "mín {v} {at}",
+                icingTempMax: "máx {v} {at}",
+                icingTempHour: "Temperatura a 2 m {v}",
+                icingTempChart: "Temperatura a 2 m na janela da previsão",
                 icingDetailsLink: "Detalhes do gelo",
                 planIcing: "Sinais de gelo {from}–{to}",
                 icingFzdz: "garoa congelante de nuvens stratus baixas",
@@ -2535,7 +2567,9 @@
             const far = icingLead(time) > ICING_FAR_H ? ` <span class="font-normal text-slate-500">· ${escapeHtml(t('icingFar'))}</span>` : '';
             const head = `<div class="text-slate-200"><span class="font-semibold">${escapeHtml(formatDayHour(time))}</span> <span class="font-semibold" style="color: ${hr ? icingInk(hr.state) : '#94a3b8'}">· ${escapeHtml(hr ? icingSummary(hr) : icingStatusText())}</span>${far}</div>
                 <div class="text-slate-500">${escapeHtml(t('icingFlightDesc', { dur: durationLabel(P.durationMin), h: P.heightM, c: P.climbMs.toLocaleString(currentLang), d: P.descentMs.toLocaleString(currentLang) }))}</div>`;
-            if (!hr) return head;
+            const temp = icingTempAt(time);
+            const tempLine = temp === null ? '' : `<div class="text-slate-300" data-icing-temp-hour>${escapeHtml(t('icingTempHour', { v: fmtTemp(temp) }))}</div>`;
+            if (!hr) return head + tempLine;
             const fmtMin = m => (Math.round(m * 10) / 10).toLocaleString(currentLang);
             const lines = Object.entries(hr.models).map(([id, m]) => {
                 const f = m.flight;
@@ -2563,7 +2597,7 @@
                 return `<div data-icing-model="${escapeHtml(id)}"><span class="font-semibold" style="color: ${icingInk(f.state)}">${escapeHtml(icingModelName(id))}</span>: ${escapeHtml(txt)}</div>`;
             });
             const layer = icingLayerText(hr);
-            return `${head}<div class="mt-1 space-y-0.5">${lines.join('')}${layer ? `<div>${escapeHtml(layer)}</div>` : ''}</div>`;
+            return `${head}${tempLine}<div class="mt-1 space-y-0.5">${lines.join('')}${layer ? `<div>${escapeHtml(layer)}</div>` : ''}</div>`;
         }
 
         // The hour the icing section details: the pinned hour (hour bar or the
@@ -2576,14 +2610,141 @@
             return i < 0 ? 0 : i;
         }
 
+        // 2 m temperature (convenience data, Celsius only): the mean of the icing
+        // models that have a value for the hour (one model when the other has
+        // none: UKMO ends after ~6.5 days), to 0.1 °C; null without any.
+        let icingTempCols = { body: null, cols: [] };
+        function icingTempAt(time) {
+            if (!icingOn() || !ICING.result || !ICING.data || !window.FlySkyIcing) return null;
+            const j = ICING.index.get(time);
+            if (j === undefined) return null;
+            if (icingTempCols.body !== ICING.data.body || icingTempCols.models !== ICING.result.models) {
+                const per = window.FlySkyIcing.splitModels(ICING.data.body.hourly, ICING.result.models);
+                icingTempCols = { body: ICING.data.body, models: ICING.result.models, cols: ICING.result.models.map(m => per[m].temperature_2m || []) };
+            }
+            const vals = icingTempCols.cols.map(c => c[j]).filter(v => Number.isFinite(v));
+            return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null;
+        }
+
+        // "3.1 °C", "−1.4 °C" (no plus sign: it is a temperature, not a change).
+        function fmtTemp(v) {
+            return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString(currentLang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' °C';
+        }
+
+        // One line under the icing strip, also when the section is folded: the
+        // first hour's value, the lowest and the highest over the window.
+        function renderIcingTempLine(temps, hours) {
+            const el = document.getElementById('icingTemp');
+            let lo = -1, hi = -1;
+            temps.forEach((v, i) => {
+                if (v === null) return;
+                if (lo < 0 || v < temps[lo]) lo = i;
+                if (hi < 0 || v > temps[hi]) hi = i;
+            });
+            el.classList.toggle('hidden', lo < 0);
+            if (lo < 0) { el.innerHTML = ''; return; }
+            const parts = [];
+            if (temps[0] !== null) parts.push(t('icingTempNow', { v: fmtTemp(temps[0]) }));
+            parts.push(t('icingTempMin', { v: fmtTemp(temps[lo]), at: formatDayHour(hours[lo].time) }));
+            parts.push(t('icingTempMax', { v: fmtTemp(temps[hi]), at: formatDayHour(hours[hi].time) }));
+            el.innerHTML = `<i class="fa-solid fa-temperature-half mr-1 text-amber-300"></i>${escapeHtml(t('icingTempTitle'))}: ${escapeHtml(parts.join(' · '))}`;
+        }
+
+        // Dashed line at 0 °C, drawn when the chart's range includes it.
+        const icingZeroPlugin = {
+            id: 'icingZero',
+            afterDatasetsDraw(chart) {
+                const y = chart.scales.y;
+                chart.$zero = y.min <= 0 && y.max >= 0;
+                if (!chart.$zero) return;
+                const { ctx, chartArea } = chart;
+                const py = y.getPixelForValue(0);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(125, 211, 252, 0.9)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(chartArea.left, py);
+                ctx.lineTo(chartArea.right, py);
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
+
+        function destroyIcingTempChart() {
+            const c = chartInstances.icingTemp;
+            if (!c) return;
+            try { c.destroy(); } catch (err) {}
+            delete chartInstances.icingTemp;
+        }
+
+        // The temperature chart of the open section: the x axis has no labels (the
+        // section's own axis is under the profile) and `offset` gives each hour
+        // a cell of 1/n of the width, like the hour bar; the y labels sit inside
+        // the plot, so the plot spans the box's whole width.
+        function renderIcingTempChart(temps, hours) {
+            const box = document.getElementById('icingTempBox');
+            const show = state.icingOpen && typeof Chart !== 'undefined';
+            box.classList.toggle('hidden', !show);
+            if (!show) return;
+            const times = hours.map(h => h.time);
+            const canvas = document.getElementById('chart-icingTemp');
+            canvas.setAttribute('aria-label', t('icingTempChart'));
+            let chart = chartInstances.icingTemp;
+            if (chart) {
+                chart.$times = times;
+                chart.data.labels = times.map(formatHour);
+                chart.data.datasets[0].data = temps;
+                chart.update('none');
+                return;
+            }
+            try {
+                chart = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: { labels: times.map(formatHour), datasets: [{ data: temps, borderColor: '#fbbf24', borderWidth: 2, pointRadius: 0, pointHoverRadius: 0, tension: 0.25, spanGaps: false }] },
+                    plugins: [selectedHourPlugin, icingZeroPlugin],
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        // Pointer events come from the section's handlers (they select the hour like the strip does).
+                        events: [],
+                        layout: { padding: 0 },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        scales: {
+                            x: { display: false, offset: true },
+                            y: {
+                                grace: '10%',
+                                grid: { color: 'rgba(255, 255, 255, 0.06)', drawTicks: false },
+                                border: { display: false },
+                                ticks: { mirror: true, padding: 0, maxTicksLimit: 5, color: '#94a3b8', font: { size: 10 }, callback: v => `${v}°` }
+                            }
+                        }
+                    }
+                });
+                chart.$times = times;
+                chartInstances.icingTemp = chart;
+                if (chartBoxObserver) chartBoxObserver.observe(box);
+                canvas.addEventListener('contextrestored', rebuildChartsSoon);
+            } catch (err) {
+                console.error('FlySky: temperature chart initialization failed.', err);
+            }
+        }
+
         // Icing section (only with the indicator on and its data there): the
-        // strip, always; open, the profile and the selected hour's details.
+        // strip and the temperature line, always; open, the profile, the
+        // temperature chart and the selected hour's details.
         function renderIcingSection(hours) {
             const sec = document.getElementById('icingSection');
             const on = icingOn() && !!ICING.result && hours.length > 0;
             sec.classList.toggle('hidden', !on);
             const strip = document.getElementById('icingStrip');
-            if (!on) { strip.innerHTML = ''; return; }
+            if (!on) {
+                strip.innerHTML = '';
+                document.getElementById('icingTemp').classList.add('hidden');
+                destroyIcingTempChart();
+                return;
+            }
             const open = state.icingOpen;
             document.getElementById('icingBody').classList.toggle('hidden', !open);
             document.getElementById('btnIcing').setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -2594,7 +2755,12 @@
                 const one = hr && st !== 'unknown' && hr.combined.known < hr.combined.total;
                 return `<div data-icing-hour="${i}" class="flex-1 min-w-0" style="background: ${one ? ICING_ONE_MODEL + ', ' : ''}${icingFill(st)};${i > ICING_FAR_H ? ' opacity: 0.45;' : ''}" title="${escapeHtml(`${formatDayHour(h.time)} · ${t('icingTitle')}: ${t('icingState_' + st)}`)}"></div>`;
             }).join('');
-            if (open) renderIcingProfile(hours);
+            const temps = hours.map(h => icingTempAt(h.time));
+            renderIcingTempLine(temps, hours);
+            if (open) {
+                renderIcingProfile(hours);
+                renderIcingTempChart(temps, hours);
+            }
             renderIcingHour();
         }
 
@@ -2652,6 +2818,8 @@
             const el = document.getElementById('icingHour');
             el.dataset.icingTime = hours[i].time;
             el.innerHTML = icingHourHtml(hours[i].time);
+            const chart = chartInstances.icingTemp;
+            if (chart) { chart.$hour = i; chart.draw(); }
         }
 
         function setIcingOpen(open) {
@@ -4410,8 +4578,15 @@
             document.getElementById('btnIcing').addEventListener('click', () => setIcingOpen(!state.icingOpen));
             const icingSec = document.getElementById('icingSection');
             const icingAt = e => {
+                if (!processed || !processed.flight) return null;
                 const c = e.target.closest('#icingStrip [data-icing-hour], #icingProfile [data-icing-hour]');
-                return c && processed && processed.flight ? { c, i: Number(c.dataset.icingHour) } : null;
+                if (c) return { c, i: Number(c.dataset.icingHour) };
+                // The temperature chart: its plot spans the hour bar's width.
+                const chart = e.target.id === 'chart-icingTemp' ? chartInstances.icingTemp : null;
+                if (!chart) return null;
+                const r = e.target.getBoundingClientRect(), a = chart.chartArea, n = processed.flight.hours.length;
+                const f = (e.clientX - r.left - a.left) / (a.right - a.left);
+                return { c: e.target, i: Math.floor(Math.max(0, Math.min(0.9999, f)) * n) };
             };
             icingSec.addEventListener('mousemove', e => {
                 const p = icingAt(e);
@@ -5576,6 +5751,8 @@
             if (typeof Chart === 'undefined') return;
             resetCharts();
             renderCharts();
+            // The icing section's temperature chart, on its new canvas too.
+            renderIcingSection(processed && processed.flight ? processed.flight.hours : []);
         }
 
         // Every chart on a brand-new canvas (drawn by the next renderCharts).
