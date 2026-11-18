@@ -258,14 +258,15 @@ ok('English again: the Models label is not overwritten by the static string', /^
   await J(() => { setSearchPanel(false); document.activeElement.blur(); }); await p2.keyboard.press('Escape'); await p2.waitForTimeout(200);
   ok('…and with the search closed, Escape closes the panel again', !(await panel()).open);
 
-  // The icing ⓘ: the owner's four paragraphs, English word for word.
+  // The icing ⓘ: the owner's four paragraphs, English word for word, and the temperature sentence of batch 1j.
   await p2.tap('#btnIcingInfo'); await p2.waitForTimeout(200);
   const ic = await J(() => [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent));
-  ok('icing ⓘ: the four paragraphs, English exactly', JSON.stringify(ic) === JSON.stringify([
+  ok('icing ⓘ: the four paragraphs and the temperature sentence, English exactly', JSON.stringify(ic) === JSON.stringify([
     'What this shows: Where DWD ICON and UK Met Office forecasts indicate sub-zero, near-saturated air, freezing fog, or freezing rain/drizzle during climb, cruise, and descent.',
     'Important: This is a potential icing hazard screen, not an icing forecast or a safety assessment. “No signs” does not mean safe. It assumes a fixed-wing drone without ice protection. Ice can rapidly affect thrust and airspeed readings and remain on the aircraft. Avoid icing conditions.',
     'Colours: Red = potential icing; yellow = marginal; grey = no signs detected; hatched = no data. Striped = only one model indicates a hazard. Faded = forecast is more than 3 days ahead.',
-    'Profile: Each row shows a model pressure level at its typical local altitude. The dashed line marks your selected flight altitude.']), ic);
+    'Profile: Each row shows a model pressure level at its typical local altitude. The dashed line marks your selected flight altitude.',
+    'Temperature: at 2 m above the ground, the average of the two models.']), ic);
   await p2.tap('#btnIcingInfo'); await p2.waitForTimeout(200);
 
   // The pinned hour: time · verdict · flag · Map; values; confidence; the split, then the
@@ -293,7 +294,7 @@ ok('English again: the Models label is not overwritten by the static string', /^
     await p2.selectOption('#langSelect', lang); await p2.waitForTimeout(600);
     const tx = await J(() => ({ info: document.getElementById('flightInfo').textContent, counts: document.getElementById('flightConfCounts').innerText.replace(/\s+/g, ' ').trim(), chart: document.getElementById('flightConf').title, label: document.getElementById('btnFlightInfo').getAttribute('aria-label'), icing: [...document.querySelectorAll('#icingInfo p')].map(e => e.textContent.trim()) }));
     ok(`${lang}: the ⓘ panel, its label, the chart label and the legend counts`, re.test(tx.info) && tx.counts.startsWith(lang === 'uk' ? 'Впевненість: ' : 'Confiança: ') && tx.chart.startsWith(lang === 'uk' ? 'Впевненість: скільки' : 'Confiança: quantos') && tx.label === (lang === 'uk' ? 'Що показує смуга' : 'O que a barra mostra'), tx);
-    ok(`${lang}: the icing note has four paragraphs, none empty`, tx.icing.length === 4 && tx.icing.every(x => x.length > 40) && (lang !== 'uk' || /^Важливо:/.test(tx.icing[1])), tx.icing);
+    ok(`${lang}: the icing note has five paragraphs (four and the temperature sentence), none empty`, tx.icing.length === 5 && tx.icing.every(x => x.length > 40) && (lang !== 'uk' || /^Важливо:/.test(tx.icing[1])), tx.icing);
   }
   await ctx2.close();
 }

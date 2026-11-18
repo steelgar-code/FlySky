@@ -252,15 +252,94 @@ opts.icingSfc = null;
 await page.click('#btnRefresh'); await page.waitForTimeout(3000);
 ok('back to the default scenario', (await flag(0)).flag === 'cruise');
 
+// ---- Batch 1j: 2 m temperature in the icing section (the mean of the two models, from the icing request's data)
+// ICON and UKMO differ, so the mean is told from either; UKMO ends after 100 h (the mock), so the 1-week window shows ICON alone at the end.
+const tIcon = k => +(2 + 5 * Math.sin(k / 6)).toFixed(1), tUkmo = k => +(1 + 4 * Math.sin(k / 6 + 0.4)).toFixed(1);
+opts.icingSfc = (m, k) => (m === 'ukmo_seamless' && k >= 100 ? null : { temperature_2m: m === 'icon_seamless' ? tIcon(k) : tUkmo(k) });
+await page.click('#btnRefresh'); await page.waitForTimeout(3000);
+const tReqs = reqs();
+const mean = k => Math.round((k < 100 ? (tIcon(k) + tUkmo(k)) / 2 : tIcon(k)) * 10) / 10;
+const tfmt = v => (v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + ' °C';
+const expectLine = async () => {
+    const n = await I(() => processed.flight.hours.length);
+    const vals = Array.from({ length: n }, (_, k) => mean(k));
+    const lo = vals.indexOf(Math.min(...vals)), hi = vals.indexOf(Math.max(...vals));
+    const lab = await I(([a, b]) => [formatDayHour(processed.flight.hours[a].time), formatDayHour(processed.flight.hours[b].time)], [lo, hi]);
+    return { n, text: `Temperature 2 m: ${tfmt(vals[0])} now · min ${tfmt(vals[lo])} ${lab[0]} · max ${tfmt(vals[hi])} ${lab[1]}` };
+};
+const lineText = () => I(() => { const e = document.getElementById('icingTemp'); return e.classList.contains('hidden') ? null : e.innerText.replace(/\s+/g, ' ').trim(); });
+await I(() => setIcingOpen(false));
+let ex = await expectLine();
+ok('temperature line, folded and 24 h: now, min and max (with their hours) of the mean of the two models', await lineText() === ex.text, { got: await lineText(), want: ex.text });
+await I(() => setIcingOpen(true)); await page.waitForTimeout(500);
+ok('temperature line: also with the section open, one line of the section', await lineText() === ex.text);
+await page.click('#windowButtons [data-window="168"]'); await page.waitForTimeout(800);
+ex = await expectLine();
+const oneModel = await I(() => { const hs = processed.flight.hours; return { n: hs.length, v120: icingTempAt(hs[120].time), v50: icingTempAt(hs[50].time) }; });
+ok('1 week: past UKMO\'s end the value is ICON alone, before it the mean', oneModel.n === 168 && oneModel.v120 === tIcon(120) && oneModel.v120 !== mean(50) && oneModel.v50 === mean(50) && tIcon(50) !== mean(50), oneModel);
+ok('temperature line over the 1-week window', await lineText() === ex.text, { got: await lineText(), want: ex.text });
+await page.click('#windowButtons [data-window="24"]'); await page.waitForTimeout(800);
+ex = await expectLine();
+// The chart: aligned with the hour bar, the 0 °C line, the selected hour's marker.
+const geo = () => I(() => {
+    const c = chartInstances.icingTemp, cv = document.getElementById('chart-icingTemp'), r = cv.getBoundingClientRect(), bar = document.getElementById('flightStrip').getBoundingClientRect();
+    const cells = document.querySelectorAll('#flightStrip [data-flight-hour]'), n = cells.length;
+    const cc = i => { const b = cells[i].getBoundingClientRect(); return b.left + b.width / 2; };
+    return { present: !!c && r.height > 90 && r.height < 130, n, hours: processed.flight.hours.length, left: r.left + c.scales.x.getPixelForValue(0) - cc(0), right: r.left + c.scales.x.getPixelForValue(n - 1) - cc(n - 1), boxL: r.left - bar.left, boxW: r.width - bar.width, zero: c.$zero, hour: c.$hour, h: Math.round(r.height) };
+});
+let g = await geo();
+ok('chart in the open section: ~110 px high, its first and last hour within 2 px of the hour bar\'s cells, as wide as the bar', g.present && g.n === g.hours && Math.abs(g.left) <= 2 && Math.abs(g.right) <= 2 && Math.abs(g.boxL) <= 1 && Math.abs(g.boxW) <= 1, g);
+ok('chart: the 0 °C line is drawn when the range crosses 0', g.zero === true && await I(() => Math.min(...chartInstances.icingTemp.data.datasets[0].data) < 0), g);
+const tsel = () => I(() => ({ chart: chartInstances.icingTemp.$hour, sel: icingSelIndex(processed.flight.hours), details: document.getElementById('icingHour').innerText }));
+await page.locator('#icingStrip [data-icing-hour="5"]').click(); await page.waitForTimeout(300);
+let sv = await tsel();
+ok('marker follows a tap on the strip, and the details show that hour\'s temperature', sv.chart === 5 && sv.sel === 5 && sv.details.includes('2 m temperature ' + tfmt(mean(5))), sv);
+await page.locator('#icingProfile [data-icing-cell][data-icing-hour="9"]').first().click(); await page.waitForTimeout(300);
+sv = await tsel();
+ok('marker follows a tap on the profile', sv.chart === 9 && sv.sel === 9 && sv.details.includes('2 m temperature ' + tfmt(mean(9))), sv);
+const cpos = await I(i => { const c = chartInstances.icingTemp, r = document.getElementById('chart-icingTemp').getBoundingClientRect(); return { x: r.left + c.scales.x.getPixelForValue(i), y: r.top + r.height / 2 }; }, 14);
+await page.mouse.click(cpos.x, cpos.y); await page.waitForTimeout(300);
+sv = await tsel();
+ok('marker follows a tap on the chart (the hour selected as in the strip)', sv.chart === 14 && sv.sel === 14 && sv.details.includes('2 m temperature ' + tfmt(mean(14))), sv);
+await page.mouse.move(cpos.x + 40, cpos.y); await page.waitForTimeout(200);
+const hv = await tsel();
+await page.mouse.move(5, 5); await page.waitForTimeout(200);
+sv = await tsel();
+ok('hovering the chart previews the hour, leaving returns to the selected one', hv.chart > 14 && sv.chart === 14, { hv, sv });
+await I(() => rebuildAllCharts()); await page.waitForTimeout(500);
+g = await geo();
+ok('rebuilding the charts (back from the background): the temperature chart is drawn again on a new canvas, same hour, still aligned', g.present && g.hour === 14 && Math.abs(g.left) <= 2 && Math.abs(g.right) <= 2, g);
+await I(() => setIcingOpen(false));
+ok('folded: the chart box is hidden, the line stays', await I(() => document.getElementById('icingTempBox').offsetHeight === 0) && await lineText() === ex.text);
+ok('opening the section and the temperature asked no new request', reqs() === tReqs, { n: reqs(), was: tReqs });
+await I(() => setIcingOpen(true)); await page.waitForTimeout(300);
+// All above freezing: no 0 °C line.
+opts.icingSfc = (m, k) => ({ temperature_2m: 6 + (k % 5) * 0.3 });
+await page.click('#btnRefresh'); await page.waitForTimeout(3000);
+ok('range above 0 °C: no 0 °C line', await I(() => chartInstances.icingTemp.$zero === false));
+// Indicator off: nothing of it.
+await drawer(true);
+await page.locator('label:has(#icingToggle)').click(); await page.waitForTimeout(500);
+ok('indicator off: no temperature line, no chart', await lineText() === null && await I(() => !chartInstances.icingTemp && document.getElementById('icingSection').classList.contains('hidden')));
+await page.locator('label:has(#icingToggle)').click(); await page.waitForTimeout(600);
+await drawer(false);
+ok('indicator on again: the line and the chart are back, no new request', await lineText() !== null && await I(() => !!chartInstances.icingTemp) && reqs() === tReqs + 1, { n: reqs(), was: tReqs });
+ok('the ⓘ note ends with the temperature sentence', (await I(() => document.getElementById('icingInfo').textContent.replace(/\s+/g, ' '))).includes('Temperature: at 2 m above the ground, the average of the two models.'));
+opts.icingSfc = null;
+await page.click('#btnRefresh'); await page.waitForTimeout(3000);
+
 // ---- Ukrainian
 await page.selectOption('#langSelect', 'uk'); await page.waitForTimeout(600);
 r = await row();
 ok('Ukrainian row', /Обледеніння.*Можливе обледеніння на 400 м \(−4,0 °C, вологість 96 %\) · 2 з 2 моделей/.test(r) && /шар ~380–590 м/.test(r), r);
+const tline = () => I(() => document.getElementById('icingTemp').innerText.replace(/\s+/g, ' ').trim());
 const tr = () => I(() => { selectHour(2); const l = document.querySelector('#flightDetail [data-icing-details]'); return { info: document.getElementById('icingInfo').textContent.replace(/\s+/g, ' '), link: l ? l.textContent.trim() : '', title: document.getElementById('btnIcingInfo').getAttribute('aria-label') }; });
 let tx = await tr();
 ok('Ukrainian: the icing note, its ⓘ and "Icing details"', /це перевірка на можливу небезпеку обледеніння, а не прогноз обледеніння і не оцінка безпеки\. «Ознак немає» не означає «безпечно»/.test(tx.info) && tx.link === 'Деталі обледеніння' && tx.title === 'Про індикатор обледеніння', tx);
+ok('Ukrainian: the temperature line and the note', /^Температура 2 м: −3,0 °C зараз · мін −3,0 °C \S+ \d\d:00 · макс −2,0 °C \S+ \d\d:00$/.test(await tline()) && /Температура: на висоті 2 м над землею, середнє двох моделей\./.test(tx.info), { line: await tline(), info: tx.info });
 await page.selectOption('#langSelect', 'pt-BR'); await page.waitForTimeout(600);
 tx = await tr();
+ok('Portuguese: the temperature line', /^Temperatura a 2 m: −3,0 °C agora · mín −3,0 °C .* · máx −2,0 °C /.test(await tline()), await tline());
 ok('Portuguese: the icing note, its ⓘ and "Icing details"', /não uma previsão de gelo nem uma avaliação de segurança\. “Sem sinais” não significa seguro/.test(tx.info) && tx.link === 'Detalhes do gelo' && tx.title === 'Sobre o indicador de gelo', tx);
 await I(() => selectHour(0));
 await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(400);
