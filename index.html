@@ -418,17 +418,24 @@
                             <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
                             <div id="icingProfileMark" class="absolute pointer-events-none" style="top: 0; bottom: 0; box-shadow: inset 0 0 0 1.5px #f8fafc"></div>
                         </div>
-                        <!-- Temperature chart: same width as the hour bar (hour i is the i-th of n cells) -->
-                        <div id="icingTempBox" class="hidden relative rounded-md bg-slate-950" data-chart-key="icingTemp">
-                            <canvas id="chart-icingTemp" role="img"></canvas>
-                            <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
-                        </div>
                         <div>
                             <div data-daynight class="h-1.5 rounded-full"></div>
                             <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
                         </div>
                         <div id="icingCell" class="text-[11px] text-slate-400 min-h-[1rem]"></div>
                         <div id="icingHour" class="text-[11px] text-slate-400 rounded-lg bg-slate-950/60 border border-slate-800/80 px-3 py-2"></div>
+                        <!-- Temperature chart: its own block, same width as the hour bar (hour i is the i-th of n cells), its own band and axis -->
+                        <div id="icingTempBlock" class="hidden" style="margin-top: 20px; padding-top: 12px; border-top: 1px solid rgba(30, 41, 59, 0.8)">
+                            <div class="mb-2 text-[11px] font-medium text-slate-300"><i class="fa-solid fa-temperature-half mr-1 text-amber-300"></i><span id="icingTempHeading"></span></div>
+                            <div id="icingTempBox" class="relative rounded-md bg-slate-950" data-chart-key="icingTemp">
+                                <canvas id="chart-icingTemp" role="img"></canvas>
+                                <div data-day-seps class="absolute inset-0 pointer-events-none"></div>
+                            </div>
+                            <div class="mt-2">
+                                <div data-daynight class="h-1.5 rounded-full"></div>
+                                <div data-flight-axis class="relative h-5 mt-1 text-[10px] text-slate-500 font-mono"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -2643,11 +2650,13 @@
             });
             el.classList.toggle('hidden', lo < 0);
             if (lo < 0) { el.innerHTML = ''; return; }
-            const parts = [];
-            if (temps[0] !== null) parts.push(t('icingTempNow', { v: fmtTemp(temps[0]) }));
-            parts.push(t('icingTempMin', { v: fmtTemp(temps[lo]), at: formatDayHour(hours[lo].time) }));
-            parts.push(t('icingTempMax', { v: fmtTemp(temps[hi]), at: formatDayHour(hours[hi].time) }));
-            el.innerHTML = `<i class="fa-solid fa-temperature-half mr-1 text-amber-300"></i>${escapeHtml(t('icingTempTitle'))}: ${escapeHtml(parts.join(' · '))}`;
+            // Each item is one nowrap group (icon, value, hour; the "·" stays with it), so a wrap never parts an icon from its value.
+            const items = [];
+            if (temps[0] !== null) items.push({ icon: '', text: t('icingTempNow', { v: fmtTemp(temps[0]) }) });
+            items.push({ icon: 'fa-temperature-arrow-down text-sky-300', text: t('icingTempMin', { v: fmtTemp(temps[lo]), at: formatDayHour(hours[lo].time) }) });
+            items.push({ icon: 'fa-temperature-arrow-up text-orange-300', text: t('icingTempMax', { v: fmtTemp(temps[hi]), at: formatDayHour(hours[hi].time) }) });
+            const groups = items.map((it, k) => `<span data-icing-temp-item style="white-space: nowrap">${it.icon ? `<i class="fa-solid ${it.icon} mr-1"></i>` : ''}${escapeHtml(it.text)}${k < items.length - 1 ? ' ·' : ''}</span>`);
+            el.innerHTML = `<i class="fa-solid fa-temperature-half mr-1 text-amber-300"></i>${escapeHtml(t('icingTempTitle'))}: ${groups.join(' ')}`;
         }
 
         // Dashed line at 0 °C, drawn when the chart's range includes it.
@@ -2671,6 +2680,40 @@
             }
         };
 
+        // The y labels, drawn inside the plot with an inset and a dark backdrop
+        // (like the profile's row labels), kept inside the plot's top and bottom;
+        // the 0 label sits just above the dashed line, never on it. The boxes
+        // (canvas pixels) are kept in chart.$yLabels.
+        const icingYLabelsPlugin = {
+            id: 'icingYLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx, chartArea: a, scales: { y } } = chart;
+                const H = 14, PAD = 4, INSET = 4, boxes = [];
+                ctx.save();
+                ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+                ctx.textBaseline = 'middle';
+                y.ticks.forEach(tk => {
+                    const v = tk.value;
+                    if (v < y.min || v > y.max) return;
+                    const text = `${v}°`, w = Math.ceil(ctx.measureText(text).width) + 2 * PAD, py = y.getPixelForValue(v);
+                    let top = py - H / 2;
+                    if (v === 0) top = py - 2 - H >= a.top ? py - 2 - H : py + 2;
+                    top = Math.max(a.top + 1, Math.min(a.bottom - H - 1, top));
+                    if (v === 0 && top < py + 1 && top + H > py - 1) return;
+                    if (boxes.some(b => top < b.y + b.h && top + H > b.y)) return;
+                    boxes.push({ v, x: a.left + INSET, y: top, w, h: H });
+                });
+                boxes.forEach(b => {
+                    ctx.fillStyle = 'rgba(2, 6, 23, 0.75)';
+                    ctx.fillRect(b.x, b.y, b.w, b.h);
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillText(`${b.v}°`, b.x + PAD, b.y + b.h / 2 + 0.5);
+                });
+                ctx.restore();
+                chart.$yLabels = boxes;
+            }
+        };
+
         function destroyIcingTempChart() {
             const c = chartInstances.icingTemp;
             if (!c) return;
@@ -2679,13 +2722,14 @@
         }
 
         // The temperature chart of the open section: the x axis has no labels (the
-        // section's own axis is under the profile) and `offset` gives each hour
-        // a cell of 1/n of the width, like the hour bar; the y labels sit inside
-        // the plot, so the plot spans the box's whole width.
+        // block has its own axis under the chart) and `offset` gives each hour
+        // a cell of 1/n of the width, like the hour bar; the y labels are drawn inside
+        // the plot (see icingYLabelsPlugin), so the plot spans the box's whole width.
         function renderIcingTempChart(temps, hours) {
             const box = document.getElementById('icingTempBox');
             const show = state.icingOpen && typeof Chart !== 'undefined';
-            box.classList.toggle('hidden', !show);
+            document.getElementById('icingTempBlock').classList.toggle('hidden', !show);
+            document.getElementById('icingTempHeading').textContent = t('icingTempTitle');
             if (!show) return;
             const times = hours.map(h => h.time);
             const canvas = document.getElementById('chart-icingTemp');
@@ -2702,7 +2746,7 @@
                 chart = new Chart(canvas.getContext('2d'), {
                     type: 'line',
                     data: { labels: times.map(formatHour), datasets: [{ data: temps, borderColor: '#fbbf24', borderWidth: 2, pointRadius: 0, pointHoverRadius: 0, tension: 0.25, spanGaps: false }] },
-                    plugins: [selectedHourPlugin, icingZeroPlugin],
+                    plugins: [selectedHourPlugin, icingZeroPlugin, icingYLabelsPlugin],
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
@@ -2717,7 +2761,7 @@
                                 grace: '10%',
                                 grid: { color: 'rgba(255, 255, 255, 0.06)', drawTicks: false },
                                 border: { display: false },
-                                ticks: { mirror: true, padding: 0, maxTicksLimit: 5, color: '#94a3b8', font: { size: 10 }, callback: v => `${v}°` }
+                                ticks: { display: false, maxTicksLimit: 5 }
                             }
                         }
                     }
