@@ -289,6 +289,25 @@ const geo = () => I(() => {
 });
 let g = await geo();
 ok('chart in the open section: ~110 px high, its first and last hour within 2 px of the hour bar\'s cells, as wide as the bar', g.present && g.n === g.hours && Math.abs(g.left) <= 2 && Math.abs(g.right) <= 2 && Math.abs(g.boxL) <= 1 && Math.abs(g.boxW) <= 1, g);
+// Its own block under the selected hour's details, with its own band and axis; the summary line's icons; the y labels.
+const blk = await I(() => {
+    const b = document.getElementById('icingTempBlock'), h = document.getElementById('icingHour'), prof = document.getElementById('icingProfile');
+    const after = el => !!(h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return { after: after(b), profBefore: !!(prof.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING), box: b.contains(document.getElementById('icingTempBox')), band: !!b.querySelector('[data-daynight]'), axisTicks: b.querySelectorAll('[data-flight-axis] > *').length, bandBg: !!b.querySelector('[data-daynight]').style.background, gap: Math.round(b.getBoundingClientRect().top - h.getBoundingClientRect().bottom), heading: b.querySelector('#icingTempHeading').textContent };
+});
+ok('chart block: after the selected hour\'s details, with its heading, its own day / night band and axis, space above', blk.after && blk.profBefore && blk.box && blk.band && blk.bandBg && blk.axisTicks > 0 && blk.gap >= 16 && blk.heading === 'Temperature 2 m', blk);
+const profBand = await I(() => {
+    const p = document.getElementById('icingProfile').parentElement, band = p.nextElementSibling, h = document.getElementById('icingHour');
+    const bd = band && band.querySelector('[data-daynight]'), ax = band && band.querySelector('[data-flight-axis]');
+    return { band: !!bd && !!bd.style.background, axis: !!ax, labels: ax ? ax.children.length : 0, before: !!band && !!(band.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING), pairs: document.querySelectorAll('#icingBody [data-daynight]').length };
+});
+ok('profile: followed by its own day / night band and axis (with hour labels) before the selected hour\'s details; the temperature block has a second pair', profBand.band && profBand.axis && profBand.labels > 0 && profBand.before && profBand.pairs === 2, profBand);
+const icons = await I(() => { const g = [...document.querySelectorAll('#icingTemp [data-icing-temp-item]')]; const f = (cls, word) => { const i = document.querySelector('#icingTemp .' + cls); const grp = i && i.closest('[data-icing-temp-item]'); return !!grp && g.includes(grp) && grp.style.whiteSpace === 'nowrap' && grp.textContent.includes(word) && /°C/.test(grp.textContent); }; return { n: g.length, min: f('fa-temperature-arrow-down', 'min'), max: f('fa-temperature-arrow-up', 'max') }; });
+ok('summary line: the min and max icons, each in the same nowrap group as its value', icons.n === 3 && icons.min && icons.max, icons);
+await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(600);
+const yl = await I(() => { const c = chartInstances.icingTemp, bx = c.$yLabels || [], z = bx.find(b => b.v === 0), zy = c.scales.y.getPixelForValue(0), a = c.chartArea; return { n: bx.length, minLeft: Math.min(...bx.map(b => b.x)), top: Math.min(...bx.map(b => b.y)) - a.top, bottom: a.bottom - Math.max(...bx.map(b => b.y + b.h)), zero: !!z, clear: z ? (z.y + z.h <= zy - 1 || z.y >= zy + 1) : null, left: document.getElementById('chart-icingTemp').getBoundingClientRect().left - document.getElementById('flightStrip').getBoundingClientRect().left, w: Math.round(document.getElementById('chart-icingTemp').getBoundingClientRect().width), tw: Math.round(document.getElementById('flightStrip').getBoundingClientRect().width) }; });
+ok('390 px: no y label touches the chart\'s left edge (>= 2 px), none is clipped, the "0°" label is off the 0 °C line, still as wide as the hour bar', yl.n >= 2 && yl.minLeft >= 2 && yl.top >= 0 && yl.bottom >= 0 && yl.zero && yl.clear === true && Math.abs(yl.left) <= 1 && yl.w === yl.tw, yl);
+await page.setViewportSize({ width: 1280, height: 900 }); await page.waitForTimeout(600);
 ok('chart: the 0 °C line is drawn when the range crosses 0', g.zero === true && await I(() => Math.min(...chartInstances.icingTemp.data.datasets[0].data) < 0), g);
 const tsel = () => I(() => ({ chart: chartInstances.icingTemp.$hour, sel: icingSelIndex(processed.flight.hours), details: document.getElementById('icingHour').innerText }));
 await page.locator('#icingStrip [data-icing-hour="5"]').click(); await page.waitForTimeout(300);
@@ -297,6 +316,7 @@ ok('marker follows a tap on the strip, and the details show that hour\'s tempera
 await page.locator('#icingProfile [data-icing-cell][data-icing-hour="9"]').first().click(); await page.waitForTimeout(300);
 sv = await tsel();
 ok('marker follows a tap on the profile', sv.chart === 9 && sv.sel === 9 && sv.details.includes('2 m temperature ' + tfmt(mean(9))), sv);
+await I(() => document.getElementById('icingTempBox').scrollIntoView({ block: 'center' })); await page.waitForTimeout(200);
 const cpos = await I(i => { const c = chartInstances.icingTemp, r = document.getElementById('chart-icingTemp').getBoundingClientRect(); return { x: r.left + c.scales.x.getPixelForValue(i), y: r.top + r.height / 2 }; }, 14);
 await page.mouse.click(cpos.x, cpos.y); await page.waitForTimeout(300);
 sv = await tsel();
