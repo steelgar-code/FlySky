@@ -27,7 +27,7 @@ const shown = (page, key) => page.evaluate(k => { const c = chartInstances[k]; r
 // What hour i must read for a chart (from the processed statistics).
 const want = (page, key, i) => page.evaluate(([k, i]) => {
   const p = PARAMS.find(x => x.key === k), s = processed.params[k].stats, f = v => formatValue(v, p);
-  return { hour: formatDayHour(processed.times[i]), med: f(s.median[i]), r50: `${f(s.p25[i])}–${f(s.p75[i])}`, r80: `${f(s.p10[i])}–${f(s.p90[i])}`, full: `${f(s.min[i])}–${f(s.max[i])}`, chance: s.chance && s.chance[i] !== null ? formatPercent(s.chance[i]) : null, count: String(s.count[i]) };
+  return { hour: formatDateHour(processed.times[i]), med: f(s.median[i]), r50: `${f(s.p25[i])}–${f(s.p75[i])}`, r80: `${f(s.p10[i])}–${f(s.p90[i])}`, full: `${f(s.min[i])}–${f(s.max[i])}`, chance: s.chance && s.chance[i] !== null ? formatPercent(s.chance[i]) : null, count: String(s.count[i]) };
 }, [key, i]);
 const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.med}`) && text.includes(`50% ${w.r50}`) && text.includes(`80% ${w.r80}`) && text.includes(`Range ${w.full}`) && text.includes(`Members ${w.count}`);
 
@@ -50,7 +50,7 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   // The hour stays when the pointer leaves, with its points.
   await page.mouse.move(5, 5); await page.waitForTimeout(400);
   s = await shown(page, W);
-  ok('the pointer leaves: hour 5 stays (values, highlighted points)', s.hour === 5 && /^\S+ \d\d:\d\d/.test(s.text) && fits(s.text, await want(page, W, 5)) && s.active.length > 0 && s.active.every(i => i === 5), s);
+  ok('the pointer leaves: hour 5 stays (values, highlighted points)', s.hour === 5 && /^\S+, \S+ \d+, \d\d:\d\d/.test(s.text) && fits(s.text, await want(page, W, 5)) && s.active.length > 0 && s.active.every(i => i === 5), s);
   ok('other charts keep the card\'s hour', (await shown(page, 'wind_gusts_10m')).hour === 0);
   // Fixed height between hours.
   const heights = [];
@@ -68,7 +68,7 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   // The card's hour moves the charts.
   await page.locator('#flightStrip').scrollIntoViewIfNeeded();
   await page.click('#flightStrip [data-flight-hour="7"]'); await page.waitForTimeout(400);
-  const all = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => [p.key, chartInstances[p.key].$hour, document.getElementById(`chartValues-${p.key}`).innerText.startsWith(formatDayHour(processed.times[7]))]));
+  const all = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => [p.key, chartInstances[p.key].$hour, document.getElementById(`chartValues-${p.key}`).innerText.startsWith(formatDateHour(processed.times[7]))]));
   ok('pin hour 7 on the flight bar: every chart shows hour 7', all.every(([k, h, t]) => h === 7 && t), all);
   // A chart can be moved off it; unpinning follows the card again.
   p5 = await at(page, W, 12); await page.mouse.move(p5.x, p5.y, { steps: 3 }); await page.waitForTimeout(250);
@@ -104,7 +104,7 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
       units: items.map(el => el.textContent),
       gap: Math.round(document.getElementById(`chartLegend-${k}`).getBoundingClientRect().top - document.getElementById(`chartValues-${k}`).getBoundingClientRect().bottom),
       rowGap: parseFloat(getComputedStyle(document.getElementById(`chartLegend-${k}`)).rowGap),
-      values: document.getElementById(`chartValues-${k}`).innerText.replace(/\s+/g, ' ').trim(), want: formatDayHour(processed.times[i]) };
+      values: document.getElementById(`chartValues-${k}`).innerText.replace(/\s+/g, ' ').trim(), want: formatDateHour(processed.times[i]) };
   }, W);
   ok('Models mode, per model: a value after each model\'s name in the legend, the hour above', leg.i === 9 && !leg.hidden && leg.n === leg.models && leg.n >= 2 && leg.ok && leg.values === leg.want && leg.min && /\d/.test(leg.names[0]), leg);
   ok('per model: no range values', !/Median|range/i.test(leg.values));
@@ -122,6 +122,7 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const W = 'wind_speed_10m';
   const heights = [];
+  const hourLabels = () => page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => { const e = document.getElementById(`chartValues-${p.key}`), h = e.firstElementChild; return { key: p.key, text: h.innerText, lines: h.getClientRects().length, h: Math.round(h.getBoundingClientRect().height), fit: h.scrollWidth <= e.clientWidth + 1, want: formatDateHour(processed.times[chartSelected(p.key)]) }; }));
   const p = await at(page, W, 5);
   await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(400);
   let s = await shown(page, W);
@@ -129,6 +130,8 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   ok('tap on hour 5 (touch): its values match the statistics', s.hour === 5 && fits(s.text, await want(page, W, 5)), { s, w: await want(page, W, 5) });
   for (const i of [0, 10, 40]) { const q = await at(page, W, i); await page.touchscreen.tap(q.x, q.y); await page.waitForTimeout(300); const t = await shown(page, W); heights.push(t.h); if (i === 10) ok('tap on hour 10', t.hour === 10 && fits(t.text, await want(page, W, 10)), t); }
   ok('phone: the values line has the same height at hours 5, 0, 10, 40 (the hour and two lines reserved)', new Set(heights).size === 1 && heights[0] === 52, heights);
+  const enL = await hourLabels();
+  ok('phone, English: the hour label has the weekday, date (day number and month) and time, on one 16 px line', enL.length > 3 && enL.every(l => /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, \d\d:\d\d$/.test(l.text) && l.text === l.want && l.lines === 1 && l.h === 16 && l.fit), enL[0]);
   const fit = await page.evaluate(() => PARAMS.map(p => { const e = document.getElementById(`chartValues-${p.key}`); return [p.key, e.scrollHeight <= e.clientHeight + 1]; }).filter(([, f]) => !f));
   ok('phone: the text of every chart fits in the reserved lines', fit.length === 0, fit);
   const pq = await at(page, 'precipitation', 30); await page.touchscreen.tap(pq.x, pq.y); await page.waitForTimeout(300);
@@ -137,6 +140,11 @@ const fits = (text, w) => text.startsWith(w.hour) && text.includes(`Median ${w.m
   const pu = await at(page, 'precipitation', 30); await page.touchscreen.tap(pu.x, pu.y); await page.waitForTimeout(300);
   const ukFit = await page.evaluate(() => PARAMS.filter(p => processed.params[p.key].members.length).map(p => { const e = document.getElementById(`chartValues-${p.key}`); return [p.key, e.scrollHeight, e.clientHeight, e.innerText]; }).filter(r => !r[1] || r[1] > r[2] + 1));
   ok('phone, Ukrainian: every values line fits in the reserved lines (three of values for precipitation)', ukFit.length === 0, ukFit);
+  const ukL = await hourLabels();
+  ok('phone, Ukrainian: the hour label is the Intl form with the date, on one 16 px line in every chart', ukL.length > 3 && ukL.every(l => l.text === l.want && /\d/.test(l.text) && l.lines === 1 && l.h === 16 && l.fit), ukL[0]);
+  await page.selectOption('#langSelect', 'pt-BR'); await page.waitForTimeout(700);
+  const ptL = await hourLabels();
+  ok('phone, Portuguese: the hour label with the date fits on one 16 px line in every chart', ptL.length > 3 && ptL.every(l => l.text === l.want && l.lines === 1 && l.h === 16 && l.fit), ptL[0]);
   await page.selectOption('#langSelect', 'en'); await page.waitForTimeout(500);
   // Models mode: the range view keeps two lines, per model (hour only) is one line.
   await page.evaluate(() => document.querySelector('[data-mode="deterministic"]').click()); await page.waitForTimeout(3500);

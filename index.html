@@ -2572,7 +2572,7 @@
             const hr = icingHour(time);
             const P = state.flightProfile;
             const far = icingLead(time) > ICING_FAR_H ? ` <span class="font-normal text-slate-500">· ${escapeHtml(t('icingFar'))}</span>` : '';
-            const head = `<div class="text-slate-200"><span class="font-semibold">${escapeHtml(formatDayHour(time))}</span> <span class="font-semibold" style="color: ${hr ? icingInk(hr.state) : '#94a3b8'}">· ${escapeHtml(hr ? icingSummary(hr) : icingStatusText())}</span>${far}</div>
+            const head = `<div class="text-slate-200"><span class="font-semibold">${escapeHtml(formatDateHour(time))}</span> <span class="font-semibold" style="color: ${hr ? icingInk(hr.state) : '#94a3b8'}">· ${escapeHtml(hr ? icingSummary(hr) : icingStatusText())}</span>${far}</div>
                 <div class="text-slate-500">${escapeHtml(t('icingFlightDesc', { dur: durationLabel(P.durationMin), h: P.heightM, c: P.climbMs.toLocaleString(currentLang), d: P.descentMs.toLocaleString(currentLang) }))}</div>`;
             const temp = icingTempAt(time);
             const tempLine = temp === null ? '' : `<div class="text-slate-300" data-icing-temp-hour>${escapeHtml(t('icingTempHour', { v: fmtTemp(temp) }))}</div>`;
@@ -3148,6 +3148,11 @@
 
         function formatDayHour(str) {
             return formatTime(str, { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+        }
+
+        // The selected hour of a graph block, with its date: "Sat, Nov 21, 15:00".
+        function formatDateHour(str) {
+            return formatTime(str, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
         }
 
         // Linear-interpolated quantile of an already sorted array.
@@ -5622,7 +5627,7 @@
             const time = processed ? processed.times[idx] : null;
             if (!data || !data.members.length || !time) { el.innerHTML = ''; return; }
             const f = v => formatValue(v, param);
-            const head = `<div class="font-semibold text-slate-100 whitespace-nowrap">${escapeHtml(formatDayHour(time))}</div>`;
+            const head = `<div class="font-semibold text-slate-100 whitespace-nowrap">${escapeHtml(formatDateHour(time))}</div>`;
             if (perModelView()) {
                 // The values are in the legend, after each model's name.
                 el.innerHTML = head;
